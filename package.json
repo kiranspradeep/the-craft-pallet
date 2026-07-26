@@ -1,0 +1,15 @@
+{
+  "name": "the-craft-pallet",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "client",
+    "admin",
+    "server"
+  ],
+  "scripts": {
+    "client": "npm run dev --workspace=client",
+    "admin": "npm run dev --workspace=admin",
+    "server": "npm run dev --workspace=server"
+  }
+}
