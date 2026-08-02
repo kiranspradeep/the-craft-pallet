@@ -91,26 +91,28 @@ export const cartRepository = {
     });
   },
 
-  createItem: async (data: {
-    cartId: string;
-    productId: string;
-    variantId?: string;
-    quantity: number;
-    unitPrice: Prisma.Decimal | number;
-    notes?: string;
-  }): Promise<CartItemWithRelations> => {
-    return prisma.cartItem.create({
-      data: {
-        cartId: data.cartId,
-        productId: data.productId,
-        variantId: data.variantId ?? null,
-        quantity: data.quantity,
-        unitPrice: data.unitPrice,
-        notes: data.notes ?? null,
-      },
-      include: itemInclude,
-    });
-  },
+ createItem: async (data: {
+  cartId: string;
+  productId: string;
+  variantId?: string;
+  quantity: number;
+  unitPrice: Prisma.Decimal | number;
+  selectedTierQuantity?: number;
+  notes?: string;
+}): Promise<CartItemWithRelations> => {
+  return prisma.cartItem.create({
+    data: {
+      cartId: data.cartId,
+      productId: data.productId,
+      variantId: data.variantId ?? null,
+      quantity: data.quantity,
+      unitPrice: data.unitPrice,
+      selectedTierQuantity: data.selectedTierQuantity ?? null,
+      notes: data.notes ?? null,
+    },
+    include: itemInclude,
+  });
+},
 
   updateItem: async (
     itemId: string,

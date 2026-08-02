@@ -1,4 +1,9 @@
-import { PrismaClient, AssetSourceType, PricingStrategy, CustomFieldType, ProductImageType } from "@prisma/client";
+import {
+  PrismaClient,
+  AssetSourceType,
+  PricingStrategy,
+  CustomFieldType,
+} from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
 const prisma = new PrismaClient();
@@ -6,36 +11,35 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Seeding products...");
 
-  // ── Business Settings ──────────────────────────────────────────────────
-  await prisma.businessSetting.upsert({
-    where: { id: "default" },
-    create: {
-      id: "default",
-      businessName: "The Craft Pallet",
-      tagline: "Personalised Gifts & Printing",
-      currency: "INR",
-    },
-    update: {
-      businessName: "The Craft Pallet",
-      tagline: "Personalised Gifts & Printing",
-    },
-  });
+  // ── Business Settings (singleton) ──────────────────────────────────────
+  const existingBusiness = await prisma.businessSetting.findFirst();
+  if (!existingBusiness) {
+    await prisma.businessSetting.create({
+      data: {
+        businessName: "The Craft Pallet",
+        tagline: "Personalised Gifts & Printing",
+        currency: "INR",
+      },
+    });
+    console.log("✅ Business settings created");
+  } else {
+    console.log("↩️  Business settings already exist");
+  }
 
-  // ── Shipping Settings ──────────────────────────────────────────────────
-  await prisma.shippingSetting.upsert({
-    where: { id: "default" },
-    create: {
-      id: "default",
-      freeShippingThreshold: new Decimal(999),
-      defaultShippingCharge: new Decimal(60),
-      defaultProcessingDays: 10,
-    },
-    update: {
-      freeShippingThreshold: new Decimal(999),
-      defaultShippingCharge: new Decimal(60),
-      defaultProcessingDays: 10,
-    },
-  });
+  // ── Shipping Settings (singleton) ──────────────────────────────────────
+  const existingShipping = await prisma.shippingSetting.findFirst();
+  if (!existingShipping) {
+    await prisma.shippingSetting.create({
+      data: {
+        freeShippingThreshold: new Decimal(999),
+        defaultShippingCharge: new Decimal(60),
+        defaultProcessingDays: 10,
+      },
+    });
+    console.log("✅ Shipping settings created");
+  } else {
+    console.log("↩️  Shipping settings already exist");
+  }
 
   // ── Categories ─────────────────────────────────────────────────────────
   const polaroidsCategory = await prisma.category.upsert({
@@ -56,8 +60,7 @@ async function main() {
     create: {
       name: "Personalised Gifts",
       slug: "personalised-gifts",
-      description:
-        "Unique personalised gifts for every occasion.",
+      description: "Unique personalised gifts for every occasion.",
       isActive: true,
       sortOrder: 1,
     },
@@ -76,7 +79,6 @@ async function main() {
 
   // ────────────────────────────────────────────────────────────────────────
   // PRODUCT 1: Mini Polaroids (36 set)
-  // Strategy: INCREMENTAL_QUANTITY — every 36 = ₹99
   // ────────────────────────────────────────────────────────────────────────
   const miniPolaroids36 = await prisma.product.upsert({
     where: { slug: "mini-polaroids-36" },
@@ -94,7 +96,8 @@ async function main() {
       metaTitle: "Mini Polaroids Set of 36 | The Craft Pallet",
       metaDescription:
         "Order personalised mini polaroid prints. 36 photos for ₹99. Perfect for room decoration, scrapbooks and gifting.",
-      metaKeywords: "mini polaroids, photo prints, personalised polaroids, room decor",
+      metaKeywords:
+        "mini polaroids, photo prints, personalised polaroids, room decor",
     },
     update: { isActive: true, isFeatured: true },
   });
@@ -132,7 +135,8 @@ async function main() {
       estimatedProductionDays: 10,
       extraRules: {
         note: "Please upload clear, high-quality images for the best print result.",
-        warning: "Make sure photos are selected correctly before placing the order.",
+        warning:
+          "Make sure photos are selected correctly before placing the order.",
       },
     },
     update: {
@@ -143,7 +147,6 @@ async function main() {
     },
   });
 
-  // Custom field — Photo Upload
   const existingMiniField = await prisma.customField.findFirst({
     where: { productId: miniPolaroids36.id, name: "photos" },
   });
@@ -166,7 +169,6 @@ async function main() {
 
   // ────────────────────────────────────────────────────────────────────────
   // PRODUCT 2: Mini Polaroids (30 set)
-  // Strategy: INCREMENTAL_QUANTITY — every 30 = ₹99
   // ────────────────────────────────────────────────────────────────────────
   const miniPolaroids30 = await prisma.product.upsert({
     where: { slug: "mini-polaroids-30" },
@@ -222,8 +224,10 @@ async function main() {
       estimatedProductionDays: 10,
       extraRules: {
         note: "Upload clear, high-quality photos for the best printing result.",
-        warning: "Customised orders cannot be changed after printing begins.",
-        colourNote: "Colour may slightly vary due to screen and printing differences.",
+        warning:
+          "Customised orders cannot be changed after printing begins.",
+        colourNote:
+          "Colour may slightly vary due to screen and printing differences.",
       },
     },
     update: {
@@ -244,8 +248,7 @@ async function main() {
         name: "photos",
         label: "Your Photos",
         type: CustomFieldType.PHOTO_UPLOAD,
-        helpText:
-          "Upload exactly 30 clear, high-quality photos.",
+        helpText: "Upload exactly 30 clear, high-quality photos.",
         isRequired: true,
         sortOrder: 0,
       },
@@ -255,11 +258,7 @@ async function main() {
   console.log("✅ Mini Polaroids 30 seeded");
 
   // ────────────────────────────────────────────────────────────────────────
-  // PRODUCT 3: Medium Polaroids
-  // Strategy: TIERED_PRICING
-  // Base: ₹9 per polaroid
-  // Tiers: 18 = ₹149, 36 = ₹259
-  // Variants: 7×10 cm size
+  // PRODUCT 3: Medium Polaroids (Tiered Pricing)
   // ────────────────────────────────────────────────────────────────────────
   const mediumPolaroids = await prisma.product.upsert({
     where: { slug: "medium-polaroids" },
@@ -277,12 +276,12 @@ async function main() {
       metaTitle: "Medium Polaroids | The Craft Pallet",
       metaDescription:
         "Order personalised medium polaroid prints (7×10cm). ₹9 per print or special offer sets. Premium quality.",
-      metaKeywords: "medium polaroids, photo prints, personalised polaroids, 7x10",
+      metaKeywords:
+        "medium polaroids, photo prints, personalised polaroids, 7x10",
     },
     update: { isActive: true, isFeatured: true },
   });
 
-  // Variant: size
   const existingMedVariant = await prisma.productVariant.findFirst({
     where: { productId: mediumPolaroids.id, name: "7 × 10 cm" },
   });
@@ -291,7 +290,7 @@ async function main() {
       data: {
         productId: mediumPolaroids.id,
         name: "7 × 10 cm",
-        price: new Decimal(9), // base per-print price shown on variant
+        price: new Decimal(9),
         isActive: true,
         sortOrder: 0,
       },
@@ -311,7 +310,6 @@ async function main() {
     },
   });
 
-  // Seed tiers — check before creating
   const tier18Exists = await prisma.pricingTier.findFirst({
     where: { pricingConfigId: medPricingConfig.id, quantity: 18 },
   });
@@ -360,8 +358,10 @@ async function main() {
       estimatedProductionDays: 10,
       extraRules: {
         note: "Upload clear, high-quality photos for the best printing result.",
-        warning: "Customised orders cannot be changed after printing begins.",
-        bulkNote: "Need more prints? Contact us for custom quantities and bulk pricing.",
+        warning:
+          "Customised orders cannot be changed after printing begins.",
+        bulkNote:
+          "Need more prints? Contact us for custom quantities and bulk pricing.",
       },
     },
     update: {
@@ -393,7 +393,6 @@ async function main() {
 
   // ────────────────────────────────────────────────────────────────────────
   // PRODUCT 4: Sticker Polaroids
-  // Strategy: FIXED_VARIANTS — each size+quantity combo is a variant
   // ────────────────────────────────────────────────────────────────────────
   const stickerPolaroids = await prisma.product.upsert({
     where: { slug: "sticker-polaroids" },
@@ -411,7 +410,8 @@ async function main() {
       metaTitle: "Sticker Polaroids | The Craft Pallet",
       metaDescription:
         "Personalised sticker polaroids in 3 sizes. Perfect for laptops, journals, phone cases and scrapbooks.",
-      metaKeywords: "sticker polaroids, photo stickers, personalised stickers, polaroid stickers",
+      metaKeywords:
+        "sticker polaroids, photo stickers, personalised stickers, polaroid stickers",
     },
     update: { isActive: true, isFeatured: true },
   });
@@ -425,19 +425,15 @@ async function main() {
     update: { strategy: PricingStrategy.FIXED_VARIANTS },
   });
 
-  // Create variants — size + quantity combos
   const stickerVariants = [
-    // 5 × 7 cm
     { name: "5×7cm — 18 Stickers", sku: "STICKER-5X7-18", price: 108, sortOrder: 0 },
     { name: "5×7cm — 36 Stickers", sku: "STICKER-5X7-36", price: 216, sortOrder: 1 },
     { name: "5×7cm — 54 Stickers", sku: "STICKER-5X7-54", price: 324, sortOrder: 2 },
     { name: "5×7cm — 72 Stickers", sku: "STICKER-5X7-72", price: 432, sortOrder: 3 },
-    // 6 × 7 cm
     { name: "6×7cm — 15 Stickers", sku: "STICKER-6X7-15", price: 90, sortOrder: 4 },
     { name: "6×7cm — 30 Stickers", sku: "STICKER-6X7-30", price: 180, sortOrder: 5 },
     { name: "6×7cm — 45 Stickers", sku: "STICKER-6X7-45", price: 270, sortOrder: 6 },
     { name: "6×7cm — 60 Stickers", sku: "STICKER-6X7-60", price: 360, sortOrder: 7 },
-    // 7 × 10 cm
     { name: "7×10cm — 18 Stickers", sku: "STICKER-7X10-18", price: 162, sortOrder: 8 },
     { name: "7×10cm — 36 Stickers", sku: "STICKER-7X10-36", price: 324, sortOrder: 9 },
     { name: "7×10cm — 54 Stickers", sku: "STICKER-7X10-54", price: 486, sortOrder: 10 },
@@ -478,7 +474,8 @@ async function main() {
       estimatedProductionDays: 10,
       extraRules: {
         note: "Upload photos matching your selected variant quantity.",
-        bulkNote: "Need a different quantity? Contact us for custom and bulk orders.",
+        bulkNote:
+          "Need a different quantity? Contact us for custom and bulk orders.",
       },
     },
     update: {
@@ -498,8 +495,7 @@ async function main() {
         name: "photos",
         label: "Your Photos",
         type: CustomFieldType.PHOTO_UPLOAD,
-        helpText:
-          "Upload photos matching your selected variant quantity.",
+        helpText: "Upload photos matching your selected variant quantity.",
         isRequired: true,
         sortOrder: 0,
       },
@@ -510,7 +506,6 @@ async function main() {
 
   // ────────────────────────────────────────────────────────────────────────
   // PRODUCT 5: Wall Posters
-  // Strategy: INCREMENTAL_QUANTITY — every 9 = ₹99
   // ────────────────────────────────────────────────────────────────────────
   const wallPosters = await prisma.product.upsert({
     where: { slug: "wall-posters" },
@@ -528,7 +523,8 @@ async function main() {
       metaTitle: "Wall Posters | The Craft Pallet",
       metaDescription:
         "Order personalised wall posters (10×15cm). 9 posters for ₹99. Custom and bulk orders available.",
-      metaKeywords: "wall posters, personalised posters, photo wall, room decor",
+      metaKeywords:
+        "wall posters, personalised posters, photo wall, room decor",
     },
     update: { isActive: true },
   });
@@ -597,8 +593,6 @@ async function main() {
 
   // ────────────────────────────────────────────────────────────────────────
   // PRODUCT 6: Customised Imported Wallet
-  // Strategy: PER_UNIT — ₹449 flat
-  // Custom fields: Color (SELECT), Charm Number (SELECT 1-50), Name (TEXT)
   // ────────────────────────────────────────────────────────────────────────
   const wallet = await prisma.product.upsert({
     where: { slug: "customised-imported-wallet" },
@@ -650,13 +644,11 @@ async function main() {
     update: { uploadRequired: false },
   });
 
-  // Custom fields
   const existingColorField = await prisma.customField.findFirst({
     where: { productId: wallet.id, name: "color" },
   });
 
   if (!existingColorField) {
-    // Field 1: Color
     const colorField = await prisma.customField.create({
       data: {
         productId: wallet.id,
@@ -671,12 +663,21 @@ async function main() {
 
     await prisma.customFieldOption.createMany({
       data: [
-        { customFieldId: colorField.id, label: "Rust", value: "rust", sortOrder: 0 },
-        { customFieldId: colorField.id, label: "Brown", value: "brown", sortOrder: 1 },
+        {
+          customFieldId: colorField.id,
+          label: "Rust",
+          value: "rust",
+          sortOrder: 0,
+        },
+        {
+          customFieldId: colorField.id,
+          label: "Brown",
+          value: "brown",
+          sortOrder: 1,
+        },
       ],
     });
 
-    // Field 2: Charm selection (1–50)
     const charmField = await prisma.customField.create({
       data: {
         productId: wallet.id,
@@ -690,7 +691,6 @@ async function main() {
       },
     });
 
-    // Seed charms 1–50
     const charmOptions = Array.from({ length: 50 }, (_, i) => ({
       customFieldId: charmField.id,
       label: `Charm ${i + 1}`,
@@ -699,7 +699,6 @@ async function main() {
     }));
     await prisma.customFieldOption.createMany({ data: charmOptions });
 
-    // Field 3: Name
     await prisma.customField.create({
       data: {
         productId: wallet.id,
@@ -729,3 +728,4 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
+  

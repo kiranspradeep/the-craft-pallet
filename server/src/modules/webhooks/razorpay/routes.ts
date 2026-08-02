@@ -3,22 +3,33 @@ import { razorpayWebhookHandler } from "./handler.js";
 
 const router = Router();
 
-// ── Raw body capture middleware ───────────────────────────────────────────
-// Razorpay signature verification requires the raw request body
-// This must be applied BEFORE express.json() parses the body
+// ── Raw body capture + JSON parse for Razorpay webhook ─────────────────
+// We need the raw body for signature verification AND parsed JSON for logic
 
 export const captureRawBody = (
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): void => {
   let data = "";
-  req.on("data", (chunk: Buffer) => {
-    data += chunk.toString();
+  req.setEncoding("utf8");
+
+  req.on("data", (chunk: string) => {
+    data += chunk;
   });
+
   req.on("end", () => {
     (req as any).rawBody = data;
+    try {
+      req.body = data ? JSON.parse(data) : {};
+    } catch {
+      req.body = {};
+    }
     next();
+  });
+
+  req.on("error", (err) => {
+    next(err);
   });
 };
 

@@ -22,8 +22,8 @@ export const addItemSchema = z.object({
       .number({ required_error: "Quantity is required" })
       .int()
       .min(1, "Quantity must be at least 1"),
+    selectedTierQuantity: z.number().int().positive().optional(),
     notes: z.string().max(500).optional(),
-    selectedTierQuantity: z.number().int().positive().optional().nullable(), // ← NEW
     customizations: z.array(customizationSchema).optional().default([]),
   }),
 });

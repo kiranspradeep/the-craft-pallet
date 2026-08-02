@@ -16,15 +16,12 @@ const router = Router();
 
 router.use(authenticateAdmin);
 
-// ── Stats & Queue — must be before /:id routes ────────────────────────────
 router.get("/stats", orderController.getStats);
 router.get("/production-queue", orderController.getProductionQueue);
 
-// ── List & Detail ─────────────────────────────────────────────────────────
 router.get("/", validate(listOrdersSchema), orderController.list);
 router.get("/:id", validate(orderIdSchema), orderController.getOne);
 
-// ── Status & Production ───────────────────────────────────────────────────
 router.patch(
   "/:id/status",
   validate(updateStatusSchema),
@@ -36,14 +33,24 @@ router.patch(
   orderController.updateProductionStage
 );
 
-// ── Notes ─────────────────────────────────────────────────────────────────
+// ── Photo status ──────────────────────────────────────────────────────────
+router.patch(
+  "/:id/photos/received",
+  validate(orderIdSchema),
+  orderController.markPhotosReceived
+);
+router.patch(
+  "/:id/photos/verified",
+  validate(orderIdSchema),
+  orderController.markPhotosVerified
+);
+
 router.patch(
   "/:id/note",
   validate(addNoteSchema),
   orderController.addNote
 );
 
-// ── Payment ───────────────────────────────────────────────────────────────
 router.patch(
   "/:id/mark-paid",
   validate(markAsPaidSchema),

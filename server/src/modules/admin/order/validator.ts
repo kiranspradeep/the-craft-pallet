@@ -1,7 +1,10 @@
 import { z } from "zod";
-import { OrderStatus, ProductionStage } from "@prisma/client";
-
-// ── List Orders ───────────────────────────────────────────────────────────
+import {
+  OrderStatus,
+  PhotoStatus,
+  ProductionStage,
+  OrderSource,
+} from "@prisma/client";
 
 export const listOrdersSchema = z.object({
   query: z.object({
@@ -17,6 +20,8 @@ export const listOrdersSchema = z.object({
       .pipe(z.number().int().min(1).max(100)),
     search: z.string().optional(),
     status: z.nativeEnum(OrderStatus).optional(),
+    photoStatus: z.nativeEnum(PhotoStatus).optional(),
+    orderSource: z.nativeEnum(OrderSource).optional(),
     productionStage: z.nativeEnum(ProductionStage).optional(),
     dateFrom: z
       .string()
@@ -34,20 +39,14 @@ export const listOrdersSchema = z.object({
   }),
 });
 
-// ── Order ID param ────────────────────────────────────────────────────────
-
 export const orderIdSchema = z.object({
   params: z.object({
     id: z.string().min(1, "Order ID is required"),
   }),
 });
 
-// ── Update Status ─────────────────────────────────────────────────────────
-
 export const updateStatusSchema = z.object({
-  params: z.object({
-    id: z.string().min(1),
-  }),
+  params: z.object({ id: z.string().min(1) }),
   body: z.object({
     status: z.nativeEnum(OrderStatus, {
       required_error: "Status is required",
@@ -56,12 +55,8 @@ export const updateStatusSchema = z.object({
   }),
 });
 
-// ── Update Production Stage ───────────────────────────────────────────────
-
 export const updateProductionStageSchema = z.object({
-  params: z.object({
-    id: z.string().min(1),
-  }),
+  params: z.object({ id: z.string().min(1) }),
   body: z.object({
     productionStage: z.nativeEnum(ProductionStage, {
       required_error: "Production stage is required",
@@ -69,36 +64,24 @@ export const updateProductionStageSchema = z.object({
   }),
 });
 
-// ── Add Admin Note ────────────────────────────────────────────────────────
-
 export const addNoteSchema = z.object({
-  params: z.object({
-    id: z.string().min(1),
-  }),
+  params: z.object({ id: z.string().min(1) }),
   body: z.object({
     note: z
       .string({ required_error: "Note is required" })
-      .min(1, "Note cannot be empty")
-      .max(1000, "Note cannot exceed 1000 characters"),
+      .min(1)
+      .max(1000),
   }),
 });
 
-// ── Mark as Paid ──────────────────────────────────────────────────────────
-
 export const markAsPaidSchema = z.object({
-  params: z.object({
-    id: z.string().min(1),
-  }),
+  params: z.object({ id: z.string().min(1) }),
   body: z.object({
     referenceNumber: z.string().max(200).optional(),
     note: z.string().max(500).optional(),
   }),
 });
 
-// ── Generate Payment Link ─────────────────────────────────────────────────
-
 export const generatePaymentLinkSchema = z.object({
-  params: z.object({
-    id: z.string().min(1),
-  }),
+  params: z.object({ id: z.string().min(1) }),
 });

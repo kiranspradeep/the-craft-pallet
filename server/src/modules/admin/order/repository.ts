@@ -1,10 +1,12 @@
 import { prisma } from "../../../prisma/client.js";
 import {
   OrderStatus,
+  PhotoStatus,
   ProductionStage,
   Prisma,
   PaymentStatus,
   PaymentMethod,
+  OrderSource,
 } from "@prisma/client";
 
 export type OrderWithRelations = Prisma.OrderGetPayload<{
@@ -32,6 +34,8 @@ export interface FindAllOrdersOptions {
   limit: number;
   search?: string;
   status?: OrderStatus;
+  photoStatus?: PhotoStatus;
+  orderSource?: OrderSource;
   productionStage?: ProductionStage;
   dateFrom?: Date;
   dateTo?: Date;
@@ -47,7 +51,6 @@ export interface FindAllOrdersResult {
   totalPages: number;
 }
 
-// Lightweight type for list view
 export type OrderSummary = Prisma.OrderGetPayload<{
   include: {
     customer: true;
@@ -90,6 +93,8 @@ export const orderRepository = {
       limit,
       search,
       status,
+      photoStatus,
+      orderSource,
       productionStage,
       dateFrom,
       dateTo,
@@ -101,6 +106,8 @@ export const orderRepository = {
 
     const where: Prisma.OrderWhereInput = {
       ...(status && { status }),
+      ...(photoStatus && { photoStatus }),
+      ...(orderSource && { orderSource }),
       ...(productionStage && { productionStage }),
       ...(dateFrom || dateTo
         ? {
@@ -140,7 +147,6 @@ export const orderRepository = {
     };
   },
 
-  // ── Find One ──────────────────────────────────────────────────────────
   findById: async (id: string): Promise<OrderWithRelations | null> => {
     return prisma.order.findUnique({
       where: { id },
@@ -157,7 +163,6 @@ export const orderRepository = {
     });
   },
 
-  // ── Update Status ─────────────────────────────────────────────────────
   updateStatus: async (
     id: string,
     status: OrderStatus,
@@ -173,8 +178,18 @@ export const orderRepository = {
     });
   },
 
-  // ── Update Production Stage ───────────────────────────────────────────
-  updateProductionStage: async (id: string, productionStage: ProductionStage) => {
+  updatePhotoStatus: async (id: string, photoStatus: PhotoStatus) => {
+    return prisma.order.update({
+      where: { id },
+      data: { photoStatus },
+      include: orderFullInclude,
+    });
+  },
+
+  updateProductionStage: async (
+    id: string,
+    productionStage: ProductionStage
+  ) => {
     return prisma.order.update({
       where: { id },
       data: { productionStage },
@@ -182,7 +197,6 @@ export const orderRepository = {
     });
   },
 
-  // ── Update Admin Note ─────────────────────────────────────────────────
   updateAdminNote: async (id: string, adminNote: string) => {
     return prisma.order.update({
       where: { id },
@@ -191,7 +205,6 @@ export const orderRepository = {
     });
   },
 
-  // ── Production Queue ──────────────────────────────────────────────────
   findProductionQueue: async (): Promise<OrderSummary[]> => {
     return prisma.order.findMany({
       where: { status: OrderStatus.IN_PRODUCTION },
@@ -200,7 +213,6 @@ export const orderRepository = {
     });
   },
 
-  // ── Timeline ──────────────────────────────────────────────────────────
   createTimelineEvent: async (data: {
     orderId: string;
     eventType: string;
@@ -225,7 +237,6 @@ export const orderRepository = {
     });
   },
 
-  // ── Payment ───────────────────────────────────────────────────────────
   findPaymentByOrderId: async (orderId: string) => {
     return prisma.payment.findUnique({ where: { orderId } });
   },
@@ -282,39 +293,53 @@ export const orderRepository = {
     });
   },
 
-  // ── Razorpay settings ─────────────────────────────────────────────────
   getPaymentSettings: async () => {
     return prisma.paymentSetting.findFirst();
   },
 
-  // ── Stats for dashboard ───────────────────────────────────────────────
   getStats: async () => {
     const [
       totalOrders,
+      draft,
       pendingPayment,
       confirmed,
       inProduction,
       shipped,
       delivered,
       cancelled,
+      whatsappOrders,
+      awaitingPhotos,
+      photosToVerify,
     ] = await prisma.$transaction([
       prisma.order.count(),
+      prisma.order.count({ where: { status: OrderStatus.DRAFT } }),
       prisma.order.count({ where: { status: OrderStatus.AWAITING_PAYMENT } }),
       prisma.order.count({ where: { status: OrderStatus.CONFIRMED } }),
       prisma.order.count({ where: { status: OrderStatus.IN_PRODUCTION } }),
       prisma.order.count({ where: { status: OrderStatus.SHIPPED } }),
       prisma.order.count({ where: { status: OrderStatus.DELIVERED } }),
       prisma.order.count({ where: { status: OrderStatus.CANCELLED } }),
+      prisma.order.count({ where: { orderSource: OrderSource.WHATSAPP } }),
+      prisma.order.count({
+        where: { photoStatus: PhotoStatus.NOT_RECEIVED },
+      }),
+      prisma.order.count({
+        where: { photoStatus: PhotoStatus.RECEIVED },
+      }),
     ]);
 
     return {
       totalOrders,
+      draft,
       pendingPayment,
       confirmed,
       inProduction,
       shipped,
       delivered,
       cancelled,
+      whatsappOrders,
+      awaitingPhotos,
+      photosToVerify,
     };
   },
 };

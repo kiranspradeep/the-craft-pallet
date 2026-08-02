@@ -14,18 +14,12 @@ import {
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-/**
- * Get or create cart for a session.
- */
 const getOrCreateCart = async (sessionId: string) => {
   const existing = await cartRepository.findBySessionId(sessionId);
   if (existing) return existing;
   return cartRepository.create(sessionId);
 };
 
-/**
- * Assert a cart item belongs to the given session's cart.
- */
 const assertItemOwnership = async (sessionId: string, itemId: string) => {
   const cart = await cartRepository.findBySessionId(sessionId);
   if (!cart) throw new NotFoundError("Cart not found");
@@ -60,6 +54,7 @@ export const cartService = {
       productId: string;
       variantId?: string;
       quantity: number;
+      selectedTierQuantity?: number;
       notes?: string;
       customizations?: {
         customFieldId: string;
@@ -73,11 +68,13 @@ export const cartService = {
       }[];
     }
   ) => {
-    // 1. Load product with pricing and configuration
+    // 1. Load product with pricing + tiers + configuration
     const product = await prisma.product.findFirst({
       where: { id: input.productId, deletedAt: null, isActive: true },
       include: {
-        pricingConfig: true,
+        pricingConfig: {
+          include: { tiers: true },
+        },
         configuration: true,
         variants: true,
         customFields: { include: { options: true } },
@@ -94,7 +91,6 @@ export const cartService = {
 
     // 2. Validate variant if required
     let variantPrice: Decimal | null = null;
-
     if (input.variantId) {
       const variant = product.variants.find(
         (v) => v.id === input.variantId && v.isActive
@@ -109,34 +105,46 @@ export const cartService = {
     const unitPrice = calculateUnitPrice(
       product.pricingConfig.strategy,
       input.quantity,
-      product.pricingConfig
-        ? {
-            strategy: product.pricingConfig.strategy,
-            unitPrice: product.pricingConfig.unitPrice
-              ? new Decimal(product.pricingConfig.unitPrice)
-              : null,
-            incrementQuantity: product.pricingConfig.incrementQuantity,
-            incrementPrice: product.pricingConfig.incrementPrice
-              ? new Decimal(product.pricingConfig.incrementPrice)
-              : null,
-            minimumOrderQuantity: product.pricingConfig.minimumOrderQuantity,
-          }
-        : null,
-      variantPrice
+      {
+        strategy: product.pricingConfig.strategy,
+        unitPrice: product.pricingConfig.unitPrice
+          ? new Decimal(product.pricingConfig.unitPrice)
+          : null,
+        baseUnitPrice: product.pricingConfig.baseUnitPrice
+          ? new Decimal(product.pricingConfig.baseUnitPrice)
+          : null,
+        incrementQuantity: product.pricingConfig.incrementQuantity,
+        incrementPrice: product.pricingConfig.incrementPrice
+          ? new Decimal(product.pricingConfig.incrementPrice)
+          : null,
+        minimumOrderQuantity: product.pricingConfig.minimumOrderQuantity,
+        tiers: product.pricingConfig.tiers.map((t) => ({
+          quantity: t.quantity,
+          price: new Decimal(t.price),
+          label: t.label,
+          isSpecialOffer: t.isSpecialOffer,
+        })),
+      },
+      variantPrice,
+      input.selectedTierQuantity
     );
 
     // 4. Validate required custom fields
-    const requiredFields = product.customFields.filter((f) => f.isRequired);
-    for (const field of requiredFields) {
-      const provided = input.customizations?.find(
-        (c) => c.customFieldId === field.id
-      );
-      if (!provided) {
-        throw new BadRequestError(
-          `Required field "${field.label}" is missing`
-        );
-      }
-    }
+// PHOTO_UPLOAD fields are validated later at checkout/order stage,
+// not when adding to cart (photos are uploaded on a separate page).
+const requiredFields = product.customFields.filter(
+  (f) => f.isRequired && f.type !== "PHOTO_UPLOAD"
+);
+for (const field of requiredFields) {
+  const provided = input.customizations?.find(
+    (c) => c.customFieldId === field.id
+  );
+  if (!provided) {
+    throw new BadRequestError(
+      `Required field "${field.label}" is missing`
+    );
+  }
+}
 
     // 5. Get or create cart
     const cart = await getOrCreateCart(sessionId);
@@ -148,6 +156,7 @@ export const cartService = {
       variantId: input.variantId,
       quantity: input.quantity,
       unitPrice,
+      selectedTierQuantity: input.selectedTierQuantity,
       notes: input.notes,
     });
 
@@ -160,14 +169,11 @@ export const cartService = {
           fieldLabel: c.fieldLabel,
           fieldType: c.fieldType,
           textValue: c.textValue ?? null,
-          numberValue: c.numberValue !== undefined
-            ? new Decimal(c.numberValue)
-            : null,
+          numberValue:
+            c.numberValue !== undefined ? new Decimal(c.numberValue) : null,
           dateValue: c.dateValue ? new Date(c.dateValue) : null,
           booleanValue: c.booleanValue ?? null,
-          asset: c.assetId
-            ? { connect: { id: c.assetId } }
-            : undefined,
+          asset: c.assetId ? { connect: { id: c.assetId } } : undefined,
         });
       }
     }
@@ -192,7 +198,11 @@ export const cartService = {
     if (input.quantity !== undefined && input.quantity !== item.quantity) {
       const product = await prisma.product.findFirst({
         where: { id: item.productId },
-        include: { pricingConfig: true },
+        include: {
+          pricingConfig: {
+            include: { tiers: true },
+          },
+        },
       });
 
       if (product?.pricingConfig) {
@@ -208,16 +218,26 @@ export const cartService = {
             unitPrice: product.pricingConfig.unitPrice
               ? new Decimal(product.pricingConfig.unitPrice)
               : null,
+            baseUnitPrice: product.pricingConfig.baseUnitPrice
+              ? new Decimal(product.pricingConfig.baseUnitPrice)
+              : null,
             incrementQuantity: product.pricingConfig.incrementQuantity,
             incrementPrice: product.pricingConfig.incrementPrice
               ? new Decimal(product.pricingConfig.incrementPrice)
               : null,
-            minimumOrderQuantity: product.pricingConfig.minimumOrderQuantity,
+            minimumOrderQuantity:
+              product.pricingConfig.minimumOrderQuantity,
+            tiers: product.pricingConfig.tiers.map((t) => ({
+              quantity: t.quantity,
+              price: new Decimal(t.price),
+              label: t.label,
+              isSpecialOffer: t.isSpecialOffer,
+            })),
           },
-          variantPrice
+          variantPrice,
+          item.selectedTierQuantity ?? undefined
         );
 
-        // Update with recalculated price
         await prisma.cartItem.update({
           where: { id: itemId },
           data: { quantity: input.quantity, unitPrice: newUnitPrice },
@@ -241,7 +261,6 @@ export const cartService = {
   removeItem: async (sessionId: string, itemId: string) => {
     const { cart } = await assertItemOwnership(sessionId, itemId);
 
-    // Customizations cascade-delete via DB constraint
     await cartRepository.deleteItem(itemId);
     await cartRepository.touchActivity(cart.id);
 
@@ -259,7 +278,8 @@ export const cartService = {
     const coupon = await cartRepository.findCouponByCode(code);
 
     if (!coupon) throw new NotFoundError("Coupon not found");
-    if (!coupon.isActive) throw new BadRequestError("This coupon is inactive");
+    if (!coupon.isActive)
+      throw new BadRequestError("This coupon is inactive");
 
     const now = new Date();
     if (coupon.startsAt && coupon.startsAt > now) {

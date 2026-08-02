@@ -1,6 +1,7 @@
 import Razorpay from "razorpay";
 import {
   OrderStatus,
+  PhotoStatus,
   ProductionStage,
   PaymentStatus,
   PaymentMethod,
@@ -10,7 +11,9 @@ import {
 import { orderRepository, FindAllOrdersOptions } from "./repository.js";
 import {
   assertValidStatusTransition,
+  assertValidPhotoStatusTransition,
   assertValidProductionStageTransition,
+  assertReadyForProduction,
   getInitialProductionStage,
 } from "./statusTransitions.js";
 import {
@@ -19,8 +22,6 @@ import {
 } from "../../../shared/errors/AppError.js";
 import { logger } from "../../../shared/logger/index.js";
 
-// ── Helpers ───────────────────────────────────────────────────────────────
-
 const assertOrderExists = async (id: string) => {
   const order = await orderRepository.findById(id);
   if (!order) throw new NotFoundError("Order not found");
@@ -28,13 +29,10 @@ const assertOrderExists = async (id: string) => {
 };
 
 const getRazorpayInstance = async (): Promise<Razorpay> => {
-  // Try DB settings first
   const settings = await orderRepository.getPaymentSettings();
 
-  const keyId =
-    settings?.apiKey || process.env.RAZORPAY_KEY_ID;
-  const keySecret =
-    settings?.apiSecret || process.env.RAZORPAY_KEY_SECRET;
+  const keyId = settings?.apiKey || process.env.RAZORPAY_KEY_ID;
+  const keySecret = settings?.apiSecret || process.env.RAZORPAY_KEY_SECRET;
 
   if (!keyId || !keySecret) {
     throw new BadRequestError(
@@ -47,27 +45,22 @@ const getRazorpayInstance = async (): Promise<Razorpay> => {
     key_secret: keySecret,
   });
 };
-// ── Service ───────────────────────────────────────────────────────────────
 
 export const orderService = {
-  // ── List Orders ───────────────────────────────────────────────────────
   findAll: async (options: FindAllOrdersOptions) => {
     return orderRepository.findAll(options);
   },
 
-  // ── Get Single Order ──────────────────────────────────────────────────
   findById: async (id: string) => {
     const order = await orderRepository.findById(id);
     if (!order) throw new NotFoundError("Order not found");
     return order;
   },
 
-  // ── Production Queue ──────────────────────────────────────────────────
   getProductionQueue: async () => {
     return orderRepository.findProductionQueue();
   },
 
-  // ── Get Stats ─────────────────────────────────────────────────────────
   getStats: async () => {
     return orderRepository.getStats();
   },
@@ -81,19 +74,14 @@ export const orderService = {
   ) => {
     const order = await assertOrderExists(orderId);
 
-    // Enforce valid transition
     assertValidStatusTransition(order.status, newStatus);
 
-    // Auto-set production stage when moving to IN_PRODUCTION
-    const newProductionStage = getInitialProductionStage(newStatus);
+    // If moving to IN_PRODUCTION — check photos are ready
+    if (newStatus === OrderStatus.IN_PRODUCTION) {
+      assertReadyForProduction(order.photoStatus);
+    }
 
-    // If moving away from IN_PRODUCTION — clear production stage
-    const productionStage =
-      newStatus !== OrderStatus.IN_PRODUCTION &&
-      newStatus !== OrderStatus.SHIPPED &&
-      newStatus !== OrderStatus.DELIVERED
-        ? null
-        : newProductionStage ?? order.productionStage;
+    const newProductionStage = getInitialProductionStage(newStatus);
 
     const updated = await orderRepository.updateStatus(
       orderId,
@@ -101,7 +89,6 @@ export const orderService = {
       newProductionStage ?? undefined
     );
 
-    // Timeline event
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: getTimelineEventForStatus(newStatus),
@@ -115,7 +102,6 @@ export const orderService = {
       metadata: { previousStatus: order.status, newStatus },
     });
 
-    // If cancelled — also add note to timeline
     if (note && newStatus === OrderStatus.CANCELLED) {
       await orderRepository.createTimelineEvent({
         orderId,
@@ -143,21 +129,16 @@ export const orderService = {
   ) => {
     const order = await assertOrderExists(orderId);
 
-    // Order must be IN_PRODUCTION
     if (order.status !== OrderStatus.IN_PRODUCTION) {
       throw new BadRequestError(
         "Production stage can only be updated when order is IN_PRODUCTION"
       );
     }
 
-    // Must have current stage to validate transition
     if (!order.productionStage) {
-      throw new BadRequestError(
-        "Order has no current production stage set"
-      );
+      throw new BadRequestError("Order has no current production stage");
     }
 
-    // Enforce valid stage transition
     assertValidProductionStageTransition(order.productionStage, newStage);
 
     const updated = await orderRepository.updateProductionStage(
@@ -165,7 +146,6 @@ export const orderService = {
       newStage
     );
 
-    // Timeline event
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.PRODUCTION_STAGE_CHANGED,
@@ -176,22 +156,71 @@ export const orderService = {
       actorType: ActorType.ADMIN,
       actorId: adminId,
       isVisibleToCustomer: false,
-      metadata: {
-        previousStage: order.productionStage,
-        newStage,
-      },
+      metadata: { previousStage: order.productionStage, newStage },
     });
 
-    logger.info(
-      `Order ${order.orderNumber} production stage: ${order.productionStage} → ${newStage}`
+    return updated;
+  },
+
+  // ── Photo Status ──────────────────────────────────────────────────────
+  markPhotosReceived: async (orderId: string, adminId: string) => {
+    const order = await assertOrderExists(orderId);
+
+    assertValidPhotoStatusTransition(
+      order.photoStatus,
+      PhotoStatus.RECEIVED
     );
 
+    const updated = await orderRepository.updatePhotoStatus(
+      orderId,
+      PhotoStatus.RECEIVED
+    );
+
+    await orderRepository.createTimelineEvent({
+      orderId,
+      eventType: TimelineEventType.PHOTOS_RECEIVED,
+      title: "Photos Received",
+      description: "Customer photos have been received and are pending review.",
+      actorType: ActorType.ADMIN,
+      actorId: adminId,
+      isVisibleToCustomer: true,
+    });
+
+    logger.info(`Order ${order.orderNumber} photos marked RECEIVED`);
+    return updated;
+  },
+
+  markPhotosVerified: async (orderId: string, adminId: string) => {
+    const order = await assertOrderExists(orderId);
+
+    assertValidPhotoStatusTransition(
+      order.photoStatus,
+      PhotoStatus.VERIFIED
+    );
+
+    const updated = await orderRepository.updatePhotoStatus(
+      orderId,
+      PhotoStatus.VERIFIED
+    );
+
+    await orderRepository.createTimelineEvent({
+      orderId,
+      eventType: TimelineEventType.PHOTOS_VERIFIED,
+      title: "Photos Verified",
+      description:
+        "Your photos have been reviewed and approved. Production will begin soon.",
+      actorType: ActorType.ADMIN,
+      actorId: adminId,
+      isVisibleToCustomer: true,
+    });
+
+    logger.info(`Order ${order.orderNumber} photos marked VERIFIED`);
     return updated;
   },
 
   // ── Add Admin Note ────────────────────────────────────────────────────
   addNote: async (orderId: string, note: string, adminId: string) => {
-    const order = await assertOrderExists(orderId);
+    await assertOrderExists(orderId);
 
     const updated = await orderRepository.updateAdminNote(orderId, note);
 
@@ -205,8 +234,6 @@ export const orderService = {
       isVisibleToCustomer: false,
     });
 
-    logger.info(`Admin note added to order ${order.orderNumber}`);
-
     return updated;
   },
 
@@ -214,15 +241,14 @@ export const orderService = {
   markAsPaid: async (
     orderId: string,
     adminId: string,
-    input: {
-      referenceNumber?: string;
-      note?: string;
-    }
+    input: { referenceNumber?: string; note?: string }
   ) => {
     const order = await assertOrderExists(orderId);
 
-    // Only allowed from AWAITING_PAYMENT
-    if (order.status !== OrderStatus.AWAITING_PAYMENT) {
+    if (
+      order.status !== OrderStatus.AWAITING_PAYMENT &&
+      order.status !== OrderStatus.DRAFT
+    ) {
       throw new BadRequestError(
         `Cannot mark as paid. Order is currently "${order.status}"`
       );
@@ -230,7 +256,6 @@ export const orderService = {
 
     const now = new Date();
 
-    // Update payment record
     await orderRepository.updatePayment(orderId, {
       status: PaymentStatus.SUCCESS,
       method: PaymentMethod.MANUAL,
@@ -241,33 +266,29 @@ export const orderService = {
       gatewayName: "manual",
     });
 
-    // Update order status → CONFIRMED
     const updated = await orderRepository.updateStatus(
       orderId,
       OrderStatus.CONFIRMED
     );
 
-    // Timeline — payment success
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.PAYMENT_SUCCESS,
       title: "Payment Verified",
-      description:
-        input.referenceNumber
-          ? `Payment manually verified. Reference: ${input.referenceNumber}`
-          : "Payment manually verified by admin",
+      description: input.referenceNumber
+        ? `Payment manually verified. Reference: ${input.referenceNumber}`
+        : "Payment manually verified by admin",
       actorType: ActorType.ADMIN,
       actorId: adminId,
       isVisibleToCustomer: true,
       metadata: { referenceNumber: input.referenceNumber },
     });
 
-    // Timeline — order confirmed
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.ORDER_CONFIRMED,
       title: "Order Confirmed",
-      description: "Your order has been confirmed and will enter production soon.",
+      description: "Your order has been confirmed.",
       actorType: ActorType.ADMIN,
       actorId: adminId,
       isVisibleToCustomer: true,
@@ -296,8 +317,10 @@ export const orderService = {
   generatePaymentLink: async (orderId: string, adminId: string) => {
     const order = await assertOrderExists(orderId);
 
-    // Only for AWAITING_PAYMENT orders
-    if (order.status !== OrderStatus.AWAITING_PAYMENT) {
+    if (
+      order.status !== OrderStatus.AWAITING_PAYMENT &&
+      order.status !== OrderStatus.DRAFT
+    ) {
       throw new BadRequestError(
         `Cannot generate payment link. Order is currently "${order.status}"`
       );
@@ -308,13 +331,9 @@ export const orderService = {
       throw new BadRequestError("Payment record not found for this order");
     }
 
-    // Get Razorpay instance — throws if not configured
     const razorpay = await getRazorpayInstance();
-
-    // Amount in paise (Razorpay uses smallest currency unit)
     const amountInPaise = Math.round(Number(order.totalAmount) * 100);
 
-    // Create Razorpay Payment Link
     const paymentLink = await (razorpay.paymentLink as any).create({
       amount: amountInPaise,
       currency: order.currency,
@@ -333,11 +352,10 @@ export const orderService = {
         orderNumber: order.orderNumber,
         orderId: order.id,
       },
-      callback_url: `${process.env.CLIENT_URL || "http://localhost:3001"}/order-confirmation/${order.orderNumber}`,
+      callback_url: `${process.env.CLIENT_URL || "http://localhost:3001"}/order-confirmation/${order.orderNumber}?phone=${order.customer.phone}`,
       callback_method: "get",
     });
 
-    // Save Razorpay details to payment record
     await orderRepository.updatePayment(orderId, {
       status: PaymentStatus.INITIATED,
       gatewayName: "razorpay",
@@ -345,7 +363,11 @@ export const orderService = {
       gatewayResponse: paymentLink as Record<string, unknown>,
     });
 
-    // Timeline event
+    // If it was DRAFT — move to AWAITING_PAYMENT
+    if (order.status === OrderStatus.DRAFT) {
+      await orderRepository.updateStatus(orderId, OrderStatus.AWAITING_PAYMENT);
+    }
+
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.PAYMENT_INITIATED,
@@ -384,7 +406,8 @@ const getTimelineEventForStatus = (
 ): TimelineEventType => {
   const map: Partial<Record<OrderStatus, TimelineEventType>> = {
     [OrderStatus.CONFIRMED]: TimelineEventType.ORDER_CONFIRMED,
-    [OrderStatus.IN_PRODUCTION]: TimelineEventType.PRODUCTION_STAGE_CHANGED,
+    [OrderStatus.IN_PRODUCTION]:
+      TimelineEventType.PRODUCTION_STAGE_CHANGED,
     [OrderStatus.SHIPPED]: TimelineEventType.SHIPPED,
     [OrderStatus.DELIVERED]: TimelineEventType.DELIVERED,
     [OrderStatus.CANCELLED]: TimelineEventType.CANCELLED,
@@ -395,6 +418,7 @@ const getTimelineEventForStatus = (
 
 const getStatusTitle = (status: OrderStatus): string => {
   const map: Record<OrderStatus, string> = {
+    [OrderStatus.DRAFT]: "Draft Order",
     [OrderStatus.AWAITING_PAYMENT]: "Awaiting Payment",
     [OrderStatus.PAYMENT_FAILED]: "Payment Failed",
     [OrderStatus.CONFIRMED]: "Order Confirmed",

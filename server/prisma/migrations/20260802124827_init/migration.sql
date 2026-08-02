@@ -2,7 +2,7 @@
 CREATE TYPE "AdminRole" AS ENUM ('ADMIN', 'SUPERADMIN');
 
 -- CreateEnum
-CREATE TYPE "PricingStrategy" AS ENUM ('INCREMENTAL_QUANTITY', 'FIXED_VARIANTS', 'PER_UNIT', 'CUSTOM_QUOTE');
+CREATE TYPE "PricingStrategy" AS ENUM ('INCREMENTAL_QUANTITY', 'FIXED_VARIANTS', 'PER_UNIT', 'TIERED_PRICING', 'CUSTOM_QUOTE');
 
 -- CreateEnum
 CREATE TYPE "CustomFieldType" AS ENUM ('TEXT', 'TEXTAREA', 'NUMBER', 'DATE', 'SELECT', 'RADIO', 'CHECKBOX', 'URL', 'PHOTO_UPLOAD');
@@ -14,7 +14,16 @@ CREATE TYPE "AssetSourceType" AS ENUM ('DIRECT_UPLOAD', 'ZIP_UPLOAD', 'GOOGLE_DR
 CREATE TYPE "AssetStatus" AS ENUM ('WAITING', 'UPLOADING', 'UPLOADED', 'PROCESSING', 'FAILED', 'DOWNLOADED', 'VERIFIED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "OrderStatus" AS ENUM ('AWAITING_PAYMENT', 'PAYMENT_FAILED', 'CONFIRMED', 'IN_PRODUCTION', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED');
+CREATE TYPE "OrderStatus" AS ENUM ('DRAFT', 'AWAITING_PAYMENT', 'PAYMENT_FAILED', 'CONFIRMED', 'IN_PRODUCTION', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED');
+
+-- CreateEnum
+CREATE TYPE "PhotoStatus" AS ENUM ('NOT_REQUIRED', 'NOT_RECEIVED', 'RECEIVED', 'VERIFIED');
+
+-- CreateEnum
+CREATE TYPE "OrderSource" AS ENUM ('WEBSITE', 'WHATSAPP');
+
+-- CreateEnum
+CREATE TYPE "CheckoutMethod" AS ENUM ('CART', 'BUY_NOW');
 
 -- CreateEnum
 CREATE TYPE "ProductionStage" AS ENUM ('QUEUED', 'DESIGN', 'PRINTING', 'CRAFTING', 'PACKING', 'READY');
@@ -29,7 +38,7 @@ CREATE TYPE "PaymentMethod" AS ENUM ('UPI', 'CARD', 'NET_BANKING', 'WALLET', 'CO
 CREATE TYPE "ShipmentStatus" AS ENUM ('PENDING', 'DISPATCHED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'DELIVERED', 'FAILED_DELIVERY', 'RETURNED');
 
 -- CreateEnum
-CREATE TYPE "TimelineEventType" AS ENUM ('ORDER_PLACED', 'PAYMENT_INITIATED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'ORDER_CONFIRMED', 'PRODUCTION_STAGE_CHANGED', 'ASSET_STATUS_CHANGED', 'NOTE_ADDED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED');
+CREATE TYPE "TimelineEventType" AS ENUM ('ORDER_PLACED', 'DRAFT_CREATED', 'PAYMENT_INITIATED', 'PAYMENT_SUCCESS', 'PAYMENT_FAILED', 'ORDER_CONFIRMED', 'PRODUCTION_STAGE_CHANGED', 'ASSET_STATUS_CHANGED', 'PHOTOS_RECEIVED', 'PHOTOS_VERIFIED', 'NOTE_ADDED', 'SHIPPED', 'DELIVERED', 'CANCELLED', 'REFUNDED');
 
 -- CreateEnum
 CREATE TYPE "ActorType" AS ENUM ('SYSTEM', 'ADMIN', 'CUSTOMER');
@@ -194,10 +203,26 @@ CREATE TABLE "pricing_configurations" (
     "incrementQuantity" INTEGER,
     "incrementPrice" DECIMAL(10,2),
     "unitPrice" DECIMAL(10,2),
+    "baseUnitPrice" DECIMAL(10,2),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "pricing_configurations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "pricing_tiers" (
+    "id" TEXT NOT NULL,
+    "pricingConfigId" TEXT NOT NULL,
+    "quantity" INTEGER NOT NULL,
+    "price" DECIMAL(10,2) NOT NULL,
+    "label" TEXT,
+    "isSpecialOffer" BOOLEAN NOT NULL DEFAULT false,
+    "sortOrder" INTEGER NOT NULL DEFAULT 0,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "pricing_tiers_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -250,11 +275,30 @@ CREATE TABLE "cart_items" (
     "variantId" TEXT,
     "quantity" INTEGER NOT NULL DEFAULT 1,
     "unitPrice" DECIMAL(10,2) NOT NULL,
+    "selectedTierQuantity" INTEGER,
     "notes" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "cart_items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "checkout_sessions" (
+    "id" TEXT NOT NULL,
+    "sessionId" TEXT NOT NULL,
+    "productId" TEXT NOT NULL,
+    "variantId" TEXT,
+    "quantity" INTEGER NOT NULL DEFAULT 1,
+    "selectedTierQuantity" INTEGER,
+    "unitPrice" DECIMAL(10,2) NOT NULL,
+    "notes" TEXT,
+    "customizations" JSONB,
+    "assetId" TEXT,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "checkout_sessions_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -336,6 +380,7 @@ CREATE TABLE "file_processing_jobs" (
 CREATE TABLE "orders" (
     "id" TEXT NOT NULL,
     "orderNumber" TEXT NOT NULL,
+    "whatsappToken" TEXT,
     "customerId" TEXT NOT NULL,
     "shipName" TEXT NOT NULL,
     "shipPhone" TEXT NOT NULL,
@@ -346,7 +391,10 @@ CREATE TABLE "orders" (
     "shipPincode" TEXT NOT NULL,
     "shipCountry" TEXT NOT NULL DEFAULT 'India',
     "status" "OrderStatus" NOT NULL DEFAULT 'AWAITING_PAYMENT',
+    "photoStatus" "PhotoStatus" NOT NULL DEFAULT 'NOT_REQUIRED',
     "productionStage" "ProductionStage",
+    "orderSource" "OrderSource" NOT NULL DEFAULT 'WEBSITE',
+    "checkoutMethod" "CheckoutMethod" NOT NULL DEFAULT 'CART',
     "subtotal" DECIMAL(10,2) NOT NULL,
     "discountAmount" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "shippingCharge" DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -355,6 +403,7 @@ CREATE TABLE "orders" (
     "couponCode" TEXT,
     "customerNote" TEXT,
     "adminNote" TEXT,
+    "driveLink" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -370,6 +419,7 @@ CREATE TABLE "order_items" (
     "quantity" INTEGER NOT NULL,
     "unitPrice" DECIMAL(10,2) NOT NULL,
     "totalPrice" DECIMAL(10,2) NOT NULL,
+    "selectedTierQuantity" INTEGER,
     "productName" TEXT NOT NULL,
     "variantName" TEXT,
     "productDescription" TEXT,
@@ -589,10 +639,19 @@ CREATE UNIQUE INDEX "product_configurations_productId_key" ON "product_configura
 CREATE UNIQUE INDEX "pricing_configurations_productId_key" ON "pricing_configurations"("productId");
 
 -- CreateIndex
+CREATE INDEX "pricing_tiers_pricingConfigId_idx" ON "pricing_tiers"("pricingConfigId");
+
+-- CreateIndex
 CREATE INDEX "custom_fields_productId_idx" ON "custom_fields"("productId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "carts_sessionId_key" ON "carts"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "checkout_sessions_sessionId_idx" ON "checkout_sessions"("sessionId");
+
+-- CreateIndex
+CREATE INDEX "checkout_sessions_expiresAt_idx" ON "checkout_sessions"("expiresAt");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "customizations_assetId_key" ON "customizations"("assetId");
@@ -619,10 +678,19 @@ CREATE INDEX "file_processing_jobs_status_idx" ON "file_processing_jobs"("status
 CREATE UNIQUE INDEX "orders_orderNumber_key" ON "orders"("orderNumber");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "orders_whatsappToken_key" ON "orders"("whatsappToken");
+
+-- CreateIndex
 CREATE INDEX "orders_customerId_idx" ON "orders"("customerId");
 
 -- CreateIndex
 CREATE INDEX "orders_status_idx" ON "orders"("status");
+
+-- CreateIndex
+CREATE INDEX "orders_photoStatus_idx" ON "orders"("photoStatus");
+
+-- CreateIndex
+CREATE INDEX "orders_orderSource_idx" ON "orders"("orderSource");
 
 -- CreateIndex
 CREATE INDEX "orders_createdAt_idx" ON "orders"("createdAt");
@@ -671,6 +739,9 @@ ALTER TABLE "product_configurations" ADD CONSTRAINT "product_configurations_prod
 
 -- AddForeignKey
 ALTER TABLE "pricing_configurations" ADD CONSTRAINT "pricing_configurations_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pricing_tiers" ADD CONSTRAINT "pricing_tiers_pricingConfigId_fkey" FOREIGN KEY ("pricingConfigId") REFERENCES "pricing_configurations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "custom_fields" ADD CONSTRAINT "custom_fields_productId_fkey" FOREIGN KEY ("productId") REFERENCES "products"("id") ON DELETE CASCADE ON UPDATE CASCADE;

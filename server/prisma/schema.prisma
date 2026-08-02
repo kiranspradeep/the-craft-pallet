@@ -1,7 +1,7 @@
 // =============================================================================
 // prisma/schema.prisma
 // The Craft Pallet — Personalized Gifts & Printing Platform
-// Version 6 — Final, Approved
+// Version 7 — Order Flow v2
 // =============================================================================
 
 generator client {
@@ -26,7 +26,7 @@ enum PricingStrategy {
   INCREMENTAL_QUANTITY
   FIXED_VARIANTS
   PER_UNIT
-  TIERED_PRICING        // ← NEW
+  TIERED_PRICING
   CUSTOM_QUOTE
 }
 
@@ -62,6 +62,7 @@ enum AssetStatus {
 }
 
 enum OrderStatus {
+  DRAFT
   AWAITING_PAYMENT
   PAYMENT_FAILED
   CONFIRMED
@@ -70,6 +71,23 @@ enum OrderStatus {
   DELIVERED
   CANCELLED
   REFUNDED
+}
+
+enum PhotoStatus {
+  NOT_REQUIRED
+  NOT_RECEIVED
+  RECEIVED
+  VERIFIED
+}
+
+enum OrderSource {
+  WEBSITE
+  WHATSAPP
+}
+
+enum CheckoutMethod {
+  CART
+  BUY_NOW
 }
 
 enum ProductionStage {
@@ -110,12 +128,15 @@ enum ShipmentStatus {
 
 enum TimelineEventType {
   ORDER_PLACED
+  DRAFT_CREATED
   PAYMENT_INITIATED
   PAYMENT_SUCCESS
   PAYMENT_FAILED
   ORDER_CONFIRMED
   PRODUCTION_STAGE_CHANGED
   ASSET_STATUS_CHANGED
+  PHOTOS_RECEIVED
+  PHOTOS_VERIFIED
   NOTE_ADDED
   SHIPPED
   DELIVERED
@@ -155,7 +176,6 @@ enum JobType {
 // ADMIN AUTHENTICATION
 // =============================================================================
 
-/// Platform staff — the only entity that authenticates
 model AdminUser {
   id           String    @id @default(cuid())
   name         String
@@ -175,7 +195,6 @@ model AdminUser {
   @@map("admin_users")
 }
 
-/// Admin authentication sessions
 model AdminSession {
   id          String   @id @default(cuid())
   adminUserId String
@@ -192,11 +211,8 @@ model AdminSession {
 
 // =============================================================================
 // CUSTOMER
-// No authentication. Guest checkout only.
-// Phone normalized before insert — e.g. "9876543210", no spaces or country code.
 // =============================================================================
 
-/// A customer identified by phone number — no login, no password
 model Customer {
   id        String   @id @default(cuid())
   name      String
@@ -215,7 +231,6 @@ model Customer {
 // ORDER SEQUENCE
 // =============================================================================
 
-/// One row per year — row-locked during checkout to prevent duplicate numbers
 model OrderSequence {
   id         String   @id @default(cuid())
   year       Int      @unique
@@ -229,8 +244,6 @@ model OrderSequence {
 // CATALOG
 // =============================================================================
 
-/// Top-level product grouping
-/// deletedAt — soft delete, preserves integrity of existing product references
 model Category {
   id          String    @id @default(cuid())
   name        String
@@ -241,16 +254,13 @@ model Category {
   sortOrder   Int       @default(0)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime? // soft delete
+  deletedAt   DateTime?
 
   products Product[]
 
   @@map("categories")
 }
 
-/// A specific product (e.g. Mini Polaroids, Eye Frame, Spotify Frame)
-/// canonicalUrl removed — generated at runtime as: baseUrl + "/products/" + slug
-/// deletedAt — soft delete, preserves integrity of existing order references
 model Product {
   id               String    @id @default(cuid())
   categoryId       String
@@ -267,7 +277,7 @@ model Product {
   ogImageUrl       String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
-  deletedAt        DateTime? // soft delete
+  deletedAt        DateTime?
 
   category      Category              @relation(fields: [categoryId], references: [id], onDelete: Restrict)
   images        ProductImage[]
@@ -282,7 +292,6 @@ model Product {
   @@map("products")
 }
 
-/// Gallery / display images for a product
 model ProductImage {
   id        String           @id @default(cuid())
   productId String
@@ -300,7 +309,6 @@ model ProductImage {
   @@map("product_images")
 }
 
-/// A selectable size or type variant (e.g. 4×4, 5×5, A4)
 model ProductVariant {
   id             String   @id @default(cuid())
   productId      String
@@ -322,11 +330,6 @@ model ProductVariant {
   @@map("product_variants")
 }
 
-// =============================================================================
-// PRODUCT CONFIGURATION
-// =============================================================================
-
-/// Operational behaviour — upload rules, allowed sources, production rules
 model ProductConfiguration {
   id                      String            @id @default(cuid())
   productId               String            @unique
@@ -349,21 +352,38 @@ model ProductConfiguration {
   @@map("product_configurations")
 }
 
-// =============================================================================
-// PRICING CONFIGURATION
-// =============================================================================
+model PricingConfiguration {
+  id        String          @id @default(cuid())
+  productId String          @unique
+  strategy  PricingStrategy
 
-/// A specific quantity+price tier for TIERED_PRICING strategy
+  minimumOrderQuantity Int?
+  incrementQuantity    Int?
+  incrementPrice       Decimal? @db.Decimal(10, 2)
+
+  unitPrice Decimal? @db.Decimal(10, 2)
+
+  baseUnitPrice Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tiers   PricingTier[]
+
+  @@map("pricing_configurations")
+}
+
 model PricingTier {
-  id                String               @id @default(cuid())
-  pricingConfigId   String
-  quantity          Int                  // exact quantity for this tier
-  price             Decimal              @db.Decimal(10, 2) // total price for this tier
-  label             String?              // e.g. "Special Offer 🔥"
-  isSpecialOffer    Boolean              @default(false)
-  sortOrder         Int                  @default(0)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
+  id              String   @id @default(cuid())
+  pricingConfigId String
+  quantity        Int
+  price           Decimal  @db.Decimal(10, 2)
+  label           String?
+  isSpecialOffer  Boolean  @default(false)
+  sortOrder       Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   pricingConfig PricingConfiguration @relation(fields: [pricingConfigId], references: [id], onDelete: Cascade)
 
@@ -371,37 +391,6 @@ model PricingTier {
   @@map("pricing_tiers")
 }
 
-// Update PricingConfiguration to include tiers relation
-model PricingConfiguration {
-  id        String          @id @default(cuid())
-  productId String          @unique
-  strategy  PricingStrategy
-
-  // INCREMENTAL_QUANTITY
-  minimumOrderQuantity Int?
-  incrementQuantity    Int?
-  incrementPrice       Decimal? @db.Decimal(10, 2)
-
-  // PER_UNIT
-  unitPrice Decimal? @db.Decimal(10, 2)
-
-  // TIERED_PRICING — base fallback price per unit
-  baseUnitPrice Decimal? @db.Decimal(10, 2)  // ← NEW
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  product Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
-  tiers   PricingTier[]  // ← NEW
-
-  @@map("pricing_configurations")
-}
-
-// =============================================================================
-// CUSTOM FIELDS
-// =============================================================================
-
-/// A configurable input field on the product customization form
 model CustomField {
   id             String          @id @default(cuid())
   productId      String
@@ -424,7 +413,6 @@ model CustomField {
   @@map("custom_fields")
 }
 
-/// Options for SELECT / RADIO type custom fields
 model CustomFieldOption {
   id            String   @id @default(cuid())
   customFieldId String
@@ -442,7 +430,6 @@ model CustomFieldOption {
 // SHOPPING CART
 // =============================================================================
 
-/// Active shopping cart — guest session based, no customer account required
 model Cart {
   id             String    @id @default(cuid())
   sessionId      String    @unique
@@ -456,17 +443,17 @@ model Cart {
   @@map("carts")
 }
 
-/// A single product line inside a cart
 model CartItem {
-  id        String   @id @default(cuid())
-  cartId    String
-  productId String
-  variantId String?
-  quantity  Int      @default(1)
-  unitPrice Decimal  @db.Decimal(10, 2)
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                    String   @id @default(cuid())
+  cartId                String
+  productId             String
+  variantId             String?
+  quantity              Int      @default(1)
+  unitPrice             Decimal  @db.Decimal(10, 2)
+  selectedTierQuantity  Int?
+  notes                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   cart           Cart            @relation(fields: [cartId], references: [id], onDelete: Cascade)
   product        Product         @relation(fields: [productId], references: [id])
@@ -477,44 +464,49 @@ model CartItem {
 }
 
 // =============================================================================
-// CUSTOMIZATION — UNIFIED TABLE
-//
-// Exactly one of cartItemId or orderItemId must be non-null at all times.
-//
-// Enforced by CHECK constraint in migration:
-//   (cart_item_id IS NOT NULL AND order_item_id IS NULL)
-//   OR
-//   (cart_item_id IS NULL AND order_item_id IS NOT NULL)
-//
-// Checkout transfer (inside a single transaction):
-//   UPDATE customizations
-//   SET    order_item_id = ?, cart_item_id = NULL
-//   WHERE  cart_item_id  = ?
-//
-// Files never move. Asset rows never duplicate. Only the FK changes.
+// CHECKOUT SESSION (Buy Now temporary storage)
 // =============================================================================
 
-/// Customer's answer to a custom field
-/// Owned by a CartItem before checkout, owned by an OrderItem after
+/// Temporary storage for "Buy Now" checkout flow — expires after 30 min
+/// Bypasses cart, holds a single product configuration until order is placed
+model CheckoutSession {
+  id                    String    @id @default(cuid())
+  sessionId             String
+  productId             String
+  variantId             String?
+  quantity              Int       @default(1)
+  selectedTierQuantity  Int?
+  unitPrice             Decimal   @db.Decimal(10, 2)
+  notes                 String?
+  customizations        Json?
+  assetId               String?
+  expiresAt             DateTime
+  createdAt             DateTime  @default(now())
+
+  @@index([sessionId])
+  @@index([expiresAt])
+  @@map("checkout_sessions")
+}
+
+// =============================================================================
+// CUSTOMIZATION
+// =============================================================================
+
 model Customization {
   id            String @id @default(cuid())
   customFieldId String
 
-  // Ownership — exactly one is non-null (enforced by CHECK constraint)
   cartItemId  String?
   orderItemId String?
 
-  // Snapshot of the field at time of submission
   fieldLabel String
   fieldType  CustomFieldType
 
-  // Typed value columns — only the relevant one is populated
   textValue    String?
   numberValue  Decimal?  @db.Decimal(10, 2)
   dateValue    DateTime?
   booleanValue Boolean?
 
-  // File upload reference — null if this field has no uploads
   assetId String? @unique
 
   createdAt DateTime @default(now())
@@ -532,10 +524,9 @@ model Customization {
 }
 
 // =============================================================================
-// ASSET — UNIFIED TABLE
+// ASSET
 // =============================================================================
 
-/// How a customer provided images — source, status, and async upload progress
 model Asset {
   id                 String          @id @default(cuid())
   sourceType         AssetSourceType
@@ -557,7 +548,6 @@ model Asset {
   @@map("assets")
 }
 
-/// An individual file belonging to an asset
 model AssetFile {
   id             String   @id @default(cuid())
   assetId        String
@@ -579,11 +569,6 @@ model AssetFile {
   @@map("asset_files")
 }
 
-// =============================================================================
-// FILE PROCESSING JOBS
-// =============================================================================
-
-/// Background job tracking for async operations on uploaded assets
 model FileProcessingJob {
   id           String    @id @default(cuid())
   assetId      String
@@ -610,10 +595,10 @@ model FileProcessingJob {
 // ORDERS
 // =============================================================================
 
-/// A placed order — shipping address embedded as a permanent snapshot
 model Order {
   id              String           @id @default(cuid())
   orderNumber     String           @unique
+  whatsappToken   String?          @unique
   customerId      String
   shipName        String
   shipPhone       String
@@ -624,7 +609,10 @@ model Order {
   shipPincode     String
   shipCountry     String           @default("India")
   status          OrderStatus      @default(AWAITING_PAYMENT)
+  photoStatus     PhotoStatus      @default(NOT_REQUIRED)
   productionStage ProductionStage?
+  orderSource     OrderSource      @default(WEBSITE)
+  checkoutMethod  CheckoutMethod   @default(CART)
   subtotal        Decimal          @db.Decimal(10, 2)
   discountAmount  Decimal          @default(0) @db.Decimal(10, 2)
   shippingCharge  Decimal          @default(0) @db.Decimal(10, 2)
@@ -633,6 +621,7 @@ model Order {
   couponCode      String?
   customerNote    String?
   adminNote       String?
+  driveLink       String?
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -644,25 +633,27 @@ model Order {
 
   @@index([customerId])
   @@index([status])
+  @@index([photoStatus])
+  @@index([orderSource])
   @@index([createdAt])
   @@map("orders")
 }
 
-/// A single product line inside an order
 model OrderItem {
-  id                 String          @id @default(cuid())
-  orderId            String
-  productId          String
-  variantId          String?
-  quantity           Int
-  unitPrice          Decimal         @db.Decimal(10, 2)
-  totalPrice         Decimal         @db.Decimal(10, 2)
-  productName        String
-  variantName        String?
-  productDescription String?
-  variantDescription String?
-  pricingStrategy    PricingStrategy
-  createdAt          DateTime        @default(now())
+  id                    String          @id @default(cuid())
+  orderId               String
+  productId             String
+  variantId             String?
+  quantity              Int
+  unitPrice             Decimal         @db.Decimal(10, 2)
+  totalPrice            Decimal         @db.Decimal(10, 2)
+  selectedTierQuantity  Int?
+  productName           String
+  variantName           String?
+  productDescription    String?
+  variantDescription    String?
+  pricingStrategy       PricingStrategy
+  createdAt             DateTime        @default(now())
 
   order          Order           @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product         @relation(fields: [productId], references: [id])
@@ -677,7 +668,6 @@ model OrderItem {
 // PAYMENT
 // =============================================================================
 
-/// Payment record linked to an order
 model Payment {
   id               String         @id @default(cuid())
   orderId          String         @unique
@@ -710,8 +700,6 @@ model Payment {
 // SHIPPING
 // =============================================================================
 
-/// Registered courier and shipping partners
-/// deletedAt — soft delete, preserves integrity of existing shipment references
 model ShippingPartner {
   id          String    @id @default(cuid())
   name        String
@@ -720,14 +708,13 @@ model ShippingPartner {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime? // soft delete
+  deletedAt   DateTime?
 
   shipments Shipment[]
 
   @@map("shipping_partners")
 }
 
-/// Shipment record created when an order is dispatched
 model Shipment {
   id                String         @id @default(cuid())
   orderId           String         @unique
@@ -748,10 +735,8 @@ model Shipment {
 
 // =============================================================================
 // ORDER TIMELINE
-// Immutable event log — rows are appended, never updated
 // =============================================================================
 
-/// One row per lifecycle event — some visible to customer, some admin-only
 model OrderTimeline {
   id                  String            @id @default(cuid())
   orderId             String
@@ -776,7 +761,6 @@ model OrderTimeline {
 // COUPONS
 // =============================================================================
 
-/// A promotional discount code with optional active window
 model Coupon {
   id              String    @id @default(cuid())
   code            String    @unique
@@ -797,7 +781,6 @@ model Coupon {
   @@map("coupons")
 }
 
-/// Tracks which customer used which coupon on which order
 model CouponUsage {
   id         String   @id @default(cuid())
   couponId   String
@@ -813,7 +796,7 @@ model CouponUsage {
 }
 
 // =============================================================================
-// SETTINGS — Domain-separated singleton tables
+// SETTINGS
 // =============================================================================
 
 model BusinessSetting {

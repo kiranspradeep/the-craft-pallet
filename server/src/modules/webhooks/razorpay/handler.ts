@@ -36,14 +36,12 @@ export const razorpayWebhookHandler = async (
   const signature = req.headers["x-razorpay-signature"] as string;
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
-  // 1. Verify secret is configured
   if (!webhookSecret) {
     logger.error("RAZORPAY_WEBHOOK_SECRET is not set");
     res.status(500).json({ success: false, message: "Webhook secret not configured" });
     return;
   }
 
-  // 2. Verify signature
   if (!signature) {
     logger.warn("Razorpay webhook received without signature");
     res.status(400).json({ success: false, message: "Missing signature" });
@@ -51,7 +49,6 @@ export const razorpayWebhookHandler = async (
   }
 
   const rawBody = (req as any).rawBody as string;
-
   if (!rawBody) {
     logger.warn("Razorpay webhook: raw body not available");
     res.status(400).json({ success: false, message: "Raw body missing" });
@@ -59,28 +56,26 @@ export const razorpayWebhookHandler = async (
   }
 
   const isValid = verifyWebhookSignature(rawBody, signature, webhookSecret);
-
   if (!isValid) {
     logger.warn("Razorpay webhook signature verification failed");
     res.status(400).json({ success: false, message: "Invalid signature" });
     return;
   }
 
-  // 3. Parse event
   const event = req.body;
   const eventType = event.event as string;
 
   logger.info(`Razorpay webhook received: ${eventType}`);
 
-  // 4. Route to handler
   try {
     switch (eventType) {
       case "payment_link.paid":
         await handlePaymentLinkPaid(event);
         break;
 
+      case "payment.authorized":
       case "payment.captured":
-        await handlePaymentCaptured(event);
+        await handlePaymentSuccess(event);
         break;
 
       case "payment.failed":
@@ -91,17 +86,63 @@ export const razorpayWebhookHandler = async (
         logger.info(`Razorpay webhook: unhandled event type "${eventType}"`);
     }
 
-    // Always respond 200 to Razorpay quickly
     res.status(200).json({ success: true });
   } catch (err) {
     logger.error(`Razorpay webhook handler error for event ${eventType}:`, err);
-    // Still return 200 — Razorpay will retry on non-200
-    // We log the error but don't want infinite retries for logic errors
     res.status(200).json({ success: true });
   }
 };
 
-// ── payment_link.paid ─────────────────────────────────────────────────────
+// ── Helper: Find order via multiple methods ──────────────────────────────
+
+const findOrderForPayment = async (payment: any) => {
+  const paymentLinkId = payment.payment_link_id as string | undefined;
+  const razorpayOrderId = payment.order_id as string | undefined;
+  const orderNumber = payment.notes?.orderNumber as string | undefined;
+  const orderId = payment.notes?.orderId as string | undefined;
+
+  // 1. By razorpay order_id (customer checkout with Razorpay Orders API)
+  if (razorpayOrderId) {
+    const rec = await prisma.payment.findFirst({
+      where: { gatewayOrderId: razorpayOrderId },
+      include: { order: { include: { customer: true } } },
+    });
+    if (rec) return rec;
+  }
+
+  // 2. By payment link ID (WhatsApp admin flow)
+  if (paymentLinkId) {
+    const rec = await prisma.payment.findFirst({
+      where: { gatewayOrderId: paymentLinkId },
+      include: { order: { include: { customer: true } } },
+    });
+    if (rec) return rec;
+  }
+
+  // 3. By orderId from Razorpay notes
+  if (orderId) {
+    const rec = await prisma.payment.findFirst({
+      where: { orderId },
+      include: { order: { include: { customer: true } } },
+    });
+    if (rec) return rec;
+  }
+
+  // 4. By orderNumber from Razorpay notes
+  if (orderNumber) {
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: { customer: true, payment: true },
+    });
+    if (order?.payment) {
+      return { ...order.payment, order };
+    }
+  }
+
+  return null;
+};
+
+// ── payment_link.paid — WhatsApp admin payment link flow ─────────────────
 
 const handlePaymentLinkPaid = async (event: any): Promise<void> => {
   const paymentLink = event.payload?.payment_link?.entity;
@@ -116,7 +157,6 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
   const razorpayPaymentId = payment?.id as string | undefined;
   const razorpaySignature = payment?.signature as string | undefined;
 
-  // Find order by gatewayOrderId (we stored payment link ID there)
   const paymentRecord = await prisma.payment.findFirst({
     where: { gatewayOrderId: paymentLinkId },
     include: { order: { include: { customer: true } } },
@@ -131,7 +171,6 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
 
   const order = paymentRecord.order;
 
-  // Idempotency check — don't process if already confirmed
   if (order.status === OrderStatus.CONFIRMED) {
     logger.info(
       `payment_link.paid: order ${order.orderNumber} already confirmed — skipping`
@@ -141,12 +180,11 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
 
   const now = new Date();
 
-  // Update payment record
   await prisma.payment.update({
     where: { orderId: order.id },
     data: {
       status: PaymentStatus.SUCCESS,
-      method: PaymentMethod.UPI, // default — Razorpay handles method
+      method: PaymentMethod.UPI,
       gatewayName: "razorpay",
       gatewayPaymentId: razorpayPaymentId ?? null,
       gatewaySignature: razorpaySignature ?? null,
@@ -155,19 +193,19 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
     },
   });
 
-  // Update order status → CONFIRMED
   await prisma.order.update({
     where: { id: order.id },
     data: { status: OrderStatus.CONFIRMED },
   });
 
-  // Timeline — payment success
   await prisma.orderTimeline.create({
     data: {
       orderId: order.id,
       eventType: TimelineEventType.PAYMENT_SUCCESS,
       title: "Payment Successful",
-      description: `Payment of ₹${Number(order.totalAmount).toFixed(2)} received successfully via Razorpay`,
+      description: `Payment of ₹${Number(order.totalAmount).toFixed(
+        2
+      )} received successfully via Razorpay`,
       actorType: ActorType.SYSTEM,
       isVisibleToCustomer: true,
       metadata: {
@@ -178,7 +216,6 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
     },
   });
 
-  // Timeline — order confirmed
   await prisma.orderTimeline.create({
     data: {
       orderId: order.id,
@@ -196,53 +233,96 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
   );
 };
 
-// ── payment.captured ──────────────────────────────────────────────────────
+// ── payment.authorized / payment.captured — customer checkout flow ───────
 
-const handlePaymentCaptured = async (event: any): Promise<void> => {
+const handlePaymentSuccess = async (event: any): Promise<void> => {
   const payment = event.payload?.payment?.entity;
 
   if (!payment) {
-    logger.warn("payment.captured: missing payment entity");
+    logger.warn("payment.success: missing payment entity");
     return;
   }
 
   const razorpayPaymentId = payment.id as string;
-  const paymentLinkId = payment.payment_link_id as string | undefined;
+  const amount = payment.amount as number;
+  const method = payment.method as string | undefined;
 
-  if (!paymentLinkId) {
-    // Not a payment link payment — skip
-    logger.info(
-      `payment.captured: no payment_link_id on payment ${razorpayPaymentId} — skipping`
-    );
-    return;
-  }
-
-  // Find payment record
-  const paymentRecord = await prisma.payment.findFirst({
-    where: { gatewayOrderId: paymentLinkId },
-    include: { order: true },
-  });
+  const paymentRecord = await findOrderForPayment(payment);
 
   if (!paymentRecord) {
     logger.warn(
-      `payment.captured: no payment record found for link ${paymentLinkId}`
+      `payment webhook: no payment record found for payment ${razorpayPaymentId}`
     );
     return;
   }
 
-  // Already handled by payment_link.paid — just update payment ID if missing
-  if (!paymentRecord.gatewayPaymentId) {
-    await prisma.payment.update({
-      where: { orderId: paymentRecord.orderId },
-      data: {
-        gatewayPaymentId: razorpayPaymentId,
-        status: PaymentStatus.SUCCESS,
-      },
-    });
+  const order = paymentRecord.order;
+
+  if (order.status === OrderStatus.CONFIRMED) {
+    logger.info(
+      `payment webhook: order ${order.orderNumber} already confirmed — skipping`
+    );
+    return;
   }
 
+  const now = new Date();
+
+  const methodMap: Record<string, PaymentMethod> = {
+    upi: PaymentMethod.UPI,
+    card: PaymentMethod.CARD,
+    netbanking: PaymentMethod.NET_BANKING,
+    wallet: PaymentMethod.WALLET,
+  };
+
+  await prisma.payment.update({
+    where: { orderId: order.id },
+    data: {
+      status: PaymentStatus.SUCCESS,
+      method: methodMap[method ?? ""] ?? PaymentMethod.UPI,
+      gatewayName: "razorpay",
+      gatewayPaymentId: razorpayPaymentId,
+      gatewayResponse: event.payload as any,
+      paidAt: now,
+    },
+  });
+
+  await prisma.order.update({
+    where: { id: order.id },
+    data: { status: OrderStatus.CONFIRMED },
+  });
+
+  await prisma.orderTimeline.create({
+    data: {
+      orderId: order.id,
+      eventType: TimelineEventType.PAYMENT_SUCCESS,
+      title: "Payment Successful",
+      description: `Payment of ₹${(amount / 100).toFixed(
+        2
+      )} received via ${method?.toUpperCase() ?? "Razorpay"}`,
+      actorType: ActorType.SYSTEM,
+      isVisibleToCustomer: true,
+      metadata: {
+        razorpayPaymentId,
+        method,
+        amount,
+      } as any,
+    },
+  });
+
+  await prisma.orderTimeline.create({
+    data: {
+      orderId: order.id,
+      eventType: TimelineEventType.ORDER_CONFIRMED,
+      title: "Order Confirmed",
+      description:
+        "Your order has been confirmed and will enter production soon.",
+      actorType: ActorType.SYSTEM,
+      isVisibleToCustomer: true,
+    },
+  });
+
   logger.info(
-    `payment.captured: payment ${razorpayPaymentId} captured for order ${paymentRecord.order.orderNumber}`
+    `Order ${order.orderNumber} confirmed via payment webhook (payment: ${razorpayPaymentId}, method: ${method})`
   );
 };
 
@@ -257,34 +337,41 @@ const handlePaymentFailed = async (event: any): Promise<void> => {
   }
 
   const razorpayPaymentId = payment.id as string;
-  const paymentLinkId = payment.payment_link_id as string | undefined;
-  const errorDescription =
-    payment.error_description as string | undefined;
+  const errorDescription = payment.error_description as string | undefined;
   const errorCode = payment.error_code as string | undefined;
 
-  if (!paymentLinkId) {
-    logger.info(
-      `payment.failed: no payment_link_id on payment ${razorpayPaymentId} — skipping`
-    );
-    return;
-  }
-
-  // Find payment record
-  const paymentRecord = await prisma.payment.findFirst({
-    where: { gatewayOrderId: paymentLinkId },
-    include: { order: true },
-  });
+  const paymentRecord = await findOrderForPayment(payment);
 
   if (!paymentRecord) {
     logger.warn(
-      `payment.failed: no payment record found for link ${paymentLinkId}`
+      `payment.failed: no payment record found for payment ${razorpayPaymentId}`
     );
     return;
   }
 
   const order = paymentRecord.order;
 
-  // Idempotency — skip if already failed
+  // ── IDEMPOTENCY GUARDS ─────────────────────────────────────────────
+  // Never downgrade a successful payment / confirmed order
+  if (paymentRecord.status === PaymentStatus.SUCCESS) {
+    logger.info(
+      `payment.failed: payment for order ${order.orderNumber} already SUCCESS — ignoring failure event (retried card etc)`
+    );
+    return;
+  }
+
+  if (
+    order.status === OrderStatus.CONFIRMED ||
+    order.status === OrderStatus.IN_PRODUCTION ||
+    order.status === OrderStatus.SHIPPED ||
+    order.status === OrderStatus.DELIVERED
+  ) {
+    logger.info(
+      `payment.failed: order ${order.orderNumber} already progressed (${order.status}) — ignoring failure event`
+    );
+    return;
+  }
+
   if (order.status === OrderStatus.PAYMENT_FAILED) {
     logger.info(
       `payment.failed: order ${order.orderNumber} already in PAYMENT_FAILED — skipping`
@@ -292,7 +379,6 @@ const handlePaymentFailed = async (event: any): Promise<void> => {
     return;
   }
 
-  // Update payment record
   await prisma.payment.update({
     where: { orderId: order.id },
     data: {
@@ -303,21 +389,18 @@ const handlePaymentFailed = async (event: any): Promise<void> => {
     },
   });
 
-  // Update order status → PAYMENT_FAILED
   await prisma.order.update({
     where: { id: order.id },
     data: { status: OrderStatus.PAYMENT_FAILED },
   });
 
-  // Timeline
   await prisma.orderTimeline.create({
     data: {
       orderId: order.id,
       eventType: TimelineEventType.PAYMENT_FAILED,
       title: "Payment Failed",
       description:
-        errorDescription ??
-        "Payment attempt failed. A new payment link can be generated.",
+        errorDescription ?? "Payment attempt failed. Please try again.",
       actorType: ActorType.SYSTEM,
       isVisibleToCustomer: true,
       metadata: {
