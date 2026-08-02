@@ -9,7 +9,9 @@ export type CartWithItems = Prisma.CartGetPayload<{
           include: {
             images: true;
             configuration: true;
-            pricingConfig: true;
+            pricingConfig: {
+              include: { tiers: true };
+            };
           };
         };
         variant: true;
@@ -27,7 +29,9 @@ export type CartItemWithRelations = Prisma.CartItemGetPayload<{
       include: {
         images: true;
         configuration: true;
-        pricingConfig: true;
+        pricingConfig: {
+          include: { tiers: true };
+        };
       };
     };
     variant: true;
@@ -58,7 +62,7 @@ export const cartRepository = {
     return prisma.cart.create({
       data: {
         sessionId,
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         lastActivityAt: new Date(),
       },
       include: cartInclude,
@@ -78,7 +82,9 @@ export const cartRepository = {
 
   // ── Cart Items ────────────────────────────────────────────────────────
 
-  findItemById: async (itemId: string): Promise<CartItemWithRelations | null> => {
+  findItemById: async (
+    itemId: string
+  ): Promise<CartItemWithRelations | null> => {
     return prisma.cartItem.findUnique({
       where: { id: itemId },
       include: itemInclude,
@@ -129,9 +135,7 @@ export const cartRepository = {
 
   // ── Customizations ────────────────────────────────────────────────────
 
-  createCustomization: async (
-    data: Prisma.CustomizationCreateInput
-  ) => {
+  createCustomization: async (data: Prisma.CustomizationCreateInput) => {
     return prisma.customization.create({ data });
   },
 
@@ -160,7 +164,9 @@ const itemInclude = {
     include: {
       images: true,
       configuration: true,
-      pricingConfig: true,
+      pricingConfig: {
+        include: { tiers: true },
+      },
     },
   },
   variant: true,

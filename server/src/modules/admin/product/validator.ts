@@ -21,7 +21,10 @@ export const createProductSchema = z.object({
     slug: z
       .string()
       .max(220)
-      .regex(/^[a-z0-9-]+$/, "Slug may only contain lowercase letters, numbers, and hyphens")
+      .regex(
+        /^[a-z0-9-]+$/,
+        "Slug may only contain lowercase letters, numbers, and hyphens"
+      )
       .optional(),
     description: z.string().optional(),
     shortDescription: z.string().max(500).optional(),
@@ -87,7 +90,10 @@ export const listProductsSchema = z.object({
         if (v === "false") return false;
         return undefined;
       }),
-    sortBy: z.enum(["name", "createdAt", "sortOrder"]).optional().default("sortOrder"),
+    sortBy: z
+      .enum(["name", "createdAt", "sortOrder"])
+      .optional()
+      .default("sortOrder"),
     sortOrder: z.enum(["asc", "desc"]).optional().default("asc"),
   }),
 });
@@ -101,7 +107,10 @@ export const addImageSchema = z.object({
   body: z.object({
     url: z.string({ required_error: "Image URL is required" }).url(),
     altText: z.string().max(200).optional(),
-    type: z.nativeEnum(ProductImageType).optional().default(ProductImageType.GALLERY),
+    type: z
+      .nativeEnum(ProductImageType)
+      .optional()
+      .default(ProductImageType.GALLERY),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
     sortOrder: z.number().int().min(0).optional().default(0),
@@ -134,7 +143,10 @@ export const reorderImagesSchema = z.object({
 export const createVariantSchema = z.object({
   params: z.object({ id: z.string().min(1) }),
   body: z.object({
-    name: z.string({ required_error: "Variant name is required" }).min(1).max(100),
+    name: z
+      .string({ required_error: "Variant name is required" })
+      .min(1)
+      .max(100),
     sku: z.string().max(100).optional(),
     price: z
       .number({ required_error: "Price is required" })
@@ -204,6 +216,7 @@ export const upsertPricingSchema = z.object({
       incrementQuantity: z.number().int().positive().optional(),
       incrementPrice: z.number().positive().optional(),
       unitPrice: z.number().positive().optional(),
+      baseUnitPrice: z.number().positive().optional(),
     })
     .superRefine((data, ctx) => {
       if (
@@ -216,10 +229,7 @@ export const upsertPricingSchema = z.object({
             "incrementQuantity and incrementPrice are required for INCREMENTAL_QUANTITY strategy",
         });
       }
-      if (
-        data.strategy === PricingStrategy.PER_UNIT &&
-        !data.unitPrice
-      ) {
+      if (data.strategy === PricingStrategy.PER_UNIT && !data.unitPrice) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           message: "unitPrice is required for PER_UNIT strategy",
@@ -228,13 +238,58 @@ export const upsertPricingSchema = z.object({
     }),
 });
 
+// ── Pricing Tiers ─────────────────────────────────────────────────────────
+
+export const createPricingTierSchema = z.object({
+  params: z.object({ id: z.string().min(1) }),
+  body: z.object({
+    quantity: z
+      .number({ required_error: "Quantity is required" })
+      .int()
+      .positive(),
+    price: z
+      .number({ required_error: "Price is required" })
+      .positive("Price must be positive"),
+    label: z.string().max(100).optional(),
+    isSpecialOffer: z.boolean().optional().default(false),
+    sortOrder: z.number().int().min(0).optional().default(0),
+  }),
+});
+
+export const updatePricingTierSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
+    tierId: z.string().min(1),
+  }),
+  body: z.object({
+    quantity: z.number().int().positive().optional(),
+    price: z.number().positive().optional(),
+    label: z.string().max(100).optional(),
+    isSpecialOffer: z.boolean().optional(),
+    sortOrder: z.number().int().min(0).optional(),
+  }),
+});
+
+export const tierIdSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
+    tierId: z.string().min(1),
+  }),
+});
+
 // ── Custom Fields ─────────────────────────────────────────────────────────
 
 export const createCustomFieldSchema = z.object({
   params: z.object({ id: z.string().min(1) }),
   body: z.object({
-    name: z.string({ required_error: "Field name is required" }).min(1).max(100),
-    label: z.string({ required_error: "Label is required" }).min(1).max(200),
+    name: z
+      .string({ required_error: "Field name is required" })
+      .min(1)
+      .max(100),
+    label: z
+      .string({ required_error: "Label is required" })
+      .min(1)
+      .max(200),
     type: z.nativeEnum(CustomFieldType, {
       required_error: "Field type is required",
     }),
@@ -274,7 +329,12 @@ export const reorderCustomFieldsSchema = z.object({
   params: z.object({ id: z.string().min(1) }),
   body: z.object({
     fields: z
-      .array(z.object({ id: z.string().min(1), sortOrder: z.number().int().min(0) }))
+      .array(
+        z.object({
+          id: z.string().min(1),
+          sortOrder: z.number().int().min(0),
+        })
+      )
       .min(1),
   }),
 });

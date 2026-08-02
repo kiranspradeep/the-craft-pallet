@@ -3,16 +3,20 @@ import { productService } from "./service.js";
 import { sendSuccess } from "../../../shared/helpers/response.js";
 import { asyncHandler } from "../../../shared/utils/asyncHandler.js";
 
-// Helper — safely extract a string param from Express 5 params
 const param = (req: Request, key: string): string =>
   req.params[key] as string;
 
 export const productController = {
-  // ── Core ─────────────────────────────────────────────────────────────
+  // ── Core ──────────────────────────────────────────────────────────────
 
   create: asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const product = await productService.create(req.body);
-    sendSuccess({ res, message: "Product created successfully", data: product, statusCode: 201 });
+    sendSuccess({
+      res,
+      message: "Product created successfully",
+      data: product,
+      statusCode: 201,
+    });
   }),
 
   list: asyncHandler(async (req: Request, res: Response): Promise<void> => {
@@ -23,9 +27,17 @@ export const productController = {
       search: q["search"],
       categoryId: q["categoryId"],
       isActive:
-        q["isActive"] === "true" ? true : q["isActive"] === "false" ? false : undefined,
+        q["isActive"] === "true"
+          ? true
+          : q["isActive"] === "false"
+          ? false
+          : undefined,
       isFeatured:
-        q["isFeatured"] === "true" ? true : q["isFeatured"] === "false" ? false : undefined,
+        q["isFeatured"] === "true"
+          ? true
+          : q["isFeatured"] === "false"
+          ? false
+          : undefined,
       sortBy: (q["sortBy"] as any) ?? "sortOrder",
       sortOrder: (q["sortOrder"] as any) ?? "asc",
     });
@@ -48,119 +60,261 @@ export const productController = {
 
   update: asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const product = await productService.update(param(req, "id"), req.body);
-    sendSuccess({ res, message: "Product updated successfully", data: product });
+    sendSuccess({
+      res,
+      message: "Product updated successfully",
+      data: product,
+    });
   }),
 
-  softDelete: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.softDelete(param(req, "id"));
-    sendSuccess({ res, message: "Product deactivated successfully" });
-  }),
+  softDelete: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.softDelete(param(req, "id"));
+      sendSuccess({ res, message: "Product deactivated successfully" });
+    }
+  ),
 
-  // ── Images ───────────────────────────────────────────────────────────
+  // ── Images ────────────────────────────────────────────────────────────
 
-  addImage: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const image = await productService.addImage(param(req, "id"), req.body);
-    sendSuccess({ res, message: "Image added successfully", data: image, statusCode: 201 });
-  }),
+  addImage: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const image = await productService.addImage(param(req, "id"), req.body);
+      sendSuccess({
+        res,
+        message: "Image added successfully",
+        data: image,
+        statusCode: 201,
+      });
+    }
+  ),
 
-  deleteImage: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.deleteImage(param(req, "id"), param(req, "imageId"));
-    sendSuccess({ res, message: "Image deleted successfully" });
-  }),
+  deleteImage: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.deleteImage(
+        param(req, "id"),
+        param(req, "imageId")
+      );
+      sendSuccess({ res, message: "Image deleted successfully" });
+    }
+  ),
 
-  reorderImages: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.reorderImages(param(req, "id"), req.body.images);
-    sendSuccess({ res, message: "Images reordered successfully" });
-  }),
+  reorderImages: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.reorderImages(param(req, "id"), req.body.images);
+      sendSuccess({ res, message: "Images reordered successfully" });
+    }
+  ),
 
-  // ── Variants ─────────────────────────────────────────────────────────
+  // ── Variants ──────────────────────────────────────────────────────────
 
-  createVariant: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const variant = await productService.createVariant(param(req, "id"), req.body);
-    sendSuccess({ res, message: "Variant created successfully", data: variant, statusCode: 201 });
-  }),
+  createVariant: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const variant = await productService.createVariant(
+        param(req, "id"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Variant created successfully",
+        data: variant,
+        statusCode: 201,
+      });
+    }
+  ),
 
-  updateVariant: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const variant = await productService.updateVariant(
-      param(req, "id"),
-      param(req, "variantId"),
-      req.body
-    );
-    sendSuccess({ res, message: "Variant updated successfully", data: variant });
-  }),
+  updateVariant: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const variant = await productService.updateVariant(
+        param(req, "id"),
+        param(req, "variantId"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Variant updated successfully",
+        data: variant,
+      });
+    }
+  ),
 
-  deleteVariant: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.deleteVariant(param(req, "id"), param(req, "variantId"));
-    sendSuccess({ res, message: "Variant deleted successfully" });
-  }),
+  deleteVariant: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.deleteVariant(
+        param(req, "id"),
+        param(req, "variantId")
+      );
+      sendSuccess({ res, message: "Variant deleted successfully" });
+    }
+  ),
 
-  // ── Configuration ─────────────────────────────────────────────────────
+  // ── Configuration ──────────────────────────────────────────────────────
 
-  upsertConfiguration: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const config = await productService.upsertConfiguration(param(req, "id"), req.body);
-    sendSuccess({ res, message: "Configuration saved successfully", data: config });
-  }),
+  upsertConfiguration: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const config = await productService.upsertConfiguration(
+        param(req, "id"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Configuration saved successfully",
+        data: config,
+      });
+    }
+  ),
 
-  // ── Pricing ───────────────────────────────────────────────────────────
+  // ── Pricing ────────────────────────────────────────────────────────────
 
-  upsertPricing: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const pricing = await productService.upsertPricing(param(req, "id"), req.body);
-    sendSuccess({ res, message: "Pricing saved successfully", data: pricing });
-  }),
+  upsertPricing: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const pricing = await productService.upsertPricing(
+        param(req, "id"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Pricing saved successfully",
+        data: pricing,
+      });
+    }
+  ),
 
-  // ── Custom Fields ─────────────────────────────────────────────────────
+  // ── Pricing Tiers ──────────────────────────────────────────────────────
 
-  createCustomField: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const field = await productService.createCustomField(param(req, "id"), req.body);
-    sendSuccess({ res, message: "Custom field created successfully", data: field, statusCode: 201 });
-  }),
+  createPricingTier: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const tier = await productService.createPricingTier(
+        param(req, "id"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Pricing tier created successfully",
+        data: tier,
+        statusCode: 201,
+      });
+    }
+  ),
 
-  updateCustomField: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const field = await productService.updateCustomField(
-      param(req, "id"),
-      param(req, "fieldId"),
-      req.body
-    );
-    sendSuccess({ res, message: "Custom field updated successfully", data: field });
-  }),
+  updatePricingTier: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const tier = await productService.updatePricingTier(
+        param(req, "id"),
+        param(req, "tierId"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Pricing tier updated successfully",
+        data: tier,
+      });
+    }
+  ),
 
-  deleteCustomField: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.deleteCustomField(param(req, "id"), param(req, "fieldId"));
-    sendSuccess({ res, message: "Custom field deleted successfully" });
-  }),
+  deletePricingTier: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.deletePricingTier(
+        param(req, "id"),
+        param(req, "tierId")
+      );
+      sendSuccess({ res, message: "Pricing tier deleted successfully" });
+    }
+  ),
 
-  reorderCustomFields: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.reorderCustomFields(param(req, "id"), req.body.fields);
-    sendSuccess({ res, message: "Custom fields reordered successfully" });
-  }),
+  // ── Custom Fields ──────────────────────────────────────────────────────
 
-  // ── Custom Field Options ──────────────────────────────────────────────
+  createCustomField: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const field = await productService.createCustomField(
+        param(req, "id"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Custom field created successfully",
+        data: field,
+        statusCode: 201,
+      });
+    }
+  ),
 
-  createCustomFieldOption: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const option = await productService.createCustomFieldOption(
-      param(req, "id"),
-      param(req, "fieldId"),
-      req.body
-    );
-    sendSuccess({ res, message: "Option created successfully", data: option, statusCode: 201 });
-  }),
+  updateCustomField: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const field = await productService.updateCustomField(
+        param(req, "id"),
+        param(req, "fieldId"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Custom field updated successfully",
+        data: field,
+      });
+    }
+  ),
 
-  updateCustomFieldOption: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const option = await productService.updateCustomFieldOption(
-      param(req, "id"),
-      param(req, "fieldId"),
-      param(req, "optionId"),
-      req.body
-    );
-    sendSuccess({ res, message: "Option updated successfully", data: option });
-  }),
+  deleteCustomField: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.deleteCustomField(
+        param(req, "id"),
+        param(req, "fieldId")
+      );
+      sendSuccess({ res, message: "Custom field deleted successfully" });
+    }
+  ),
 
-  deleteCustomFieldOption: asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    await productService.deleteCustomFieldOption(
-      param(req, "id"),
-      param(req, "fieldId"),
-      param(req, "optionId")
-    );
-    sendSuccess({ res, message: "Option deleted successfully" });
-  }),
+  reorderCustomFields: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.reorderCustomFields(
+        param(req, "id"),
+        req.body.fields
+      );
+      sendSuccess({ res, message: "Custom fields reordered successfully" });
+    }
+  ),
+
+  // ── Custom Field Options ────────────────────────────────────────────────
+
+  createCustomFieldOption: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const option = await productService.createCustomFieldOption(
+        param(req, "id"),
+        param(req, "fieldId"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Option created successfully",
+        data: option,
+        statusCode: 201,
+      });
+    }
+  ),
+
+  updateCustomFieldOption: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const option = await productService.updateCustomFieldOption(
+        param(req, "id"),
+        param(req, "fieldId"),
+        param(req, "optionId"),
+        req.body
+      );
+      sendSuccess({
+        res,
+        message: "Option updated successfully",
+        data: option,
+      });
+    }
+  ),
+
+  deleteCustomFieldOption: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      await productService.deleteCustomFieldOption(
+        param(req, "id"),
+        param(req, "fieldId"),
+        param(req, "optionId")
+      );
+      sendSuccess({ res, message: "Option deleted successfully" });
+    }
+  ),
 };

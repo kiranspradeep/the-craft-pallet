@@ -2,12 +2,11 @@ import { Request, Response } from "express";
 import { orderService } from "./service.js";
 import { sendSuccess } from "../../../shared/helpers/response.js";
 import { asyncHandler } from "../../../shared/utils/asyncHandler.js";
-import { OrderStatus, ShipmentStatus } from "@prisma/client";
+import { BadRequestError } from "../../../shared/errors/AppError.js";
+import { OrderStatus, ProductionStage } from "@prisma/client";
 
 const param = (req: Request, key: string): string =>
   req.params[key] as string;
-
-const adminId = (req: Request): string => req.admin!.id;
 
 export const orderController = {
   // GET /api/admin/orders
@@ -19,12 +18,13 @@ export const orderController = {
       limit: q["limit"] ? parseInt(q["limit"], 10) : 20,
       search: q["search"],
       status: q["status"] as OrderStatus | undefined,
-      paymentStatus: q["paymentStatus"],
-      customerId: q["customerId"],
-      dateFrom: q["dateFrom"],
-      dateTo: q["dateTo"],
-      sortBy: (q["sortBy"] as any) ?? "createdAt",
-      sortOrder: (q["sortOrder"] as any) ?? "desc",
+      productionStage: q["productionStage"] as ProductionStage | undefined,
+      dateFrom: q["dateFrom"] ? new Date(q["dateFrom"]) : undefined,
+      dateTo: q["dateTo"] ? new Date(q["dateTo"]) : undefined,
+      sortBy:
+        (q["sortBy"] as "createdAt" | "updatedAt" | "totalAmount") ??
+        "createdAt",
+      sortOrder: (q["sortOrder"] as "asc" | "desc") ?? "desc",
     });
 
     sendSuccess({
@@ -39,6 +39,22 @@ export const orderController = {
     });
   }),
 
+  // GET /api/admin/orders/stats
+  getStats: asyncHandler(
+    async (_req: Request, res: Response): Promise<void> => {
+      const stats = await orderService.getStats();
+      sendSuccess({ res, data: stats });
+    }
+  ),
+
+  // GET /api/admin/orders/production-queue
+  getProductionQueue: asyncHandler(
+    async (_req: Request, res: Response): Promise<void> => {
+      const orders = await orderService.getProductionQueue();
+      sendSuccess({ res, data: orders });
+    }
+  ),
+
   // GET /api/admin/orders/:id
   getOne: asyncHandler(async (req: Request, res: Response): Promise<void> => {
     const order = await orderService.findById(param(req, "id"));
@@ -49,114 +65,101 @@ export const orderController = {
   updateStatus: asyncHandler(
     async (req: Request, res: Response): Promise<void> => {
       const { status, note } = req.body;
+      const adminId = req.admin!.id;
+
       const order = await orderService.updateStatus(
         param(req, "id"),
-        status as OrderStatus,
-        adminId(req),
+        status,
+        adminId,
         note
       );
+
       sendSuccess({
         res,
-        message: "Order status updated",
+        message: "Order status updated successfully",
         data: order,
       });
     }
   ),
 
-  // POST /api/admin/orders/:id/verify-payment
-  verifyPayment: asyncHandler(
+  // PATCH /api/admin/orders/:id/production-stage
+  updateProductionStage: asyncHandler(
     async (req: Request, res: Response): Promise<void> => {
-      const order = await orderService.verifyPayment(
+      const { productionStage } = req.body;
+      const adminId = req.admin!.id;
+
+      const order = await orderService.updateProductionStage(
         param(req, "id"),
-        adminId(req),
-        req.body
+        productionStage,
+        adminId
       );
+
       sendSuccess({
         res,
-        message: req.body.approved
-          ? "Payment approved and order confirmed"
-          : "Payment rejected",
+        message: "Production stage updated successfully",
         data: order,
       });
     }
   ),
 
-  // PATCH /api/admin/orders/:id/shipment
-  assignShipment: asyncHandler(
+  // PATCH /api/admin/orders/:id/note
+  addNote: asyncHandler(
     async (req: Request, res: Response): Promise<void> => {
-      const order = await orderService.assignShipment(
+      const { note } = req.body;
+      const adminId = req.admin!.id;
+
+      const order = await orderService.addNote(
         param(req, "id"),
-        adminId(req),
-        req.body
+        note,
+        adminId
       );
+
       sendSuccess({
         res,
-        message: "Shipment assigned and order marked as shipped",
+        message: "Note added successfully",
         data: order,
       });
     }
   ),
 
-  // PATCH /api/admin/orders/:id/shipment/status
-  updateShipmentStatus: asyncHandler(
+  // PATCH /api/admin/orders/:id/mark-paid
+  markAsPaid: asyncHandler(
     async (req: Request, res: Response): Promise<void> => {
-      const order = await orderService.updateShipmentStatus(
+      const adminId = req.admin!.id;
+
+      const order = await orderService.markAsPaid(
         param(req, "id"),
-        adminId(req),
+        adminId,
         {
-          status: req.body.status as ShipmentStatus,
+          referenceNumber: req.body.referenceNumber,
           note: req.body.note,
         }
       );
+
       sendSuccess({
         res,
-        message: "Shipment status updated",
+        message: "Order marked as paid successfully",
         data: order,
       });
     }
   ),
 
-  // PATCH /api/admin/orders/:id/cancel
-  cancelOrder: asyncHandler(
+  // POST /api/admin/orders/:id/payment-link
+  generatePaymentLink: asyncHandler(
     async (req: Request, res: Response): Promise<void> => {
-      const order = await orderService.cancelOrder(
-        param(req, "id"),
-        adminId(req),
-        req.body.reason
-      );
-      sendSuccess({ res, message: "Order cancelled", data: order });
-    }
-  ),
+      const adminId = req.admin!.id;
 
-  // POST /api/admin/orders/:id/refund
-  refundOrder: asyncHandler(
-    async (req: Request, res: Response): Promise<void> => {
-      const order = await orderService.refundOrder(
+      const result = await orderService.generatePaymentLink(
         param(req, "id"),
-        adminId(req),
-        req.body
+        adminId
       );
-      sendSuccess({ res, message: "Refund recorded", data: order });
-    }
-  ),
 
-  // POST /api/admin/orders/:id/notes
-  addNote: asyncHandler(
-    async (req: Request, res: Response): Promise<void> => {
-      const order = await orderService.addNote(
-        param(req, "id"),
-        adminId(req),
-        req.body
-      );
-      sendSuccess({ res, message: "Note added", data: order });
-    }
-  ),
-
-  // GET /api/admin/shipping-partners
-  getShippingPartners: asyncHandler(
-    async (_req: Request, res: Response): Promise<void> => {
-      const partners = await orderService.getShippingPartners();
-      sendSuccess({ res, data: partners });
+      sendSuccess({
+        res,
+        message: "Payment link generated successfully",
+        data: result,
+        statusCode: 201,
+      });
     }
   ),
 };

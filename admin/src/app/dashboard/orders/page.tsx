@@ -4,11 +4,13 @@ import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
+import OrderFilters from "./OrderFilters";
 
 interface Order {
   id: string;
   orderNumber: string;
   status: string;
+  productionStage: string | null;
   totalAmount: string;
   createdAt: string;
   customer: { name: string; phone: string };
@@ -18,38 +20,72 @@ interface Order {
 
 function statusVariant(
   status: string
-): "success" | "warning" | "error" | "neutral" {
+): "success" | "warning" | "error" | "neutral" | "brand" {
   switch (status) {
     case "DELIVERED": return "success";
+    case "CONFIRMED": return "success";
     case "AWAITING_PAYMENT": return "warning";
-    case "CANCELLED": return "error";
     case "PAYMENT_FAILED": return "error";
+    case "CANCELLED": return "error";
+    case "IN_PRODUCTION": return "brand";
+    case "SHIPPED": return "brand";
     default: return "neutral";
   }
 }
 
-function formatStatus(s: string) {
+function paymentVariant(
+  status: string
+): "success" | "error" | "neutral" | "warning" {
+  switch (status) {
+    case "SUCCESS": return "success";
+    case "FAILED": return "error";
+    case "INITIATED": return "warning";
+    default: return "neutral";
+  }
+}
+
+function formatLabel(s: string) {
   return s.replace(/_/g, " ");
 }
 
-async function getOrders(token: string) {
+async function getOrders(token: string, params: Record<string, string>) {
   const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-  const res = await fetch(
-    `${API_URL}/api/admin/orders?limit=50&sortBy=createdAt&sortOrder=desc`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-      cache: "no-store",
-    }
-  );
+  const query = new URLSearchParams({
+    limit: "50",
+    sortBy: "createdAt",
+    sortOrder: "desc",
+    ...params,
+  }).toString();
+
+  const res = await fetch(`${API_URL}/api/admin/orders?${query}`, {
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
   if (!res.ok) return { orders: [], total: 0 };
   const data = await res.json();
-  return { orders: data.data as Order[], total: data.meta?.total ?? 0 };
+  return {
+    orders: data.data as Order[],
+    total: data.meta?.total ?? 0,
+  };
 }
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
+  const resolvedParams = await searchParams;
   const cookieStore = await cookies();
   const token = cookieStore.get("tcp_admin_token")?.value || "";
-  const { orders, total } = await getOrders(token);
+
+  // Build filter params from URL search params
+  const filterParams: Record<string, string> = {};
+  if (resolvedParams["status"]) filterParams["status"] = resolvedParams["status"];
+  if (resolvedParams["search"]) filterParams["search"] = resolvedParams["search"];
+  if (resolvedParams["dateFrom"]) filterParams["dateFrom"] = resolvedParams["dateFrom"];
+  if (resolvedParams["dateTo"]) filterParams["dateTo"] = resolvedParams["dateTo"];
+
+  const { orders, total } = await getOrders(token, filterParams);
 
   return (
     <div>
@@ -58,8 +94,11 @@ export default async function OrdersPage() {
         description={`${total} total orders`}
       />
 
+      {/* Filters */}
+      <OrderFilters />
+
       <div
-        className="rounded-2xl border overflow-hidden"
+        className="rounded-2xl border overflow-hidden mt-5"
         style={{
           backgroundColor: "var(--surface)",
           borderColor: "var(--border)",
@@ -69,7 +108,7 @@ export default async function OrdersPage() {
         {orders.length === 0 ? (
           <EmptyState
             icon={<ShoppingBag size={40} />}
-            title="No orders yet"
+            title="No orders found"
             description="Orders will appear here once customers start purchasing"
           />
         ) : (
@@ -97,7 +136,10 @@ export default async function OrdersPage() {
               style={{ borderColor: "var(--border)" }}
             >
               {orders.map((order) => (
-                <tr key={order.id}>
+                <tr
+                  key={order.id}
+                  className="hover:bg-opacity-50 transition-colors"
+                >
                   <td className="px-6 py-4">
                     <span
                       className="text-sm font-medium font-mono"
@@ -105,6 +147,14 @@ export default async function OrdersPage() {
                     >
                       {order.orderNumber}
                     </span>
+                    {order.productionStage && (
+                      <p
+                        className="text-xs mt-0.5"
+                        style={{ color: "var(--text-secondary)" }}
+                      >
+                        {formatLabel(order.productionStage)}
+                      </p>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <p
@@ -138,19 +188,17 @@ export default async function OrdersPage() {
                   </td>
                   <td className="px-6 py-4">
                     <Badge
-                      label={order.payment?.status ?? "—"}
-                      variant={
-                        order.payment?.status === "SUCCESS"
-                          ? "success"
-                          : order.payment?.status === "FAILED"
-                          ? "error"
-                          : "neutral"
+                      label={
+                        order.payment?.status
+                          ? formatLabel(order.payment.status)
+                          : "—"
                       }
+                      variant={paymentVariant(order.payment?.status ?? "")}
                     />
                   </td>
                   <td className="px-6 py-4">
                     <Badge
-                      label={formatStatus(order.status)}
+                      label={formatLabel(order.status)}
                       variant={statusVariant(order.status)}
                     />
                   </td>
@@ -169,8 +217,11 @@ export default async function OrdersPage() {
                   <td className="px-6 py-4 text-right">
                     <Link
                       href={`/dashboard/orders/${order.id}`}
-                      className="text-sm font-medium"
-                      style={{ color: "var(--brand)" }}
+                      className="text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                      style={{
+                        color: "var(--brand)",
+                        backgroundColor: "rgba(166,138,117,0.08)",
+                      }}
                     >
                       View
                     </Link>

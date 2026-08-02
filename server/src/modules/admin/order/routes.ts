@@ -6,77 +6,53 @@ import {
   listOrdersSchema,
   orderIdSchema,
   updateStatusSchema,
-  assignShipmentSchema,
-  cancelOrderSchema,
-  refundOrderSchema,
-  verifyPaymentSchema,
+  updateProductionStageSchema,
   addNoteSchema,
-  updateShipmentStatusSchema,
+  markAsPaidSchema,
+  generatePaymentLinkSchema,
 } from "./validator.js";
 
 const router = Router();
 
 router.use(authenticateAdmin);
 
-// ── Orders ────────────────────────────────────────────────────────────────
-router.get(
-  "/",
-  validate(listOrdersSchema),
-  orderController.list
-);
+// ── Stats & Queue — must be before /:id routes ────────────────────────────
+router.get("/stats", orderController.getStats);
+router.get("/production-queue", orderController.getProductionQueue);
 
-router.get(
-  "/:id",
-  validate(orderIdSchema),
-  orderController.getOne
-);
+// ── List & Detail ─────────────────────────────────────────────────────────
+router.get("/", validate(listOrdersSchema), orderController.list);
+router.get("/:id", validate(orderIdSchema), orderController.getOne);
 
+// ── Status & Production ───────────────────────────────────────────────────
 router.patch(
   "/:id/status",
   validate(updateStatusSchema),
   orderController.updateStatus
 );
-
-router.post(
-  "/:id/verify-payment",
-  validate(verifyPaymentSchema),
-  orderController.verifyPayment
-);
-
 router.patch(
-  "/:id/shipment",
-  validate(assignShipmentSchema),
-  orderController.assignShipment
+  "/:id/production-stage",
+  validate(updateProductionStageSchema),
+  orderController.updateProductionStage
 );
 
+// ── Notes ─────────────────────────────────────────────────────────────────
 router.patch(
-  "/:id/shipment/status",
-  validate(updateShipmentStatusSchema),
-  orderController.updateShipmentStatus
-);
-
-router.patch(
-  "/:id/cancel",
-  validate(cancelOrderSchema),
-  orderController.cancelOrder
-);
-
-router.post(
-  "/:id/refund",
-  validate(refundOrderSchema),
-  orderController.refundOrder
-);
-
-router.post(
-  "/:id/notes",
+  "/:id/note",
   validate(addNoteSchema),
   orderController.addNote
 );
 
-// ── Shipping Partners ─────────────────────────────────────────────────────
-router.get(
-  "/shipping-partners/list",
-  orderController.getShippingPartners
+// ── Payment ───────────────────────────────────────────────────────────────
+router.patch(
+  "/:id/mark-paid",
+  validate(markAsPaidSchema),
+  orderController.markAsPaid
+);
+router.post(
+  "/:id/payment-link",
+  validate(generatePaymentLinkSchema),
+  orderController.generatePaymentLink
 );
 
 export default router;

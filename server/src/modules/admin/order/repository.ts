@@ -1,25 +1,21 @@
 import { prisma } from "../../../prisma/client.js";
-import { OrderStatus, Prisma } from "@prisma/client";
+import {
+  OrderStatus,
+  ProductionStage,
+  Prisma,
+  PaymentStatus,
+  PaymentMethod,
+} from "@prisma/client";
 
-export type AdminOrderSummary = Prisma.OrderGetPayload<{
-  include: {
-    customer: true;
-    payment: true;
-    shipment: { include: { shippingPartner: true } };
-    _count: { select: { items: true } };
-  };
-}>;
-
-export type AdminOrderDetail = Prisma.OrderGetPayload<{
+export type OrderWithRelations = Prisma.OrderGetPayload<{
   include: {
     customer: true;
     items: {
       include: {
-        product: { include: { images: true } };
+        product: true;
         variant: true;
         customizations: {
           include: {
-            customField: true;
             asset: { include: { files: true } };
           };
         };
@@ -27,7 +23,7 @@ export type AdminOrderDetail = Prisma.OrderGetPayload<{
     };
     payment: true;
     shipment: { include: { shippingPartner: true } };
-    timeline: true;
+    timeline: { orderBy: { createdAt: "asc" } };
   };
 }>;
 
@@ -36,25 +32,56 @@ export interface FindAllOrdersOptions {
   limit: number;
   search?: string;
   status?: OrderStatus;
-  paymentStatus?: string;
-  customerId?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  sortBy?: "createdAt" | "totalAmount" | "orderNumber";
+  productionStage?: ProductionStage;
+  dateFrom?: Date;
+  dateTo?: Date;
+  sortBy?: "createdAt" | "updatedAt" | "totalAmount";
   sortOrder?: "asc" | "desc";
 }
 
 export interface FindAllOrdersResult {
-  orders: AdminOrderSummary[];
+  orders: OrderSummary[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
 }
 
-export const orderRepository = {
-  // ── List ──────────────────────────────────────────────────────────────
+// Lightweight type for list view
+export type OrderSummary = Prisma.OrderGetPayload<{
+  include: {
+    customer: true;
+    payment: true;
+    _count: { select: { items: true } };
+  };
+}>;
 
+const orderFullInclude = {
+  customer: true,
+  items: {
+    include: {
+      product: true,
+      variant: true,
+      customizations: {
+        include: {
+          asset: { include: { files: true } },
+        },
+      },
+    },
+  },
+  payment: true,
+  shipment: { include: { shippingPartner: true } },
+  timeline: { orderBy: { createdAt: "asc" as const } },
+} satisfies Prisma.OrderInclude;
+
+const orderSummaryInclude = {
+  customer: true,
+  payment: true,
+  _count: { select: { items: true } },
+} satisfies Prisma.OrderInclude;
+
+export const orderRepository = {
+  // ── Find All ──────────────────────────────────────────────────────────
   findAll: async (
     options: FindAllOrdersOptions
   ): Promise<FindAllOrdersResult> => {
@@ -63,8 +90,7 @@ export const orderRepository = {
       limit,
       search,
       status,
-      paymentStatus,
-      customerId,
+      productionStage,
       dateFrom,
       dateTo,
       sortBy = "createdAt",
@@ -75,25 +101,23 @@ export const orderRepository = {
 
     const where: Prisma.OrderWhereInput = {
       ...(status && { status }),
-      ...(customerId && { customerId }),
-      ...(search && {
-        OR: [
-          { orderNumber: { contains: search, mode: "insensitive" } },
-          { customer: { name: { contains: search, mode: "insensitive" } } },
-          { customer: { phone: { contains: search } } },
-        ],
-      }),
-      ...(paymentStatus && {
-        payment: { status: paymentStatus as any },
-      }),
+      ...(productionStage && { productionStage }),
       ...(dateFrom || dateTo
         ? {
             createdAt: {
-              ...(dateFrom && { gte: new Date(dateFrom) }),
-              ...(dateTo && { lte: new Date(dateTo) }),
+              ...(dateFrom && { gte: dateFrom }),
+              ...(dateTo && { lte: dateTo }),
             },
           }
         : {}),
+      ...(search && {
+        OR: [
+          { orderNumber: { contains: search, mode: "insensitive" } },
+          { customer: { phone: { contains: search } } },
+          { customer: { name: { contains: search, mode: "insensitive" } } },
+          { shipName: { contains: search, mode: "insensitive" } },
+        ],
+      }),
     };
 
     const [orders, total] = await prisma.$transaction([
@@ -102,12 +126,7 @@ export const orderRepository = {
         skip,
         take: limit,
         orderBy: { [sortBy]: sortOrder },
-        include: {
-          customer: true,
-          payment: true,
-          shipment: { include: { shippingPartner: true } },
-          _count: { select: { items: true } },
-        },
+        include: orderSummaryInclude,
       }),
       prisma.order.count({ where }),
     ]);
@@ -122,65 +141,72 @@ export const orderRepository = {
   },
 
   // ── Find One ──────────────────────────────────────────────────────────
-
-  findById: async (id: string): Promise<AdminOrderDetail | null> => {
+  findById: async (id: string): Promise<OrderWithRelations | null> => {
     return prisma.order.findUnique({
       where: { id },
-      include: {
-        customer: true,
-        items: {
-          include: {
-            product: { include: { images: true } },
-            variant: true,
-            customizations: {
-              include: {
-                customField: true,
-                asset: { include: { files: true } },
-              },
-            },
-          },
-        },
-        payment: true,
-        shipment: { include: { shippingPartner: true } },
-        timeline: { orderBy: { createdAt: "asc" } },
-      },
+      include: orderFullInclude,
     });
   },
 
-  // ── Update Order ──────────────────────────────────────────────────────
+  findByOrderNumber: async (
+    orderNumber: string
+  ): Promise<OrderWithRelations | null> => {
+    return prisma.order.findUnique({
+      where: { orderNumber },
+      include: orderFullInclude,
+    });
+  },
 
+  // ── Update Status ─────────────────────────────────────────────────────
   updateStatus: async (
     id: string,
     status: OrderStatus,
-    extra?: { adminNote?: string; productionStage?: any }
+    productionStage?: ProductionStage | null
   ) => {
     return prisma.order.update({
       where: { id },
       data: {
         status,
-        ...(extra?.adminNote && { adminNote: extra.adminNote }),
-        ...(extra?.productionStage !== undefined && {
-          productionStage: extra.productionStage,
-        }),
+        ...(productionStage !== undefined && { productionStage }),
       },
+      include: orderFullInclude,
     });
   },
 
+  // ── Update Production Stage ───────────────────────────────────────────
+  updateProductionStage: async (id: string, productionStage: ProductionStage) => {
+    return prisma.order.update({
+      where: { id },
+      data: { productionStage },
+      include: orderFullInclude,
+    });
+  },
+
+  // ── Update Admin Note ─────────────────────────────────────────────────
   updateAdminNote: async (id: string, adminNote: string) => {
     return prisma.order.update({
       where: { id },
       data: { adminNote },
+      include: orderFullInclude,
+    });
+  },
+
+  // ── Production Queue ──────────────────────────────────────────────────
+  findProductionQueue: async (): Promise<OrderSummary[]> => {
+    return prisma.order.findMany({
+      where: { status: OrderStatus.IN_PRODUCTION },
+      orderBy: { createdAt: "asc" },
+      include: orderSummaryInclude,
     });
   },
 
   // ── Timeline ──────────────────────────────────────────────────────────
-
-  appendTimeline: async (data: {
+  createTimelineEvent: async (data: {
     orderId: string;
-    eventType: any;
+    eventType: string;
     title: string;
     description?: string;
-    actorType: any;
+    actorType: string;
     actorId?: string;
     isVisibleToCustomer?: boolean;
     metadata?: Record<string, unknown>;
@@ -188,11 +214,11 @@ export const orderRepository = {
     return prisma.orderTimeline.create({
       data: {
         orderId: data.orderId,
-        eventType: data.eventType,
+        eventType: data.eventType as any,
         title: data.title,
         description: data.description,
-        actorType: data.actorType,
-        actorId: data.actorId ?? null,
+        actorType: data.actorType as any,
+        actorId: data.actorId,
         isVisibleToCustomer: data.isVisibleToCustomer ?? false,
         metadata: data.metadata as any,
       },
@@ -200,46 +226,95 @@ export const orderRepository = {
   },
 
   // ── Payment ───────────────────────────────────────────────────────────
-
   findPaymentByOrderId: async (orderId: string) => {
     return prisma.payment.findUnique({ where: { orderId } });
   },
 
   updatePayment: async (
     orderId: string,
-    data: Prisma.PaymentUpdateInput
+    data: {
+      status?: PaymentStatus;
+      method?: PaymentMethod;
+      gatewayName?: string;
+      gatewayOrderId?: string;
+      gatewayPaymentId?: string;
+      gatewaySignature?: string;
+      gatewayResponse?: Record<string, unknown>;
+      referenceNumber?: string;
+      paidAt?: Date;
+      verifiedBy?: string;
+      verifiedAt?: Date;
+      failureReason?: string;
+    }
   ) => {
-    return prisma.payment.update({ where: { orderId }, data });
-  },
-
-  // ── Shipment ──────────────────────────────────────────────────────────
-
-  findShipmentByOrderId: async (orderId: string) => {
-    return prisma.shipment.findUnique({ where: { orderId } });
-  },
-
-  createShipment: async (data: {
-    orderId: string;
-    shippingPartnerId: string;
-    trackingNumber: string;
-    estimatedDelivery?: Date;
-  }) => {
-    return prisma.shipment.create({ data });
-  },
-
-  updateShipment: async (
-    orderId: string,
-    data: Prisma.ShipmentUpdateInput
-  ) => {
-    return prisma.shipment.update({ where: { orderId }, data });
-  },
-
-  // ── Shipping Partners ──────────────────────────────────────────────────
-
-  findAllShippingPartners: async () => {
-    return prisma.shippingPartner.findMany({
-      where: { isActive: true, deletedAt: null },
-      orderBy: { name: "asc" },
+    return prisma.payment.update({
+      where: { orderId },
+      data: {
+        ...(data.status && { status: data.status }),
+        ...(data.method && { method: data.method }),
+        ...(data.gatewayName !== undefined && {
+          gatewayName: data.gatewayName,
+        }),
+        ...(data.gatewayOrderId !== undefined && {
+          gatewayOrderId: data.gatewayOrderId,
+        }),
+        ...(data.gatewayPaymentId !== undefined && {
+          gatewayPaymentId: data.gatewayPaymentId,
+        }),
+        ...(data.gatewaySignature !== undefined && {
+          gatewaySignature: data.gatewaySignature,
+        }),
+        ...(data.gatewayResponse !== undefined && {
+          gatewayResponse: data.gatewayResponse as any,
+        }),
+        ...(data.referenceNumber !== undefined && {
+          referenceNumber: data.referenceNumber,
+        }),
+        ...(data.paidAt && { paidAt: data.paidAt }),
+        ...(data.verifiedBy !== undefined && {
+          verifiedBy: data.verifiedBy,
+        }),
+        ...(data.verifiedAt && { verifiedAt: data.verifiedAt }),
+        ...(data.failureReason !== undefined && {
+          failureReason: data.failureReason,
+        }),
+      },
     });
+  },
+
+  // ── Razorpay settings ─────────────────────────────────────────────────
+  getPaymentSettings: async () => {
+    return prisma.paymentSetting.findFirst();
+  },
+
+  // ── Stats for dashboard ───────────────────────────────────────────────
+  getStats: async () => {
+    const [
+      totalOrders,
+      pendingPayment,
+      confirmed,
+      inProduction,
+      shipped,
+      delivered,
+      cancelled,
+    ] = await prisma.$transaction([
+      prisma.order.count(),
+      prisma.order.count({ where: { status: OrderStatus.AWAITING_PAYMENT } }),
+      prisma.order.count({ where: { status: OrderStatus.CONFIRMED } }),
+      prisma.order.count({ where: { status: OrderStatus.IN_PRODUCTION } }),
+      prisma.order.count({ where: { status: OrderStatus.SHIPPED } }),
+      prisma.order.count({ where: { status: OrderStatus.DELIVERED } }),
+      prisma.order.count({ where: { status: OrderStatus.CANCELLED } }),
+    ]);
+
+    return {
+      totalOrders,
+      pendingPayment,
+      confirmed,
+      inProduction,
+      shipped,
+      delivered,
+      cancelled,
+    };
   },
 };

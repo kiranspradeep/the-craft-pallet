@@ -2,34 +2,41 @@ import { PricingStrategy } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { BadRequestError } from "../../shared/errors/AppError.js";
 
+export interface PricingTier {
+  quantity: number;
+  price: Decimal;
+  label?: string | null;
+  isSpecialOffer?: boolean;
+}
+
 export interface PricingConfig {
   strategy: PricingStrategy;
   unitPrice?: Decimal | null;
+  baseUnitPrice?: Decimal | null;
   incrementQuantity?: number | null;
   incrementPrice?: Decimal | null;
   minimumOrderQuantity?: number | null;
-}
-
-export interface VariantPrice {
-  price: Decimal;
+  tiers?: PricingTier[];
 }
 
 /**
  * Calculate the unit price for a cart item based on
  * the product's pricing strategy.
  *
- * Returns: price per logical "unit" (i.e. what gets stored
- * in CartItem.unitPrice). Total = unitPrice * quantity.
+ * For TIERED_PRICING:
+ * - Customer must explicitly select a tier (pass selectedTierQuantity)
+ * - If no tier selected and baseUnitPrice exists → baseUnitPrice per unit
+ * - If no tier and no baseUnitPrice → error
  */
 export const calculateUnitPrice = (
   strategy: PricingStrategy,
   quantity: number,
   pricingConfig?: PricingConfig | null,
-  variantPrice?: Decimal | null
+  variantPrice?: Decimal | null,
+  selectedTierQuantity?: number | null
 ): Decimal => {
   switch (strategy) {
     case PricingStrategy.FIXED_VARIANTS: {
-      // Price comes from the selected variant
       if (!variantPrice) {
         throw new BadRequestError(
           "A variant must be selected for this product"
@@ -40,7 +47,9 @@ export const calculateUnitPrice = (
 
     case PricingStrategy.PER_UNIT: {
       if (!pricingConfig?.unitPrice) {
-        throw new BadRequestError("Unit price is not configured for this product");
+        throw new BadRequestError(
+          "Unit price is not configured for this product"
+        );
       }
       return pricingConfig.unitPrice;
     }
@@ -62,17 +71,46 @@ export const calculateUnitPrice = (
         );
       }
 
-      // price = ceil(qty / incrementQty) * incrementPrice
       const increments = Math.ceil(
         quantity / pricingConfig.incrementQuantity
       );
       const total = pricingConfig.incrementPrice.mul(increments);
-      // unit price = total / quantity (for line item storage)
+      // Store as unit price = total / quantity
       return total.div(quantity).toDecimalPlaces(2);
     }
 
+    case PricingStrategy.TIERED_PRICING: {
+      const tiers = pricingConfig?.tiers ?? [];
+
+      // Customer selected a specific tier
+      if (selectedTierQuantity !== null && selectedTierQuantity !== undefined) {
+        const tier = tiers.find((t) => t.quantity === selectedTierQuantity);
+        if (!tier) {
+          throw new BadRequestError(
+            `No pricing tier found for quantity ${selectedTierQuantity}`
+          );
+        }
+        // Validate the ordered quantity matches the tier
+        if (quantity !== tier.quantity) {
+          throw new BadRequestError(
+            `Quantity must be exactly ${tier.quantity} for the selected tier`
+          );
+        }
+        // unit price = tier total price / quantity
+        return tier.price.div(quantity).toDecimalPlaces(2);
+      }
+
+      // No tier selected — fall back to base per-unit price
+      if (!pricingConfig?.baseUnitPrice) {
+        throw new BadRequestError(
+          "Please select a pricing tier for this product"
+        );
+      }
+
+      return pricingConfig.baseUnitPrice;
+    }
+
     case PricingStrategy.CUSTOM_QUOTE: {
-      // No price — quote on request
       return new Decimal(0);
     }
 
@@ -128,4 +166,57 @@ export const applyCouponDiscount = (
   }
 
   return new Decimal(0);
+};
+
+/**
+ * Get available tiers for a product — for displaying to customer.
+ * Returns sorted list with base unit price option if configured.
+ */
+export const getAvailableTiers = (
+  pricingConfig: PricingConfig
+): {
+  type: "tier" | "base";
+  quantity?: number;
+  totalPrice: Decimal;
+  unitPrice: Decimal;
+  label?: string | null;
+  isSpecialOffer?: boolean;
+}[] => {
+  const result: {
+    type: "tier" | "base";
+    quantity?: number;
+    totalPrice: Decimal;
+    unitPrice: Decimal;
+    label?: string | null;
+    isSpecialOffer?: boolean;
+  }[] = [];
+
+  // Add all tiers sorted by quantity
+  const sortedTiers = [...(pricingConfig.tiers ?? [])].sort(
+    (a, b) => a.quantity - b.quantity
+  );
+
+  for (const tier of sortedTiers) {
+    result.push({
+      type: "tier",
+      quantity: tier.quantity,
+      totalPrice: tier.price,
+      unitPrice: tier.price.div(tier.quantity).toDecimalPlaces(2),
+      label: tier.label,
+      isSpecialOffer: tier.isSpecialOffer ?? false,
+    });
+  }
+
+  // Add base unit price option if configured
+  if (pricingConfig.baseUnitPrice) {
+    result.push({
+      type: "base",
+      totalPrice: pricingConfig.baseUnitPrice,
+      unitPrice: pricingConfig.baseUnitPrice,
+      label: "Per print (custom quantity)",
+      isSpecialOffer: false,
+    });
+  }
+
+  return result;
 };

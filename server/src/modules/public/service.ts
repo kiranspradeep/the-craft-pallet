@@ -7,7 +7,6 @@ export const publicService = {
 
   getCategories: async () => {
     const categories = await publicRepository.findAllCategories();
-
     return categories.map((cat) => ({
       id: cat.id,
       name: cat.name,
@@ -22,7 +21,6 @@ export const publicService = {
   getCategoryBySlug: async (slug: string) => {
     const category = await publicRepository.findCategoryBySlug(slug);
     if (!category) throw new NotFoundError("Category not found");
-
     return {
       id: category.id,
       name: category.name,
@@ -65,7 +63,24 @@ export const publicService = {
         category: p.category,
         thumbnail: p.images[0] ?? null,
         variants: p.variants,
-        pricingStrategy: p.pricingConfig?.strategy ?? null,
+        pricingConfig: p.pricingConfig
+          ? {
+              strategy: p.pricingConfig.strategy,
+              unitPrice: p.pricingConfig.unitPrice,
+              baseUnitPrice: p.pricingConfig.baseUnitPrice,
+              minimumOrderQuantity: p.pricingConfig.minimumOrderQuantity,
+              incrementQuantity: p.pricingConfig.incrementQuantity,
+              incrementPrice: p.pricingConfig.incrementPrice,
+              tiers: p.pricingConfig.tiers.map((t) => ({
+                id: t.id,
+                quantity: t.quantity,
+                price: t.price,
+                label: t.label,
+                isSpecialOffer: t.isSpecialOffer,
+                sortOrder: t.sortOrder,
+              })),
+            }
+          : null,
         variantCount: p._count.variants,
       })),
     };
@@ -75,7 +90,12 @@ export const publicService = {
     const product = await publicRepository.findProductBySlug(slug);
     if (!product) throw new NotFoundError("Product not found");
 
-    // Shape the response — only expose what the storefront needs
+    // Related products — same category
+    const related = await publicRepository.findRelatedProducts(
+      product.categoryId,
+      product.id
+    );
+
     return {
       id: product.id,
       name: product.name,
@@ -90,15 +110,28 @@ export const publicService = {
       category: product.category,
       images: product.images,
       variants: product.variants,
+
+      // Full pricing config including tiers
       pricingConfig: product.pricingConfig
         ? {
             strategy: product.pricingConfig.strategy,
             unitPrice: product.pricingConfig.unitPrice,
-            minimumOrderQuantity: product.pricingConfig.minimumOrderQuantity,
+            baseUnitPrice: product.pricingConfig.baseUnitPrice,
+            minimumOrderQuantity:
+              product.pricingConfig.minimumOrderQuantity,
             incrementQuantity: product.pricingConfig.incrementQuantity,
             incrementPrice: product.pricingConfig.incrementPrice,
+            tiers: product.pricingConfig.tiers.map((t) => ({
+              id: t.id,
+              quantity: t.quantity,
+              price: t.price,
+              label: t.label,
+              isSpecialOffer: t.isSpecialOffer,
+              sortOrder: t.sortOrder,
+            })),
           }
         : null,
+
       configuration: product.configuration
         ? {
             uploadRequired: product.configuration.uploadRequired,
@@ -108,12 +141,16 @@ export const publicService = {
             maxZipSizeMb: product.configuration.maxZipSizeMb,
             allowedExtensions: product.configuration.allowedExtensions,
             allowedSources: product.configuration.allowedSources,
-            allowDuplicateImages: product.configuration.allowDuplicateImages,
-            allowImageReordering: product.configuration.allowImageReordering,
+            allowDuplicateImages:
+              product.configuration.allowDuplicateImages,
+            allowImageReordering:
+              product.configuration.allowImageReordering,
             estimatedProductionDays:
               product.configuration.estimatedProductionDays,
+            extraRules: product.configuration.extraRules,
           }
         : null,
+
       customFields: product.customFields.map((field) => ({
         id: field.id,
         name: field.name,
@@ -126,6 +163,30 @@ export const publicService = {
         validationJson: field.validationJson,
         options: field.options,
       })),
+
+      // Related products — lightweight
+      relatedProducts: related.map((r) => ({
+        id: r.id,
+        name: r.name,
+        slug: r.slug,
+        thumbnail: r.images[0] ?? null,
+        pricingConfig: r.pricingConfig
+          ? {
+              strategy: r.pricingConfig.strategy,
+              unitPrice: r.pricingConfig.unitPrice,
+              baseUnitPrice: r.pricingConfig.baseUnitPrice,
+              incrementPrice: r.pricingConfig.incrementPrice,
+              incrementQuantity: r.pricingConfig.incrementQuantity,
+              tiers: r.pricingConfig.tiers.map((t) => ({
+                quantity: t.quantity,
+                price: t.price,
+                label: t.label,
+                isSpecialOffer: t.isSpecialOffer,
+              })),
+            }
+          : null,
+        variants: r.variants,
+      })),
     };
   },
 
@@ -134,8 +195,6 @@ export const publicService = {
   getBusinessSettings: async () => {
     const settings = await publicRepository.getBusinessSettings();
     if (!settings) return null;
-
-    // Only expose safe public fields
     return {
       businessName: settings.businessName,
       tagline: settings.tagline,
@@ -153,7 +212,6 @@ export const publicService = {
   getShippingSettings: async () => {
     const settings = await publicRepository.getShippingSettings();
     if (!settings) return null;
-
     return {
       freeShippingThreshold: settings.freeShippingThreshold,
       defaultShippingCharge: settings.defaultShippingCharge,
@@ -170,7 +228,6 @@ export const publicService = {
   trackOrder: async (orderNumber: string, phone: string) => {
     const order = await checkoutService.trackOrder(orderNumber, phone);
 
-    // Shape for customer — hide internal admin fields
     return {
       orderNumber: order.orderNumber,
       status: order.status,

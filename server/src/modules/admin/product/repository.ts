@@ -25,7 +25,9 @@ export type ProductWithRelations = Prisma.ProductGetPayload<{
     category: true;
     images: true;
     variants: true;
-    pricingConfig: true;
+    pricingConfig: {
+      include: { tiers: true };
+    };
     configuration: true;
     customFields: {
       include: { options: true };
@@ -75,7 +77,11 @@ export const productRepository = {
           category: true,
           images: { orderBy: { sortOrder: "asc" } },
           variants: { orderBy: { sortOrder: "asc" } },
-          pricingConfig: true,
+          pricingConfig: {
+            include: {
+              tiers: { orderBy: { sortOrder: "asc" } },
+            },
+          },
           configuration: true,
           customFields: {
             orderBy: { sortOrder: "asc" },
@@ -104,7 +110,11 @@ export const productRepository = {
         category: true,
         images: { orderBy: { sortOrder: "asc" } },
         variants: { orderBy: { sortOrder: "asc" } },
-        pricingConfig: true,
+        pricingConfig: {
+          include: {
+            tiers: { orderBy: { sortOrder: "asc" } },
+          },
+        },
         configuration: true,
         customFields: {
           orderBy: { sortOrder: "asc" },
@@ -148,9 +158,7 @@ export const productRepository = {
   },
 
   // ── Images ────────────────────────────────────────────────────────────
-  addImage: async (
-    data: Prisma.ProductImageCreateInput
-  ) => {
+  addImage: async (data: Prisma.ProductImageCreateInput) => {
     return prisma.productImage.create({ data });
   },
 
@@ -173,9 +181,7 @@ export const productRepository = {
   },
 
   // ── Variants ──────────────────────────────────────────────────────────
-  createVariant: async (
-    data: Prisma.ProductVariantCreateInput
-  ) => {
+  createVariant: async (data: Prisma.ProductVariantCreateInput) => {
     return prisma.productVariant.create({ data });
   },
 
@@ -215,13 +221,36 @@ export const productRepository = {
       where: { productId },
       create: { ...data, product: { connect: { id: productId } } },
       update: data,
+      include: { tiers: { orderBy: { sortOrder: "asc" } } },
     });
   },
 
-  // ── Custom Fields ─────────────────────────────────────────────────────
-  createCustomField: async (
-    data: Prisma.CustomFieldCreateInput
+  // ── Pricing Tiers ─────────────────────────────────────────────────────
+  createPricingTier: async (data: Prisma.PricingTierCreateInput) => {
+    return prisma.pricingTier.create({ data });
+  },
+
+  updatePricingTier: async (
+    tierId: string,
+    data: Prisma.PricingTierUpdateInput
   ) => {
+    return prisma.pricingTier.update({ where: { id: tierId }, data });
+  },
+
+  deletePricingTier: async (tierId: string) => {
+    return prisma.pricingTier.delete({ where: { id: tierId } });
+  },
+
+  findPricingTierById: async (tierId: string) => {
+    return prisma.pricingTier.findUnique({ where: { id: tierId } });
+  },
+
+  deleteAllTiersForConfig: async (pricingConfigId: string) => {
+    return prisma.pricingTier.deleteMany({ where: { pricingConfigId } });
+  },
+
+  // ── Custom Fields ─────────────────────────────────────────────────────
+  createCustomField: async (data: Prisma.CustomFieldCreateInput) => {
     return prisma.customField.create({
       data,
       include: { options: true },
@@ -285,20 +314,18 @@ export const productRepository = {
     return prisma.customFieldOption.findUnique({ where: { id: optionId } });
   },
 
-// ── Category Existence ────────────────────────────────────────────────
-findCategoryById: async (categoryId: string) => {
-  return prisma.category.findFirst({
-    where: { id: categoryId, deletedAt: null, isActive: true },
-  });
-},
+  // ── Category Existence ────────────────────────────────────────────────
+  findCategoryById: async (categoryId: string) => {
+    return prisma.category.findFirst({
+      where: { id: categoryId, deletedAt: null, isActive: true },
+    });
+  },
 
-
-// ── SKU Uniqueness ────────────────────────────────────────────────────
-findVariantBySku: async (sku: string): Promise<{ id: string } | null> => {
-  return prisma.productVariant.findUnique({
-    where: { sku },
-    select: { id: true },
-  });
-},
-
+  // ── SKU Uniqueness ────────────────────────────────────────────────────
+  findVariantBySku: async (sku: string): Promise<{ id: string } | null> => {
+    return prisma.productVariant.findUnique({
+      where: { sku },
+      select: { id: true },
+    });
+  },
 };

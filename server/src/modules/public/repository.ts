@@ -65,7 +65,9 @@ export const publicRepository = {
         where: { slug: categorySlug, isActive: true, deletedAt: null },
         select: { id: true },
       });
-      if (!category) return { products: [], total: 0, page, limit, totalPages: 0 };
+      if (!category) {
+        return { products: [], total: 0, page, limit, totalPages: 0 };
+      }
       categoryId = category.id;
     }
 
@@ -93,9 +95,8 @@ export const publicRepository = {
             select: { id: true, name: true, slug: true },
           },
           images: {
-            where: { type: "THUMBNAIL" },
-            take: 1,
             orderBy: { sortOrder: "asc" },
+            take: 1,
           },
           variants: {
             where: { isActive: true },
@@ -106,9 +107,14 @@ export const publicRepository = {
               price: true,
               thumbnailUrl: true,
               processingDays: true,
+              sortOrder: true,
             },
           },
-          pricingConfig: true,
+          pricingConfig: {
+            include: {
+              tiers: { orderBy: { sortOrder: "asc" } },
+            },
+          },
           _count: { select: { variants: true } },
         },
       }),
@@ -138,12 +144,56 @@ export const publicRepository = {
           where: { isActive: true },
           orderBy: { sortOrder: "asc" },
         },
-        pricingConfig: true,
+        pricingConfig: {
+          include: {
+            tiers: { orderBy: { sortOrder: "asc" } },
+          },
+        },
         configuration: true,
         customFields: {
           orderBy: { sortOrder: "asc" },
           include: {
             options: { orderBy: { sortOrder: "asc" } },
+          },
+        },
+      },
+    });
+  },
+
+  // ── Related Products ──────────────────────────────────────────────────
+  // Same category, exclude current product, limit 4
+
+  findRelatedProducts: async (
+    categoryId: string,
+    excludeProductId: string
+  ) => {
+    return prisma.product.findMany({
+      where: {
+        categoryId,
+        isActive: true,
+        deletedAt: null,
+        NOT: { id: excludeProductId },
+      },
+      take: 4,
+      orderBy: { sortOrder: "asc" },
+      include: {
+        images: {
+          orderBy: { sortOrder: "asc" },
+          take: 1,
+        },
+        pricingConfig: {
+          include: {
+            tiers: { orderBy: { sortOrder: "asc" } },
+          },
+        },
+        variants: {
+          where: { isActive: true },
+          orderBy: { sortOrder: "asc" },
+          select: {
+            id: true,
+            name: true,
+            price: true,
+            sortOrder: true,
           },
         },
       },
@@ -166,7 +216,6 @@ export const publicRepository = {
         phoneNumber: true,
         isEnabled: true,
         orderMessageTemplate: true,
-        // Never expose id or internal fields publicly
       },
     });
   },

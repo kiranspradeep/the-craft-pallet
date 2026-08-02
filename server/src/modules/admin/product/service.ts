@@ -1,4 +1,5 @@
 import { PricingStrategy, ProductImageType, Prisma } from "@prisma/client";
+import { prisma } from "../../../prisma/client.js";
 import { Decimal } from "@prisma/client/runtime/library";
 import { productRepository } from "./repository.js";
 import { generateUniqueSlug } from "../../../shared/utils/slug.js";
@@ -28,9 +29,11 @@ const assertSkuUnique = async (sku: string, excludeVariantId?: string) => {
   }
 };
 
-// ── Product Core ──────────────────────────────────────────────────────────
+// ── Service ───────────────────────────────────────────────────────────────
 
 export const productService = {
+  // ── Core ──────────────────────────────────────────────────────────────
+
   create: async (input: {
     categoryId: string;
     name: string;
@@ -45,14 +48,13 @@ export const productService = {
     metaKeywords?: string;
     ogImageUrl?: string;
   }) => {
-    // 1. Category must exist and be active
     await assertCategoryExists(input.categoryId);
 
-    // 2. Resolve slug
     let slug: string;
     if (input.slug) {
       const existing = await productRepository.findBySlug(input.slug);
-      if (existing) throw new ConflictError(`Slug "${input.slug}" is already in use`);
+      if (existing)
+        throw new ConflictError(`Slug "${input.slug}" is already in use`);
       slug = input.slug;
     } else {
       slug = await generateUniqueSlug(input.name, async (candidate) => {
@@ -115,7 +117,6 @@ export const productService = {
   ) => {
     const existing = await assertProductExists(id);
 
-    // If category is being changed — verify new category exists
     if (input.categoryId && input.categoryId !== existing.categoryId) {
       await assertCategoryExists(input.categoryId);
     }
@@ -124,27 +125,43 @@ export const productService = {
 
     if (slug) {
       const conflict = await productRepository.findBySlugExcludingId(slug, id);
-      if (conflict) throw new ConflictError(`Slug "${slug}" is already in use`);
+      if (conflict)
+        throw new ConflictError(`Slug "${slug}" is already in use`);
     } else if (input.name && input.name !== existing.name) {
       slug = await generateUniqueSlug(input.name, async (candidate) => {
-        const found = await productRepository.findBySlugExcludingId(candidate, id);
+        const found = await productRepository.findBySlugExcludingId(
+          candidate,
+          id
+        );
         return !!found;
       });
     }
 
     return productRepository.update(id, {
-      ...(input.categoryId && { category: { connect: { id: input.categoryId } } }),
+      ...(input.categoryId && {
+        category: { connect: { id: input.categoryId } },
+      }),
       ...(input.name && { name: input.name }),
       ...(slug && { slug }),
-      ...(input.description !== undefined && { description: input.description }),
-      ...(input.shortDescription !== undefined && { shortDescription: input.shortDescription }),
+      ...(input.description !== undefined && {
+        description: input.description,
+      }),
+      ...(input.shortDescription !== undefined && {
+        shortDescription: input.shortDescription,
+      }),
       ...(input.isActive !== undefined && { isActive: input.isActive }),
       ...(input.isFeatured !== undefined && { isFeatured: input.isFeatured }),
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
       ...(input.metaTitle !== undefined && { metaTitle: input.metaTitle }),
-      ...(input.metaDescription !== undefined && { metaDescription: input.metaDescription }),
-      ...(input.metaKeywords !== undefined && { metaKeywords: input.metaKeywords }),
-      ...(input.ogImageUrl !== undefined && { ogImageUrl: input.ogImageUrl || null }),
+      ...(input.metaDescription !== undefined && {
+        metaDescription: input.metaDescription,
+      }),
+      ...(input.metaKeywords !== undefined && {
+        metaKeywords: input.metaKeywords,
+      }),
+      ...(input.ogImageUrl !== undefined && {
+        ogImageUrl: input.ogImageUrl || null,
+      }),
     });
   },
 
@@ -153,7 +170,7 @@ export const productService = {
     return productRepository.softDelete(id);
   },
 
-  // ── Images ──────────────────────────────────────────────────────────────
+  // ── Images ────────────────────────────────────────────────────────────
 
   addImage: async (
     productId: string,
@@ -195,7 +212,7 @@ export const productService = {
     return productRepository.updateImageSortOrders(updates);
   },
 
-  // ── Variants ────────────────────────────────────────────────────────────
+  // ── Variants ──────────────────────────────────────────────────────────
 
   createVariant: async (
     productId: string,
@@ -211,7 +228,6 @@ export const productService = {
   ) => {
     await assertProductExists(productId);
 
-    // SKU must be globally unique if provided
     if (input.sku) {
       await assertSkuUnique(input.sku);
     }
@@ -248,7 +264,6 @@ export const productService = {
       throw new NotFoundError("Variant not found on this product");
     }
 
-    // SKU uniqueness — exclude current variant from check
     if (input.sku && input.sku !== variant.sku) {
       await assertSkuUnique(input.sku, variantId);
     }
@@ -277,7 +292,7 @@ export const productService = {
     await productRepository.deleteVariant(variantId);
   },
 
-  // ── Configuration ────────────────────────────────────────────────────────
+  // ── Configuration ──────────────────────────────────────────────────────
 
   upsertConfiguration: async (
     productId: string,
@@ -297,7 +312,6 @@ export const productService = {
   ) => {
     await assertProductExists(productId);
 
-    // minImages must not exceed maxImages
     if (
       input.minImages !== undefined &&
       input.maxImages !== undefined &&
@@ -324,7 +338,7 @@ export const productService = {
     });
   },
 
-  // ── Pricing ──────────────────────────────────────────────────────────────
+  // ── Pricing ────────────────────────────────────────────────────────────
 
   upsertPricing: async (
     productId: string,
@@ -334,23 +348,148 @@ export const productService = {
       incrementQuantity?: number;
       incrementPrice?: number;
       unitPrice?: number;
+      baseUnitPrice?: number;
     }
   ) => {
     await assertProductExists(productId);
     return productRepository.upsertPricing(productId, {
       strategy: input.strategy,
-      minimumOrderQuantity: input.minimumOrderQuantity,
-      incrementQuantity: input.incrementQuantity,
+      minimumOrderQuantity: input.minimumOrderQuantity ?? null,
+      incrementQuantity: input.incrementQuantity ?? null,
       incrementPrice:
         input.incrementPrice !== undefined
           ? new Decimal(input.incrementPrice)
           : null,
       unitPrice:
         input.unitPrice !== undefined ? new Decimal(input.unitPrice) : null,
+      baseUnitPrice:
+        input.baseUnitPrice !== undefined
+          ? new Decimal(input.baseUnitPrice)
+          : null,
     });
   },
 
-  // ── Custom Fields ────────────────────────────────────────────────────────
+  // ── Pricing Tiers ──────────────────────────────────────────────────────
+
+  createPricingTier: async (
+    productId: string,
+    input: {
+      quantity: number;
+      price: number;
+      label?: string;
+      isSpecialOffer?: boolean;
+      sortOrder?: number;
+    }
+  ) => {
+    await assertProductExists(productId);
+
+    const pricingConfig = await prisma.pricingConfiguration.findUnique({
+      where: { productId },
+    });
+
+    if (!pricingConfig) {
+      throw new BadRequestError(
+        "Configure pricing strategy first before adding tiers"
+      );
+    }
+
+    if (pricingConfig.strategy !== PricingStrategy.TIERED_PRICING) {
+      throw new BadRequestError(
+        "Tiers can only be added to products with TIERED_PRICING strategy"
+      );
+    }
+
+    const existing = await prisma.pricingTier.findFirst({
+      where: {
+        pricingConfigId: pricingConfig.id,
+        quantity: input.quantity,
+      },
+    });
+
+    if (existing) {
+      throw new ConflictError(
+        `A tier for quantity ${input.quantity} already exists`
+      );
+    }
+
+    return productRepository.createPricingTier({
+      pricingConfig: { connect: { id: pricingConfig.id } },
+      quantity: input.quantity,
+      price: new Decimal(input.price),
+      label: input.label ?? null,
+      isSpecialOffer: input.isSpecialOffer ?? false,
+      sortOrder: input.sortOrder ?? 0,
+    });
+  },
+
+  updatePricingTier: async (
+    productId: string,
+    tierId: string,
+    input: {
+      quantity?: number;
+      price?: number;
+      label?: string;
+      isSpecialOffer?: boolean;
+      sortOrder?: number;
+    }
+  ) => {
+    await assertProductExists(productId);
+
+    const tier = await productRepository.findPricingTierById(tierId);
+    if (!tier) throw new NotFoundError("Pricing tier not found");
+
+    const pricingConfig = await prisma.pricingConfiguration.findUnique({
+      where: { productId },
+    });
+
+    if (!pricingConfig || tier.pricingConfigId !== pricingConfig.id) {
+      throw new NotFoundError("Pricing tier not found on this product");
+    }
+
+    if (input.quantity && input.quantity !== tier.quantity) {
+      const duplicate = await prisma.pricingTier.findFirst({
+        where: {
+          pricingConfigId: pricingConfig.id,
+          quantity: input.quantity,
+          NOT: { id: tierId },
+        },
+      });
+      if (duplicate) {
+        throw new ConflictError(
+          `A tier for quantity ${input.quantity} already exists`
+        );
+      }
+    }
+
+    return productRepository.updatePricingTier(tierId, {
+      ...(input.quantity !== undefined && { quantity: input.quantity }),
+      ...(input.price !== undefined && { price: new Decimal(input.price) }),
+      ...(input.label !== undefined && { label: input.label }),
+      ...(input.isSpecialOffer !== undefined && {
+        isSpecialOffer: input.isSpecialOffer,
+      }),
+      ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
+    });
+  },
+
+  deletePricingTier: async (productId: string, tierId: string) => {
+    await assertProductExists(productId);
+
+    const tier = await productRepository.findPricingTierById(tierId);
+    if (!tier) throw new NotFoundError("Pricing tier not found");
+
+    const pricingConfig = await prisma.pricingConfiguration.findUnique({
+      where: { productId },
+    });
+
+    if (!pricingConfig || tier.pricingConfigId !== pricingConfig.id) {
+      throw new NotFoundError("Pricing tier not found on this product");
+    }
+
+    await productRepository.deletePricingTier(tierId);
+  },
+
+  // ── Custom Fields ──────────────────────────────────────────────────────
 
   createCustomField: async (
     productId: string,
@@ -405,7 +544,9 @@ export const productService = {
       ...(input.name && { name: input.name }),
       ...(input.label && { label: input.label }),
       ...(input.type && { type: input.type as any }),
-      ...(input.placeholder !== undefined && { placeholder: input.placeholder }),
+      ...(input.placeholder !== undefined && {
+        placeholder: input.placeholder,
+      }),
       ...(input.helpText !== undefined && { helpText: input.helpText }),
       ...(input.isRequired !== undefined && { isRequired: input.isRequired }),
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
@@ -432,7 +573,7 @@ export const productService = {
     return productRepository.updateCustomFieldSortOrders(updates);
   },
 
-  // ── Custom Field Options ──────────────────────────────────────────────────
+  // ── Custom Field Options ────────────────────────────────────────────────
 
   createCustomFieldOption: async (
     productId: string,

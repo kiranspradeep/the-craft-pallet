@@ -14,6 +14,7 @@ import assetRoutes from "./modules/asset/routes.js";
 import cartRoutes from "./modules/cart/routes.js";
 import checkoutRoutes from "./modules/checkout/routes.js";
 import publicRoutes from "./modules/public/routes.js";
+import webhookRoutes, { captureRawBody } from "./modules/webhooks/razorpay/routes.js";
 
 ensureUploadDirs();
 
@@ -26,6 +27,12 @@ app.use(
     credentials: true,
   })
 );
+
+// ── Webhooks — MUST be before express.json() ──────────────────────────────
+// Razorpay needs raw body for signature verification
+app.use("/api/webhooks", webhookRoutes);
+
+// ── Body parsers — after webhooks ─────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

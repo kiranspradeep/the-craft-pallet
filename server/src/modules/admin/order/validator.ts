@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { OrderStatus, ShipmentStatus } from "@prisma/client";
+import { OrderStatus, ProductionStage } from "@prisma/client";
 
 // ── List Orders ───────────────────────────────────────────────────────────
 
@@ -17,14 +17,17 @@ export const listOrdersSchema = z.object({
       .pipe(z.number().int().min(1).max(100)),
     search: z.string().optional(),
     status: z.nativeEnum(OrderStatus).optional(),
-    paymentStatus: z
-      .enum(["PENDING", "INITIATED", "SUCCESS", "FAILED", "REFUNDED"])
-      .optional(),
-    customerId: z.string().optional(),
-    dateFrom: z.string().optional(),
-    dateTo: z.string().optional(),
+    productionStage: z.nativeEnum(ProductionStage).optional(),
+    dateFrom: z
+      .string()
+      .optional()
+      .transform((v) => (v ? new Date(v) : undefined)),
+    dateTo: z
+      .string()
+      .optional()
+      .transform((v) => (v ? new Date(v) : undefined)),
     sortBy: z
-      .enum(["createdAt", "totalAmount", "orderNumber"])
+      .enum(["createdAt", "updatedAt", "totalAmount"])
       .optional()
       .default("createdAt"),
     sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
@@ -42,7 +45,9 @@ export const orderIdSchema = z.object({
 // ── Update Status ─────────────────────────────────────────────────────────
 
 export const updateStatusSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
+  params: z.object({
+    id: z.string().min(1),
+  }),
   body: z.object({
     status: z.nativeEnum(OrderStatus, {
       required_error: "Status is required",
@@ -51,82 +56,49 @@ export const updateStatusSchema = z.object({
   }),
 });
 
-// ── Assign Shipment ───────────────────────────────────────────────────────
+// ── Update Production Stage ───────────────────────────────────────────────
 
-export const assignShipmentSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
-  body: z.object({
-    shippingPartnerId: z.string({
-      required_error: "Shipping partner is required",
-    }).min(1),
-    trackingNumber: z
-      .string({ required_error: "Tracking number is required" })
-      .min(1)
-      .max(100),
-    estimatedDelivery: z.string().datetime().optional(),
-    note: z.string().max(500).optional(),
+export const updateProductionStageSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
   }),
-});
-
-// ── Cancel Order ──────────────────────────────────────────────────────────
-
-export const cancelOrderSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
   body: z.object({
-    reason: z
-      .string({ required_error: "Cancellation reason is required" })
-      .min(1)
-      .max(500),
-  }),
-});
-
-// ── Refund Order ──────────────────────────────────────────────────────────
-
-export const refundOrderSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
-  body: z.object({
-    refundAmount: z
-      .number({ required_error: "Refund amount is required" })
-      .positive("Refund amount must be positive"),
-    reason: z
-      .string({ required_error: "Refund reason is required" })
-      .min(1)
-      .max(500),
-  }),
-});
-
-// ── Verify Payment ────────────────────────────────────────────────────────
-
-export const verifyPaymentSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
-  body: z.object({
-    approved: z.boolean({ required_error: "approved is required" }),
-    note: z.string().max(500).optional(),
-    referenceNumber: z.string().max(200).optional(),
+    productionStage: z.nativeEnum(ProductionStage, {
+      required_error: "Production stage is required",
+    }),
   }),
 });
 
 // ── Add Admin Note ────────────────────────────────────────────────────────
 
 export const addNoteSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
+  params: z.object({
+    id: z.string().min(1),
+  }),
   body: z.object({
     note: z
       .string({ required_error: "Note is required" })
-      .min(1)
-      .max(1000),
-    isVisibleToCustomer: z.boolean().optional().default(false),
+      .min(1, "Note cannot be empty")
+      .max(1000, "Note cannot exceed 1000 characters"),
   }),
 });
 
-// ── Update Shipment Status ────────────────────────────────────────────────
+// ── Mark as Paid ──────────────────────────────────────────────────────────
 
-export const updateShipmentStatusSchema = z.object({
-  params: z.object({ id: z.string().min(1) }),
+export const markAsPaidSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
+  }),
   body: z.object({
-    status: z.nativeEnum(ShipmentStatus, {
-      required_error: "Shipment status is required",
-    }),
+    referenceNumber: z.string().max(200).optional(),
     note: z.string().max(500).optional(),
+  }),
+});
+
+// ── Generate Payment Link ─────────────────────────────────────────────────
+
+export const generatePaymentLinkSchema = z.object({
+  params: z.object({
+    id: z.string().min(1),
   }),
 });

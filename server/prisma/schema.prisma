@@ -26,6 +26,7 @@ enum PricingStrategy {
   INCREMENTAL_QUANTITY
   FIXED_VARIANTS
   PER_UNIT
+  TIERED_PRICING        // ← NEW
   CUSTOM_QUOTE
 }
 
@@ -352,13 +353,31 @@ model ProductConfiguration {
 // PRICING CONFIGURATION
 // =============================================================================
 
-/// Pricing strategy and calculation rules — no stored tiers, computed at runtime
+/// A specific quantity+price tier for TIERED_PRICING strategy
+model PricingTier {
+  id                String               @id @default(cuid())
+  pricingConfigId   String
+  quantity          Int                  // exact quantity for this tier
+  price             Decimal              @db.Decimal(10, 2) // total price for this tier
+  label             String?              // e.g. "Special Offer 🔥"
+  isSpecialOffer    Boolean              @default(false)
+  sortOrder         Int                  @default(0)
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  pricingConfig PricingConfiguration @relation(fields: [pricingConfigId], references: [id], onDelete: Cascade)
+
+  @@index([pricingConfigId])
+  @@map("pricing_tiers")
+}
+
+// Update PricingConfiguration to include tiers relation
 model PricingConfiguration {
   id        String          @id @default(cuid())
   productId String          @unique
   strategy  PricingStrategy
 
-  // INCREMENTAL_QUANTITY: price = ceil(qty / incrementQuantity) * incrementPrice
+  // INCREMENTAL_QUANTITY
   minimumOrderQuantity Int?
   incrementQuantity    Int?
   incrementPrice       Decimal? @db.Decimal(10, 2)
@@ -366,10 +385,14 @@ model PricingConfiguration {
   // PER_UNIT
   unitPrice Decimal? @db.Decimal(10, 2)
 
+  // TIERED_PRICING — base fallback price per unit
+  baseUnitPrice Decimal? @db.Decimal(10, 2)  // ← NEW
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  tiers   PricingTier[]  // ← NEW
 
   @@map("pricing_configurations")
 }
