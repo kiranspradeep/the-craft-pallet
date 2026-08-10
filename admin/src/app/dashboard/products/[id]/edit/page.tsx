@@ -1,14 +1,16 @@
+//admin\src\app\dashboard\products\[id]\edit\page.tsx
 import { cookies } from "next/headers";
 import ProductEditTabs from "./ProductEditTabs";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 async function getProduct(id: string, token: string) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const [productRes, categoriesRes] = await Promise.all([
-    fetch(`${API_URL}/api/admin/products/${id}`, {
+    fetch(`${API}/api/admin/products/${id}`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     }),
-    fetch(`${API_URL}/api/admin/categories?limit=100`, {
+    fetch(`${API}/api/admin/categories?limit=100`, {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
     }),

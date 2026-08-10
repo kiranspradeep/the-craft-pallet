@@ -8,6 +8,7 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
 import Button from "@/components/ui/Button";
+import FileUpload from "@/components/ui/FileUpload";
 
 function generateSlug(name: string) {
   return name
@@ -49,31 +50,16 @@ export default function EditCategoryForm({
   const set = (key: string, val: unknown) =>
     setForm((f) => ({ ...f, [key]: val }));
 
-  const getToken = () => {
-    const match = document.cookie
-      .split("; ")
-      .find((r) => r.startsWith("tcp_admin_token="));
-    return match?.split("=")[1] || "";
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/categories/${category.id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify(form),
-        }
-      );
-
+      const res = await fetch(`/api/admin/categories/${category.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Failed to update category");
@@ -100,7 +86,10 @@ export default function EditCategoryForm({
           </button>
         </Link>
         <div>
-          <h1 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h1
+            className="text-xl font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             Edit Category
           </h1>
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -120,7 +109,11 @@ export default function EditCategoryForm({
         {error && (
           <div
             className="mb-4 px-4 py-3 rounded-xl text-sm"
-            style={{ backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}
+            style={{
+              backgroundColor: "#FEF2F2",
+              color: "#DC2626",
+              border: "1px solid #FECACA",
+            }}
           >
             {error}
           </div>
@@ -136,14 +129,12 @@ export default function EditCategoryForm({
               set("slug", generateSlug(e.target.value));
             }}
           />
-
           <Input
             label="Slug"
             value={form.slug}
             onChange={(e) => set("slug", e.target.value)}
             helpText="Changing the slug affects existing URLs"
           />
-
           <Textarea
             label="Description"
             value={form.description}
@@ -151,12 +142,15 @@ export default function EditCategoryForm({
             rows={3}
           />
 
-          <Input
-            label="Image URL"
-            type="url"
-            value={form.imageUrl}
-            onChange={(e) => set("imageUrl", e.target.value)}
-            placeholder="https://..."
+          {/* Replaced Image URL input with Cloudinary file upload */}
+          <FileUpload
+            label="Category Image"
+            multiple={false}
+            maxFiles={1}
+            value={form.imageUrl || undefined}
+            onUpload={(urls) => set("imageUrl", urls[0] ?? "")}
+            onRemove={() => set("imageUrl", "")}
+            helpText="Upload a new image to replace the current one."
           />
 
           <Input
@@ -166,19 +160,22 @@ export default function EditCategoryForm({
             value={form.sortOrder}
             onChange={(e) => set("sortOrder", parseInt(e.target.value) || 0)}
           />
-
           <Toggle
             label="Active"
             checked={form.isActive}
             onChange={(v) => set("isActive", v)}
           />
-
-          <div className="flex gap-3 pt-2 border-t" style={{ borderColor: "var(--border)" }}>
+          <div
+            className="flex gap-3 pt-2 border-t"
+            style={{ borderColor: "var(--border)" }}
+          >
             <Button type="submit" loading={loading}>
               Save Changes
             </Button>
             <Link href="/dashboard/categories">
-              <Button type="button" variant="secondary">Cancel</Button>
+              <Button type="button" variant="secondary">
+                Cancel
+              </Button>
             </Link>
           </div>
         </form>

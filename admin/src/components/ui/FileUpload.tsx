@@ -76,16 +76,12 @@ export default function FileUpload({
             if (xhr.status >= 200 && xhr.status < 300) {
               try {
                 const data = JSON.parse(xhr.responseText);
-                const asset = data.data;
-                if (asset?.files && asset.files.length > 0) {
-                  const API_URL =
-                    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-                  const uploadedUrls = asset.files.map(
-                    (f: { storagePath: string }) => `${API_URL}/${f.storagePath}`
-                  );
+                // Admin upload returns { data: { urls: string[] } }
+                const uploadedUrls: string[] = data?.data?.urls;
+                if (uploadedUrls && uploadedUrls.length > 0) {
                   resolve(uploadedUrls);
                 } else {
-                  reject(new Error("No files in response"));
+                  reject(new Error("No URLs in response"));
                 }
               } catch {
                 reject(new Error("Invalid response"));
@@ -104,7 +100,7 @@ export default function FileUpload({
             reject(new Error("Network error"))
           );
 
-          // Goes through Next.js proxy which attaches the token
+          // Calls Next.js /api/upload which proxies to Express with auth token
           xhr.open("POST", "/api/upload");
           xhr.send(formData);
         });
@@ -135,7 +131,6 @@ export default function FileUpload({
   };
 
   const handleDragLeave = () => setDragOver(false);
-
   const handleClick = () => inputRef.current?.click();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,11 +160,7 @@ export default function FileUpload({
                 className="w-20 h-20 rounded-xl overflow-hidden border"
                 style={{ borderColor: "var(--border)" }}
               >
-                <img
-                  src={url}
-                  alt=""
-                  className="w-full h-full object-cover"
-                />
+                <img src={url} alt="" className="w-full h-full object-cover" />
               </div>
               {onRemove && (
                 <button
@@ -220,11 +211,8 @@ export default function FileUpload({
               className="mx-auto animate-spin"
               style={{ color: "var(--brand)" }}
             />
-            <p
-              className="text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              Uploading... {progress}%
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Uploading to Cloudinary... {progress}%
             </p>
             <div
               className="w-full h-1.5 rounded-full overflow-hidden"

@@ -200,11 +200,14 @@ function CheckoutContent() {
           orderId: order.id,
         },
         theme: { color: "#C96C4A" },
-        handler: function () {
-          router.push(
-            `/order-confirmation/${order.orderNumber}?phone=${form.phone}`
-          );
-        },
+        handler: function (response: any) {
+  // Small delay to allow webhook to process before page loads
+  setTimeout(() => {
+    router.push(
+      `/order-confirmation/${order.orderNumber}?phone=${form.phone}&paid=true`
+    );
+  }, 1500);
+},
         modal: {
           ondismiss: function () {
             setPlacing(false);

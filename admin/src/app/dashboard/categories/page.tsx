@@ -1,3 +1,4 @@
+//admin\src\app\dashboard\categories\page.tsx
 import { cookies } from "next/headers";
 import { Tag } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
@@ -17,10 +18,11 @@ interface Category {
   _count: { products: number };
 }
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 async function getCategories(token: string) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const res = await fetch(
-    `${API_URL}/api/admin/categories?limit=100&sortBy=sortOrder`,
+    `${API}/api/admin/categories?limit=100&sortBy=sortOrder`,
     {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",

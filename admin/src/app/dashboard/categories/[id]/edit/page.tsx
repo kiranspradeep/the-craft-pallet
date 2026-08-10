@@ -1,9 +1,10 @@
 import { cookies } from "next/headers";
 import EditCategoryForm from "./EditCategoryForm";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 async function getCategory(id: string, token: string) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-  const res = await fetch(`${API_URL}/api/admin/categories/${id}`, {
+  const res = await fetch(`${API}/api/admin/categories/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });

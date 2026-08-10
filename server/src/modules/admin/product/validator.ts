@@ -32,8 +32,8 @@ export const createProductSchema = z.object({
     isFeatured: z.boolean().optional().default(false),
     sortOrder: z.number().int().min(0).optional().default(0),
     metaTitle: z.string().max(160).optional(),
-    metaDescription: z.string().max(320).optional(),
-    metaKeywords: z.string().max(500).optional(),
+    metaDescription: z.string().max(1000).optional(),
+    metaKeywords: z.string().max(2000).optional(),
     ogImageUrl: z.string().url().optional().or(z.literal("")),
   }),
 });
@@ -54,8 +54,8 @@ export const updateProductSchema = z.object({
     isFeatured: z.boolean().optional(),
     sortOrder: z.number().int().min(0).optional(),
     metaTitle: z.string().max(160).optional(),
-    metaDescription: z.string().max(320).optional(),
-    metaKeywords: z.string().max(500).optional(),
+    metaDescription: z.string().max(1000).optional(),
+    metaKeywords: z.string().max(2000).optional(),
     ogImageUrl: z.string().url().optional().or(z.literal("")),
   }),
 });

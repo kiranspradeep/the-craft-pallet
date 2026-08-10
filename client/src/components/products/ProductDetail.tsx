@@ -47,10 +47,30 @@ export default function ProductDetail({ product }: Props) {
   const [added, setAdded] = useState(false);
   const [error, setError] = useState("");
 
+  // ── Derived values ────────────────────────────────────────────────────
+
   const selectedVariant = useMemo(
     () => product.variants.find((v: any) => v.id === selectedVariantId),
     [selectedVariantId, product.variants]
   );
+
+  // Step size for quantity buttons
+  const quantityStep = useMemo(() => {
+    const p = product.pricingConfig;
+    if (!p) return 1;
+    if (p.strategy === "INCREMENTAL_QUANTITY")
+      return p.incrementQuantity || 1;
+    return 1;
+  }, [product.pricingConfig]);
+
+  // Minimum allowed quantity
+  const quantityMin = useMemo(() => {
+    const p = product.pricingConfig;
+    if (!p) return 1;
+    if (p.strategy === "INCREMENTAL_QUANTITY")
+      return p.minimumOrderQuantity || p.incrementQuantity || 1;
+    return 1;
+  }, [product.pricingConfig]);
 
   const displayPrice = useMemo(() => {
     const p = product.pricingConfig;
@@ -58,7 +78,9 @@ export default function ProductDetail({ product }: Props) {
 
     switch (p.strategy) {
       case "PER_UNIT":
-        return p.unitPrice ? formatPrice(Number(p.unitPrice) * quantity) : "—";
+        return p.unitPrice
+          ? formatPrice(Number(p.unitPrice) * quantity)
+          : "—";
       case "INCREMENTAL_QUANTITY": {
         if (!p.incrementPrice || !p.incrementQuantity) return "—";
         const inc = Math.ceil(quantity / p.incrementQuantity);
@@ -81,6 +103,8 @@ export default function ProductDetail({ product }: Props) {
         return "—";
     }
   }, [product.pricingConfig, quantity, selectedTier, selectedVariant]);
+
+  // ── Validation ────────────────────────────────────────────────────────
 
   const validate = (): boolean => {
     for (const field of product.customFields || []) {
@@ -119,6 +143,8 @@ export default function ProductDetail({ product }: Props) {
           };
         return { ...base, textValue: customFieldValues[f.id] };
       });
+
+  // ── Handlers ──────────────────────────────────────────────────────────
 
   const handleAddToCart = async () => {
     setError("");
@@ -167,6 +193,8 @@ export default function ProductDetail({ product }: Props) {
     }
   };
 
+  // ── Render ────────────────────────────────────────────────────────────
+
   return (
     <div className="tcp-container">
       <div
@@ -186,7 +214,7 @@ export default function ProductDetail({ product }: Props) {
           className="pdp-grid grid"
           style={{ gridTemplateColumns: "1fr", gap: "48px" }}
         >
-          {/* Left — Gallery */}
+          {/* ── Left — Gallery ── */}
           <div>
             <div
               style={{
@@ -201,8 +229,14 @@ export default function ProductDetail({ product }: Props) {
               {product.images?.[activeImageIdx] ? (
                 <img
                   src={product.images[activeImageIdx].url}
-                  alt={product.images[activeImageIdx].altText || product.name}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  alt={
+                    product.images[activeImageIdx].altText || product.name
+                  }
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
                 />
               ) : (
                 <div
@@ -225,8 +259,7 @@ export default function ProductDetail({ product }: Props) {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns:
-                    "repeat(auto-fit, minmax(80px, 1fr))",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))",
                   gap: "12px",
                 }}
               >
@@ -260,7 +293,7 @@ export default function ProductDetail({ product }: Props) {
             )}
           </div>
 
-          {/* Right — Info */}
+          {/* ── Right — Info ── */}
           <div>
             <p className="tcp-eyebrow">{product.category.name}</p>
             <h1
@@ -483,7 +516,7 @@ export default function ProductDetail({ product }: Props) {
                 </div>
               )}
 
-            {/* Custom Fields (not photo upload) */}
+            {/* Custom Fields */}
             {product.customFields
               ?.filter((f: any) => f.type !== "PHOTO_UPLOAD")
               .map((field: any) => (
@@ -502,10 +535,14 @@ export default function ProductDetail({ product }: Props) {
                       <span style={{ color: "var(--accent)" }}> *</span>
                     )}
                   </label>
+
                   {field.type === "TEXT" || field.type === "URL" ? (
                     <input
                       type={field.type === "URL" ? "url" : "text"}
                       placeholder={field.placeholder || ""}
+                      maxLength={
+                        field.validationJson?.maxTextLength || undefined
+                      }
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
                         setCustomFieldValues((v) => ({
@@ -526,6 +563,9 @@ export default function ProductDetail({ product }: Props) {
                     <textarea
                       rows={3}
                       placeholder={field.placeholder || ""}
+                      maxLength={
+                        field.validationJson?.maxTextLength || undefined
+                      }
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
                         setCustomFieldValues((v) => ({
@@ -572,6 +612,8 @@ export default function ProductDetail({ product }: Props) {
                     <input
                       type="number"
                       placeholder={field.placeholder || ""}
+                      min={field.validationJson?.min ?? undefined}
+                      max={field.validationJson?.max ?? undefined}
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
                         setCustomFieldValues((v) => ({
@@ -608,6 +650,7 @@ export default function ProductDetail({ product }: Props) {
                       }}
                     />
                   ) : null}
+
                   {field.helpText && (
                     <p
                       style={{
@@ -619,10 +662,45 @@ export default function ProductDetail({ product }: Props) {
                       {field.helpText}
                     </p>
                   )}
+
+                  {/* Show min/max hint for NUMBER fields */}
+                  {field.type === "NUMBER" &&
+                    (field.validationJson?.min !== undefined ||
+                      field.validationJson?.max !== undefined) && (
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-secondary)",
+                          marginTop: "6px",
+                        }}
+                      >
+                        {field.validationJson?.min !== undefined &&
+                          field.validationJson?.max !== undefined
+                          ? `Enter a value between ${field.validationJson.min} and ${field.validationJson.max}`
+                          : field.validationJson?.min !== undefined
+                          ? `Minimum: ${field.validationJson.min}`
+                          : `Maximum: ${field.validationJson.max}`}
+                      </p>
+                    )}
+
+                  {/* Show char count hint for TEXT fields */}
+                  {(field.type === "TEXT" || field.type === "TEXTAREA") &&
+                    field.validationJson?.maxTextLength && (
+                      <p
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-secondary)",
+                          marginTop: "6px",
+                        }}
+                      >
+                        {(customFieldValues[field.id] || "").length} /{" "}
+                        {field.validationJson.maxTextLength} characters
+                      </p>
+                    )}
                 </div>
               ))}
 
-            {/* Photo upload notice (if required) */}
+            {/* Photo upload notice */}
             {product.configuration?.uploadRequired && (
               <div
                 style={{
@@ -661,7 +739,7 @@ export default function ProductDetail({ product }: Props) {
               </div>
             )}
 
-            {/* Quantity (non-tiered, non-fixed variants) */}
+            {/* Quantity — not shown for TIERED or FIXED_VARIANTS */}
             {product.pricingConfig?.strategy !== "TIERED_PRICING" &&
               product.pricingConfig?.strategy !== "FIXED_VARIANTS" && (
                 <div style={{ marginBottom: "24px" }}>
@@ -675,6 +753,19 @@ export default function ProductDetail({ product }: Props) {
                     }}
                   >
                     Quantity
+                    {product.pricingConfig?.strategy ===
+                      "INCREMENTAL_QUANTITY" && (
+                      <span
+                        style={{
+                          marginLeft: "8px",
+                          fontSize: "11px",
+                          color: "var(--text-secondary)",
+                          fontWeight: 400,
+                        }}
+                      >
+                        (steps of {quantityStep})
+                      </span>
+                    )}
                   </label>
                   <div
                     style={{
@@ -686,9 +777,12 @@ export default function ProductDetail({ product }: Props) {
                       borderRadius: "999px",
                     }}
                   >
+                    {/* MINUS — steps down by quantityStep, never below quantityMin */}
                     <button
                       onClick={() =>
-                        setQuantity((q) => Math.max(1, q - 1))
+                        setQuantity((q) =>
+                          Math.max(quantityMin, q - quantityStep)
+                        )
                       }
                       style={{
                         width: "36px",
@@ -703,6 +797,7 @@ export default function ProductDetail({ product }: Props) {
                     >
                       <Minus size={14} strokeWidth={2} />
                     </button>
+
                     <span
                       style={{
                         minWidth: "40px",
@@ -713,8 +808,12 @@ export default function ProductDetail({ product }: Props) {
                     >
                       {quantity}
                     </span>
+
+                    {/* PLUS — steps up by quantityStep */}
                     <button
-                      onClick={() => setQuantity((q) => q + 1)}
+                      onClick={() =>
+                        setQuantity((q) => q + quantityStep)
+                      }
                       style={{
                         width: "36px",
                         height: "36px",
@@ -777,7 +876,7 @@ export default function ProductDetail({ product }: Props) {
               </div>
             )}
 
-            {/* CTAs — Buy Now + Add to Cart */}
+            {/* CTAs */}
             <div
               style={{
                 display: "flex",
@@ -840,7 +939,7 @@ export default function ProductDetail({ product }: Props) {
               Need help? Chat with us on WhatsApp
             </a>
 
-            {/* Trust */}
+            {/* Trust badges */}
             <div
               style={{
                 display: "grid",

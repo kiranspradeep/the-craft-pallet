@@ -18,12 +18,9 @@ export default function UploadMethodPage() {
     const check = async () => {
       try {
         if (buyNowId) {
-          const session = await buyNowApi.get(buyNowId);
-          // Assume Buy Now has product info — for now assume upload might be needed
-          // We'll check via cart API which one has upload requirement
-          // For simplicity here, always show both options
-          setNeedsUpload(true);
-        } else {
+  const session = await buyNowApi.get(buyNowId);
+  setNeedsUpload(session.uploadRequired ?? false);  // ← done
+} else {
           const res = await cartApi.getCart();
           if (!res?.cart?.items?.length) {
             router.push("/cart");

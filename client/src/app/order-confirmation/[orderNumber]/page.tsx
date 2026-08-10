@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle, MessageCircle, Copy, ArrowRight, Clock } from "lucide-react";
@@ -17,6 +17,7 @@ export default function OrderConfirmationPage() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const orderRef = useRef<any>(null);
 
   useEffect(() => {
     if (!phone) {
@@ -30,14 +31,27 @@ export default function OrderConfirmationPage() {
           `${API}/api/orders/track/${orderNumber}?phone=${phone}`
         );
         const data = await res.json();
-        if (res.ok) setOrder(data.data);
+        if (res.ok) {
+  setOrder(data.data);
+  orderRef.current = data.data;
+}
       } catch {}
       setLoading(false);
     };
 
     load();
-    const interval = setInterval(load, 5000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+  const current = orderRef.current;
+  if (
+    current?.status === "CONFIRMED" ||
+    current?.payment?.status === "SUCCESS"
+  ) {
+    clearInterval(interval);
+    return;
+  }
+  load();
+}, 5000);
+return () => clearInterval(interval);
   }, [orderNumber, phone]);
 
   const copyOrderNumber = () => {
@@ -54,9 +68,10 @@ export default function OrderConfirmationPage() {
     );
   }
 
-  const isPaid = order?.payment?.status === "SUCCESS";
+  const paidParam = searchParams.get("paid") === "true";
+  const isPaid = paidParam || order?.payment?.status === "SUCCESS" || order?.status === "CONFIRMED";
   const isDraft = order?.status === "DRAFT";
-  const isAwaitingPayment = order?.status === "AWAITING_PAYMENT";
+  const isAwaitingPayment = !isPaid && order?.status === "AWAITING_PAYMENT";
   const orderSource = order?.orderSource;
 
   // Status headline

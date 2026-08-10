@@ -8,6 +8,7 @@ import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
 import Button from "@/components/ui/Button";
+import FileUpload from "@/components/ui/FileUpload";
 
 function generateSlug(name: string) {
   return name
@@ -40,31 +41,16 @@ export default function NewCategoryPage() {
     set("slug", generateSlug(name));
   };
 
-  const getToken = () => {
-    const match = document.cookie
-      .split("; ")
-      .find((r) => r.startsWith("tcp_admin_token="));
-    return match?.split("=")[1] || "";
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
     try {
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/categories`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify(form),
-        }
-      );
-
+      const res = await fetch("/api/admin/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Failed to create category");
@@ -131,7 +117,6 @@ export default function NewCategoryPage() {
             onChange={(e) => handleNameChange(e.target.value)}
             placeholder="e.g. Mini Polaroids"
           />
-
           <Input
             label="Slug"
             value={form.slug}
@@ -139,7 +124,6 @@ export default function NewCategoryPage() {
             placeholder="mini-polaroids"
             helpText="Auto-generated from name. You can customise it."
           />
-
           <Textarea
             label="Description"
             value={form.description}
@@ -148,12 +132,15 @@ export default function NewCategoryPage() {
             rows={3}
           />
 
-          <Input
-            label="Image URL"
-            type="url"
-            value={form.imageUrl}
-            onChange={(e) => set("imageUrl", e.target.value)}
-            placeholder="https://..."
+          {/* Replaced Image URL input with Cloudinary file upload */}
+          <FileUpload
+            label="Category Image"
+            multiple={false}
+            maxFiles={1}
+            value={form.imageUrl || undefined}
+            onUpload={(urls) => set("imageUrl", urls[0] ?? "")}
+            onRemove={() => set("imageUrl", "")}
+            helpText="Uploaded to Cloudinary. Recommended: square image, at least 400×400px."
           />
 
           <Input
@@ -164,14 +151,12 @@ export default function NewCategoryPage() {
             onChange={(e) => set("sortOrder", parseInt(e.target.value) || 0)}
             helpText="Lower numbers appear first"
           />
-
           <Toggle
             label="Active"
             helpText="Inactive categories are hidden from the store"
             checked={form.isActive}
             onChange={(v) => set("isActive", v)}
           />
-
           <div
             className="flex gap-3 pt-2 border-t"
             style={{ borderColor: "var(--border)" }}

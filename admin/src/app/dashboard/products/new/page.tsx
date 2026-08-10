@@ -9,6 +9,7 @@ import Textarea from "@/components/ui/Textarea";
 import Select from "@/components/ui/Select";
 import Toggle from "@/components/ui/Toggle";
 import Button from "@/components/ui/Button";
+import FileUpload from "@/components/ui/FileUpload";
 
 interface Category {
   id: string;
@@ -24,14 +25,6 @@ function generateSlug(name: string) {
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
-
-const getToken = () =>
-  document.cookie
-    .split("; ")
-    .find((r) => r.startsWith("tcp_admin_token="))
-    ?.split("=")[1] || "";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -54,9 +47,7 @@ export default function NewProductPage() {
   });
 
   useEffect(() => {
-    fetch(`${API}/api/admin/categories?limit=100`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    })
+    fetch("/api/admin/categories?limit=100")
       .then((r) => r.json())
       .then((d) => setCategories(d.data || []));
   }, []);
@@ -69,12 +60,9 @@ export default function NewProductPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/admin/products`, {
+      const res = await fetch("/api/admin/products", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const data = await res.json();
@@ -136,7 +124,7 @@ export default function NewProductPage() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
-          {/* General */}
+          {/* General Information */}
           <div>
             <p
               className="text-xs font-semibold uppercase tracking-wide mb-4"
@@ -241,12 +229,14 @@ export default function NewProductPage() {
                 onChange={(e) => set("metaKeywords", e.target.value)}
                 placeholder="keyword1, keyword2, keyword3"
               />
-              <Input
-                label="OG Image URL"
-                type="url"
-                value={form.ogImageUrl}
-                onChange={(e) => set("ogImageUrl", e.target.value)}
-                placeholder="https://..."
+              <FileUpload
+                label="OG Image (Social Media Preview)"
+                multiple={false}
+                maxFiles={1}
+                value={form.ogImageUrl || undefined}
+                onUpload={(urls) => set("ogImageUrl", urls[0] ?? "")}
+                onRemove={() => set("ogImageUrl", "")}
+                helpText="Optional. Used when sharing on Facebook, WhatsApp, etc."
               />
             </div>
           </div>

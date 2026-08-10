@@ -1,17 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus, Pencil, X, Check } from "lucide-react";
+import { Trash2, Plus, Pencil } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Toggle from "@/components/ui/Toggle";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-const getToken = () =>
-  document.cookie
-    .split("; ")
-    .find((r) => r.startsWith("tcp_admin_token="))
-    ?.split("=")[1] || "";
 
 interface Variant {
   id: string;
@@ -49,9 +42,7 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     setForm((f) => ({ ...f, [key]: val }));
 
   const refreshProduct = async () => {
-    const res = await fetch(`${API}/api/admin/products/${product.id}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    const res = await fetch(`/api/admin/products/${product.id}`);
     const data = await res.json();
     if (res.ok) onUpdate(data.data);
   };
@@ -61,26 +52,20 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(
-        `${API}/api/admin/products/${product.id}/variants`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify({
-            name: form.name,
-            sku: form.sku || undefined,
-            price: parseFloat(form.price),
-            processingDays: form.processingDays
-              ? parseInt(form.processingDays)
-              : undefined,
-            isActive: form.isActive,
-            sortOrder: form.sortOrder,
-          }),
-        }
-      );
+      const res = await fetch(`/api/admin/products/${product.id}/variants`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          sku: form.sku || undefined,
+          price: parseFloat(form.price),
+          processingDays: form.processingDays
+            ? parseInt(form.processingDays)
+            : undefined,
+          isActive: form.isActive,
+          sortOrder: form.sortOrder,
+        }),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Failed to create variant");
@@ -101,13 +86,10 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     setError("");
     try {
       const res = await fetch(
-        `${API}/api/admin/products/${product.id}/variants/${variantId}`,
+        `/api/admin/products/${product.id}/variants/${variantId}`,
         {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             name: form.name,
             sku: form.sku || undefined,
@@ -139,13 +121,9 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     if (!confirm("Delete this variant?")) return;
     setDeleting(variantId);
     try {
-      await fetch(
-        `${API}/api/admin/products/${product.id}/variants/${variantId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${getToken()}` },
-        }
-      );
+      await fetch(`/api/admin/products/${product.id}/variants/${variantId}`, {
+        method: "DELETE",
+      });
       await refreshProduct();
     } finally {
       setDeleting(null);
@@ -277,7 +255,6 @@ export default function VariantsTab({ product, onUpdate }: Props) {
         )}
       </div>
 
-      {/* Add form */}
       {showForm && (
         <div
           className="p-4 rounded-xl mb-4"
@@ -301,7 +278,6 @@ export default function VariantsTab({ product, onUpdate }: Props) {
         </div>
       )}
 
-      {/* Variant list */}
       {product.variants?.length === 0 && !showForm ? (
         <div className="text-center py-10">
           <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
@@ -353,8 +329,7 @@ export default function VariantsTab({ product, onUpdate }: Props) {
                     >
                       ₹{Number(v.price).toFixed(2)}
                       {v.sku && ` · SKU: ${v.sku}`}
-                      {v.processingDays &&
-                        ` · ${v.processingDays} days`}
+                      {v.processingDays && ` · ${v.processingDays} days`}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">

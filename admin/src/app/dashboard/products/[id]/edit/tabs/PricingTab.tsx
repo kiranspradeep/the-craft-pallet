@@ -7,27 +7,11 @@ import Select from "@/components/ui/Select";
 import Button from "@/components/ui/Button";
 import Toggle from "@/components/ui/Toggle";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-const getToken = () =>
-  document.cookie
-    .split("; ")
-    .find((r) => r.startsWith("tcp_admin_token="))
-    ?.split("=")[1] || "";
-
 const STRATEGIES = [
   { value: "PER_UNIT", label: "Per Unit — fixed price per item" },
-  {
-    value: "INCREMENTAL_QUANTITY",
-    label: "Incremental Quantity — price per batch",
-  },
-  {
-    value: "FIXED_VARIANTS",
-    label: "Fixed Variants — price from selected variant",
-  },
-  {
-    value: "TIERED_PRICING",
-    label: "Tiered Pricing — special offers + base price",
-  },
+  { value: "INCREMENTAL_QUANTITY", label: "Incremental Quantity — price per batch" },
+  { value: "FIXED_VARIANTS", label: "Fixed Variants — price from selected variant" },
+  { value: "TIERED_PRICING", label: "Tiered Pricing — special offers + base price" },
   { value: "CUSTOM_QUOTE", label: "Custom Quote — no price shown" },
 ];
 
@@ -68,7 +52,6 @@ export default function PricingTab({ product, onUpdate }: Props) {
     incrementPrice: pricing?.incrementPrice?.toString() || "",
   });
 
-  // Tier form
   const [showTierForm, setShowTierForm] = useState(false);
   const [tierForm, setTierForm] = useState(emptyTierForm);
   const [tierLoading, setTierLoading] = useState(false);
@@ -82,9 +65,7 @@ export default function PricingTab({ product, onUpdate }: Props) {
     setTierForm((f) => ({ ...f, [key]: val }));
 
   const refreshProduct = async () => {
-    const res = await fetch(`${API}/api/admin/products/${product.id}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    const res = await fetch(`/api/admin/products/${product.id}`);
     const data = await res.json();
     if (res.ok) onUpdate(data.data);
   };
@@ -96,33 +77,22 @@ export default function PricingTab({ product, onUpdate }: Props) {
     setSuccess(false);
 
     const body: Record<string, unknown> = { strategy: form.strategy };
-
-    if (form.strategy === "PER_UNIT") {
-      body.unitPrice = parseFloat(form.unitPrice);
-    }
+    if (form.strategy === "PER_UNIT") body.unitPrice = parseFloat(form.unitPrice);
     if (form.strategy === "INCREMENTAL_QUANTITY") {
       if (form.minimumOrderQuantity)
         body.minimumOrderQuantity = parseInt(form.minimumOrderQuantity);
       body.incrementQuantity = parseInt(form.incrementQuantity);
       body.incrementPrice = parseFloat(form.incrementPrice);
     }
-    if (form.strategy === "TIERED_PRICING") {
-      if (form.baseUnitPrice)
-        body.baseUnitPrice = parseFloat(form.baseUnitPrice);
-    }
+    if (form.strategy === "TIERED_PRICING" && form.baseUnitPrice)
+      body.baseUnitPrice = parseFloat(form.baseUnitPrice);
 
     try {
-      const res = await fetch(
-        `${API}/api/admin/products/${product.id}/pricing`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify(body),
-        }
-      );
+      const res = await fetch(`/api/admin/products/${product.id}/pricing`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
       const data = await res.json();
       if (!res.ok) {
         setError(data.message || "Failed to save pricing");
@@ -144,13 +114,10 @@ export default function PricingTab({ product, onUpdate }: Props) {
     setTierError("");
     try {
       const res = await fetch(
-        `${API}/api/admin/products/${product.id}/pricing/tiers`,
+        `/api/admin/products/${product.id}/pricing/tiers`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             quantity: parseInt(tierForm.quantity),
             price: parseFloat(tierForm.price),
@@ -180,11 +147,8 @@ export default function PricingTab({ product, onUpdate }: Props) {
     setDeletingTier(tierId);
     try {
       await fetch(
-        `${API}/api/admin/products/${product.id}/pricing/tiers/${tierId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${getToken()}` },
-        }
+        `/api/admin/products/${product.id}/pricing/tiers/${tierId}`,
+        { method: "DELETE" }
       );
       await refreshProduct();
     } finally {
@@ -196,7 +160,6 @@ export default function PricingTab({ product, onUpdate }: Props) {
 
   return (
     <div className="space-y-5">
-      {/* Strategy + base config */}
       <div
         className="rounded-2xl border p-6"
         style={{
@@ -266,9 +229,7 @@ export default function PricingTab({ product, onUpdate }: Props) {
                 type="number"
                 min={1}
                 value={form.minimumOrderQuantity}
-                onChange={(e) =>
-                  set("minimumOrderQuantity", e.target.value)
-                }
+                onChange={(e) => set("minimumOrderQuantity", e.target.value)}
                 placeholder="e.g. 36"
               />
               <Input
@@ -315,7 +276,7 @@ export default function PricingTab({ product, onUpdate }: Props) {
               value={form.baseUnitPrice}
               onChange={(e) => set("baseUnitPrice", e.target.value)}
               placeholder="e.g. 9"
-              helpText="Fallback price per unit when customer doesn't select a tier. Leave empty to require tier selection."
+              helpText="Fallback price per unit. Leave empty to require tier selection."
             />
           )}
 
@@ -327,8 +288,8 @@ export default function PricingTab({ product, onUpdate }: Props) {
                 color: "var(--brand)",
               }}
             >
-              Price is taken from the selected variant. Configure variant
-              prices in the Variants tab.
+              Price is taken from the selected variant. Configure variant prices
+              in the Variants tab.
             </div>
           )}
 
@@ -351,7 +312,6 @@ export default function PricingTab({ product, onUpdate }: Props) {
         </form>
       </div>
 
-      {/* Tiers — only shown for TIERED_PRICING */}
       {form.strategy === "TIERED_PRICING" && (
         <div
           className="rounded-2xl border p-6"
@@ -388,7 +348,6 @@ export default function PricingTab({ product, onUpdate }: Props) {
             )}
           </div>
 
-          {/* Add tier form */}
           {showTierForm && (
             <div
               className="p-4 rounded-xl mb-4"
@@ -441,7 +400,7 @@ export default function PricingTab({ product, onUpdate }: Props) {
                   label="Label"
                   value={tierForm.label}
                   onChange={(e) => setTier("label", e.target.value)}
-                  placeholder='e.g. "Best Value 🔥" or "Special Offer"'
+                  placeholder='e.g. "Best Value 🔥"'
                   helpText="Optional label shown to customer"
                 />
                 <div className="grid grid-cols-2 gap-4">
@@ -481,13 +440,9 @@ export default function PricingTab({ product, onUpdate }: Props) {
             </div>
           )}
 
-          {/* Tier list */}
           {tiers.length === 0 && !showTierForm ? (
             <div className="text-center py-10">
-              <p
-                className="text-sm"
-                style={{ color: "var(--text-secondary)" }}
-              >
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 No tiers yet. Add your first pricing tier above.
               </p>
             </div>
@@ -512,8 +467,7 @@ export default function PricingTab({ product, onUpdate }: Props) {
                         className="text-sm font-medium"
                         style={{ color: "var(--text-primary)" }}
                       >
-                        {tier.quantity} prints = ₹
-                        {Number(tier.price).toFixed(2)}
+                        {tier.quantity} prints = ₹{Number(tier.price).toFixed(2)}
                         {tier.label && (
                           <span
                             className="ml-2 text-xs"
@@ -527,9 +481,8 @@ export default function PricingTab({ product, onUpdate }: Props) {
                         className="text-xs mt-0.5"
                         style={{ color: "var(--text-secondary)" }}
                       >
-                        ₹
-                        {(Number(tier.price) / tier.quantity).toFixed(2)}{" "}
-                        per print
+                        ₹{(Number(tier.price) / tier.quantity).toFixed(2)} per
+                        print
                         {tier.isSpecialOffer && (
                           <span
                             className="ml-2 px-1.5 py-0.5 rounded-full text-xs"

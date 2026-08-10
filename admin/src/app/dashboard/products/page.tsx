@@ -1,3 +1,4 @@
+//admin\src\app\dashboard\products\page.tsx
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { Package } from "lucide-react";
@@ -18,10 +19,11 @@ interface Product {
   pricingConfig: { strategy: string } | null;
 }
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 async function getProducts(token: string) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const res = await fetch(
-    `${API_URL}/api/admin/products?limit=100&sortBy=sortOrder`,
+    `${API}/api/admin/products?limit=100&sortBy=sortOrder`,
     {
       headers: { Authorization: `Bearer ${token}` },
       cache: "no-store",
@@ -102,7 +104,10 @@ export default async function ProductsPage() {
                           className="w-10 h-10 rounded-xl flex items-center justify-center"
                           style={{ backgroundColor: "rgba(166,138,117,0.1)" }}
                         >
-                          <Package size={16} style={{ color: "var(--brand)" }} />
+                          <Package
+                            size={16}
+                            style={{ color: "var(--brand)" }}
+                          />
                         </div>
                       )}
                       <div>

@@ -13,6 +13,7 @@ import settingsRoutes from "./modules/admin/settings/routes.js";
 import assetRoutes from "./modules/asset/routes.js";
 import cartRoutes from "./modules/cart/routes.js";
 import checkoutRoutes from "./modules/checkout/routes.js";
+import adminUploadRoutes from "./modules/admin/upload/routes.js";
 import publicRoutes from "./modules/public/routes.js";
 import webhookRoutes, { captureRawBody } from "./modules/webhooks/razorpay/routes.js";
 
@@ -48,11 +49,13 @@ app.use("/api/admin/categories", categoryRoutes);
 app.use("/api/admin/products", productRoutes);
 app.use("/api/admin/orders", orderRoutes);
 app.use("/api/admin/settings", settingsRoutes);
+app.use("/api/admin/upload", adminUploadRoutes);
 
 // ── Customer (session-based) ───────────────────────────────────────────────
 app.use("/api/assets", assetRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/checkout", checkoutRoutes);
+
 
 // ── Public (no auth) ───────────────────────────────────────────────────────
 app.use("/api", publicRoutes);

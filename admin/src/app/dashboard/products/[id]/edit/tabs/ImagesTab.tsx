@@ -3,15 +3,8 @@
 import { useState } from "react";
 import { Trash2, ImageIcon } from "lucide-react";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-const getToken = () =>
-  document.cookie
-    .split("; ")
-    .find((r) => r.startsWith("tcp_admin_token="))
-    ?.split("=")[1] || "";
+import FileUpload from "@/components/ui/FileUpload";
 
 interface Props {
   product: any;
@@ -25,60 +18,54 @@ const IMAGE_TYPES = [
 ];
 
 export default function ImagesTab({ product, onUpdate }: Props) {
-  const [form, setForm] = useState({
-    url: "",
-    altText: "",
-    type: "GALLERY",
-    sortOrder: 0,
-  });
-  const [loading, setLoading] = useState(false);
+  const [imageType, setImageType] = useState("GALLERY");
+  const [sortOrder, setSortOrder] = useState(0);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const refreshProduct = async () => {
-    const res = await fetch(`${API}/api/admin/products/${product.id}`, {
-      headers: { Authorization: `Bearer ${getToken()}` },
-    });
+    const res = await fetch(`/api/admin/products/${product.id}`);
     const data = await res.json();
     if (res.ok) onUpdate(data.data);
   };
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  // Called by FileUpload after Cloudinary upload — receives array of URLs
+  const handleUpload = async (urls: string[]) => {
+    setSaving(true);
     setError("");
     try {
-      const res = await fetch(
-        `${API}/api/admin/products/${product.id}/images`,
-        {
+      // Save each uploaded URL as a product image record
+      for (const url of urls) {
+        const res = await fetch(`/api/admin/products/${product.id}/images`, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${getToken()}`,
-          },
-          body: JSON.stringify(form),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url,
+            type: imageType,
+            sortOrder,
+            altText: product.name,
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json();
+          setError(data.message || "Failed to save image");
+          return;
         }
-      );
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.message || "Failed to add image");
-        return;
       }
-      setForm({ url: "", altText: "", type: "GALLERY", sortOrder: 0 });
       await refreshProduct();
     } catch {
       setError("Network error");
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
   const handleDelete = async (imageId: string) => {
     setDeleting(imageId);
     try {
-      await fetch(`${API}/api/admin/products/${product.id}/images/${imageId}`, {
+      await fetch(`/api/admin/products/${product.id}/images/${imageId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${getToken()}` },
       });
       await refreshProduct();
     } finally {
@@ -162,7 +149,7 @@ export default function ImagesTab({ product, onUpdate }: Props) {
         )}
       </div>
 
-      {/* Add Image Form */}
+      {/* Upload new image */}
       <div
         className="rounded-2xl border p-6"
         style={{
@@ -175,7 +162,7 @@ export default function ImagesTab({ product, onUpdate }: Props) {
           className="text-sm font-semibold mb-4"
           style={{ color: "var(--text-primary)" }}
         >
-          Add Image
+          Upload Image
         </p>
 
         {error && (
@@ -191,47 +178,53 @@ export default function ImagesTab({ product, onUpdate }: Props) {
           </div>
         )}
 
-        <form onSubmit={handleAdd} className="space-y-4">
-          <Input
-            label="Image URL"
-            required
-            type="url"
-            value={form.url}
-            onChange={(e) => setForm((f) => ({ ...f, url: e.target.value }))}
-            placeholder="https://..."
-          />
+        <div className="space-y-4">
+          {/* Image type selector */}
           <div className="grid grid-cols-2 gap-4">
             <Select
-              label="Type"
-              value={form.type}
-              onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+              label="Image Type"
+              value={imageType}
+              onChange={(e) => setImageType(e.target.value)}
               options={IMAGE_TYPES}
             />
-            <Input
-              label="Sort Order"
-              type="number"
-              min={0}
-              value={form.sortOrder}
-              onChange={(e) =>
-                setForm((f) => ({
-                  ...f,
-                  sortOrder: parseInt(e.target.value) || 0,
-                }))
-              }
-            />
+            <div>
+              <label
+                className="block text-sm font-medium mb-1.5"
+                style={{ color: "var(--text-primary)" }}
+              >
+                Sort Order
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={sortOrder}
+                onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
+                className="w-full px-3 py-2 rounded-xl text-sm outline-none"
+                style={{
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                }}
+              />
+            </div>
           </div>
-          <Input
-            label="Alt Text"
-            value={form.altText}
-            onChange={(e) =>
-              setForm((f) => ({ ...f, altText: e.target.value }))
-            }
-            placeholder="Describe this image..."
+
+          {/* File upload — goes to Cloudinary */}
+          <FileUpload
+            label="Select Image"
+            multiple={true}
+            maxFiles={10}
+            accept="image/jpeg,image/png,image/webp"
+            onUpload={handleUpload}
+            helpText="Images are uploaded to Cloudinary. Select type before uploading."
           />
-          <Button type="submit" loading={loading}>
-            Add Image
-          </Button>
-        </form>
+
+          {saving && (
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+              Saving image records...
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -48,8 +48,9 @@ function formatLabel(s: string) {
   return s.replace(/_/g, " ");
 }
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 async function getOrders(token: string, params: Record<string, string>) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
   const query = new URLSearchParams({
     limit: "50",
     sortBy: "createdAt",
@@ -57,7 +58,7 @@ async function getOrders(token: string, params: Record<string, string>) {
     ...params,
   }).toString();
 
-  const res = await fetch(`${API_URL}/api/admin/orders?${query}`, {
+  const res = await fetch(`${API}/api/admin/orders?${query}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -78,7 +79,6 @@ export default async function OrdersPage({
   const cookieStore = await cookies();
   const token = cookieStore.get("tcp_admin_token")?.value || "";
 
-  // Build filter params from URL search params
   const filterParams: Record<string, string> = {};
   if (resolvedParams["status"]) filterParams["status"] = resolvedParams["status"];
   if (resolvedParams["search"]) filterParams["search"] = resolvedParams["search"];
@@ -94,7 +94,6 @@ export default async function OrdersPage({
         description={`${total} total orders`}
       />
 
-      {/* Filters */}
       <OrderFilters />
 
       <div

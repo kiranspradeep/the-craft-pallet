@@ -4,7 +4,6 @@ import { useState } from "react";
 import Toggle from "@/components/ui/Toggle";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
-import { adminPut, adminGet } from "@/lib/adminApi";
 
 const ALL_SOURCES = [
   "DIRECT_UPLOAD",
@@ -60,10 +59,17 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
       uploadRequired: form.uploadRequired,
       minImages: form.minImages ? parseInt(form.minImages) : undefined,
       maxImages: form.maxImages ? parseInt(form.maxImages) : undefined,
-      maxFileSizeMb: form.maxFileSizeMb ? parseInt(form.maxFileSizeMb) : undefined,
-      maxZipSizeMb: form.maxZipSizeMb ? parseInt(form.maxZipSizeMb) : undefined,
+      maxFileSizeMb: form.maxFileSizeMb
+        ? parseInt(form.maxFileSizeMb)
+        : undefined,
+      maxZipSizeMb: form.maxZipSizeMb
+        ? parseInt(form.maxZipSizeMb)
+        : undefined,
       allowedExtensions: form.allowedExtensions
-        ? form.allowedExtensions.split(",").map((s: string) => s.trim()).filter(Boolean)
+        ? form.allowedExtensions
+            .split(",")
+            .map((s: string) => s.trim())
+            .filter(Boolean)
         : [],
       allowedSources: form.allowedSources,
       allowDuplicateImages: form.allowDuplicateImages,
@@ -74,8 +80,13 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
     };
 
     try {
-      await adminPut(`/api/admin/products/${product.id}/configuration`, body);
-      const data: any = await adminGet(`/api/admin/products/${product.id}`);
+      await fetch(`/api/admin/products/${product.id}/configuration`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const res = await fetch(`/api/admin/products/${product.id}`);
+      const data = await res.json();
       if (data.data) onUpdate(data.data);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -105,7 +116,11 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
       {error && (
         <div
           className="mb-4 px-4 py-3 rounded-xl text-sm"
-          style={{ backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}
+          style={{
+            backgroundColor: "#FEF2F2",
+            color: "#DC2626",
+            border: "1px solid #FECACA",
+          }}
         >
           {error}
         </div>
@@ -113,7 +128,11 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
       {success && (
         <div
           className="mb-4 px-4 py-3 rounded-xl text-sm"
-          style={{ backgroundColor: "rgba(142,159,130,0.15)", color: "var(--success)", border: "1px solid rgba(142,159,130,0.3)" }}
+          style={{
+            backgroundColor: "rgba(142,159,130,0.15)",
+            color: "var(--success)",
+            border: "1px solid rgba(142,159,130,0.3)",
+          }}
         >
           Configuration saved
         </div>
@@ -128,16 +147,60 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
         />
 
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Minimum Images" type="number" min={1} value={form.minImages} onChange={(e) => set("minImages", e.target.value)} placeholder="Optional" />
-          <Input label="Maximum Images" type="number" min={1} value={form.maxImages} onChange={(e) => set("maxImages", e.target.value)} placeholder="Optional" />
-          <Input label="Max File Size (MB)" type="number" min={1} value={form.maxFileSizeMb} onChange={(e) => set("maxFileSizeMb", e.target.value)} placeholder="e.g. 20" />
-          <Input label="Max ZIP Size (MB)" type="number" min={1} value={form.maxZipSizeMb} onChange={(e) => set("maxZipSizeMb", e.target.value)} placeholder="e.g. 200" />
-          <Input label="Estimated Production Days" type="number" min={1} value={form.estimatedProductionDays} onChange={(e) => set("estimatedProductionDays", e.target.value)} placeholder="e.g. 3" />
-          <Input label="Allowed Extensions" value={form.allowedExtensions} onChange={(e) => set("allowedExtensions", e.target.value)} placeholder=".jpg, .png, .webp" helpText="Comma separated" />
+          <Input
+            label="Minimum Images"
+            type="number"
+            min={1}
+            value={form.minImages}
+            onChange={(e) => set("minImages", e.target.value)}
+            placeholder="Optional"
+          />
+          <Input
+            label="Maximum Images"
+            type="number"
+            min={1}
+            value={form.maxImages}
+            onChange={(e) => set("maxImages", e.target.value)}
+            placeholder="Optional"
+          />
+          <Input
+            label="Max File Size (MB)"
+            type="number"
+            min={1}
+            value={form.maxFileSizeMb}
+            onChange={(e) => set("maxFileSizeMb", e.target.value)}
+            placeholder="e.g. 20"
+          />
+          <Input
+            label="Max ZIP Size (MB)"
+            type="number"
+            min={1}
+            value={form.maxZipSizeMb}
+            onChange={(e) => set("maxZipSizeMb", e.target.value)}
+            placeholder="e.g. 200"
+          />
+          <Input
+            label="Estimated Production Days"
+            type="number"
+            min={1}
+            value={form.estimatedProductionDays}
+            onChange={(e) => set("estimatedProductionDays", e.target.value)}
+            placeholder="e.g. 3"
+          />
+          <Input
+            label="Allowed Extensions"
+            value={form.allowedExtensions}
+            onChange={(e) => set("allowedExtensions", e.target.value)}
+            placeholder=".jpg, .png, .webp"
+            helpText="Comma separated"
+          />
         </div>
 
         <div>
-          <p className="text-sm font-medium mb-3" style={{ color: "var(--text-primary)" }}>
+          <p
+            className="text-sm font-medium mb-3"
+            style={{ color: "var(--text-primary)" }}
+          >
             Allowed Upload Sources
           </p>
           <div className="flex flex-wrap gap-2">
@@ -148,9 +211,15 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
                 onClick={() => toggleSource(source)}
                 className="px-3 py-1.5 rounded-xl text-xs font-medium border transition-all"
                 style={{
-                  backgroundColor: form.allowedSources.includes(source) ? "var(--brand)" : "transparent",
-                  color: form.allowedSources.includes(source) ? "#fff" : "var(--text-secondary)",
-                  borderColor: form.allowedSources.includes(source) ? "var(--brand)" : "var(--border)",
+                  backgroundColor: form.allowedSources.includes(source)
+                    ? "var(--brand)"
+                    : "transparent",
+                  color: form.allowedSources.includes(source)
+                    ? "#fff"
+                    : "var(--text-secondary)",
+                  borderColor: form.allowedSources.includes(source)
+                    ? "var(--brand)"
+                    : "var(--border)",
                 }}
               >
                 {source.replace(/_/g, " ")}
@@ -160,8 +229,16 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
         </div>
 
         <div className="flex gap-6">
-          <Toggle label="Allow Duplicate Images" checked={form.allowDuplicateImages} onChange={(v) => set("allowDuplicateImages", v)} />
-          <Toggle label="Allow Image Reordering" checked={form.allowImageReordering} onChange={(v) => set("allowImageReordering", v)} />
+          <Toggle
+            label="Allow Duplicate Images"
+            checked={form.allowDuplicateImages}
+            onChange={(v) => set("allowDuplicateImages", v)}
+          />
+          <Toggle
+            label="Allow Image Reordering"
+            checked={form.allowImageReordering}
+            onChange={(v) => set("allowImageReordering", v)}
+          />
         </div>
 
         <Button type="submit" loading={loading}>

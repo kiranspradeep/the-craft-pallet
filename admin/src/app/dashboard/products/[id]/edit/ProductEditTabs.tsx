@@ -1,3 +1,4 @@
+//admin\src\app\dashboard\products\[id]\edit\ProductEditTabs.tsx
 "use client";
 
 import { useState } from "react";

@@ -236,7 +236,7 @@ export default function Footer() {
                   {
                     href: "mailto:hello@thecraftpallet.com",
                     icon: <Mail size={14} strokeWidth={1.75} />,
-                    label: "hello@thecraftpallet.com",
+                    label: "kiranspradeep2002@gmail.com",
                   },
                   {
                     href: "https://wa.me/918086415357",

@@ -1,3 +1,4 @@
+//admin\src\app\dashboard\categories\CategoryActions.tsx
 "use client";
 
 import { useState } from "react";
@@ -15,24 +16,10 @@ export default function CategoryActions({ id, isActive }: Props) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const getToken = () => {
-    const match = document.cookie
-      .split("; ")
-      .find((r) => r.startsWith("tcp_admin_token="));
-    return match?.split("=")[1] || "";
-  };
-
   const handleDelete = async () => {
     if (!confirm("Deactivate this category?")) return;
     setLoading(true);
-    const token = getToken();
-    await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/categories/${id}`,
-      {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    await fetch(`/api/admin/categories/${id}`, { method: "DELETE" });
     setLoading(false);
     setOpen(false);
     router.refresh();
@@ -40,14 +27,7 @@ export default function CategoryActions({ id, isActive }: Props) {
 
   const handleRestore = async () => {
     setLoading(true);
-    const token = getToken();
-    await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/admin/categories/${id}/restore`,
-      {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${token}` },
-      }
-    );
+    await fetch(`/api/admin/categories/${id}/restore`, { method: "PATCH" });
     setLoading(false);
     setOpen(false);
     router.refresh();
@@ -73,10 +53,7 @@ export default function CategoryActions({ id, isActive }: Props) {
 
       {open && (
         <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-          />
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div
             className="absolute right-0 top-8 z-20 w-40 rounded-xl border shadow-lg overflow-hidden"
             style={{

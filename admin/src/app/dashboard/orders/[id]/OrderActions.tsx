@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Button from "@/components/ui/Button";
-import { ExternalLink, CheckCircle, XCircle, Truck, Package } from "lucide-react";
+import {
+  ExternalLink,
+  CheckCircle,
+  XCircle,
+  Truck,
+  Package,
+} from "lucide-react";
 
 interface Order {
   id: string;
@@ -11,15 +17,6 @@ interface Order {
   productionStage: string | null;
   payment: { status: string } | null;
 }
-
-const getToken = () => {
-  const match = document.cookie
-    .split("; ")
-    .find((r) => r.startsWith("tcp_admin_token="));
-  return match?.split("=")[1] || "";
-};
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const PRODUCTION_STAGES = [
   { value: "QUEUED", label: "Queued" },
@@ -43,29 +40,18 @@ export default function OrderActions({ order }: { order: Order }) {
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
-  // Note form
   const [note, setNote] = useState("");
-
-  // Mark paid form
   const [showMarkPaid, setShowMarkPaid] = useState(false);
   const [refNumber, setRefNumber] = useState("");
   const [paidNote, setPaidNote] = useState("");
-
-  // Cancel form
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
-
-  // Payment link result
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
 
   const call = async (path: string, method: string, body?: object) => {
-    const res = await fetch(`${API}/api/admin/orders/${order.id}${path}`, {
+    const res = await fetch(`/api/admin/orders/${order.id}${path}`, {
       method,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : undefined,
     });
     const data = await res.json();
@@ -105,7 +91,6 @@ export default function OrderActions({ order }: { order: Order }) {
 
   return (
     <div className="space-y-4">
-      {/* Error / Success */}
       {error && (
         <div
           className="px-4 py-3 rounded-xl text-sm"
@@ -131,7 +116,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── Generate Payment Link ── */}
+      {/* Generate Payment Link */}
       {order.status === "AWAITING_PAYMENT" && (
         <div className="space-y-2">
           <p
@@ -140,7 +125,6 @@ export default function OrderActions({ order }: { order: Order }) {
           >
             Payment
           </p>
-
           <Button
             size="sm"
             loading={loading === "paylink"}
@@ -192,7 +176,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── Mark as Paid (Manual) ── */}
+      {/* Mark as Paid */}
       {order.status === "AWAITING_PAYMENT" && (
         <div className="space-y-2">
           {!showMarkPaid ? (
@@ -276,7 +260,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── Move to Production ── */}
+      {/* Move to Production */}
       {order.status === "CONFIRMED" && (
         <div className="space-y-2">
           <p
@@ -292,8 +276,7 @@ export default function OrderActions({ order }: { order: Order }) {
             onClick={() =>
               action(
                 "production",
-                () =>
-                  call("/status", "PATCH", { status: "IN_PRODUCTION" }),
+                () => call("/status", "PATCH", { status: "IN_PRODUCTION" }),
                 "Order moved to production"
               )
             }
@@ -304,7 +287,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── Advance Production Stage ── */}
+      {/* Advance Production Stage */}
       {order.status === "IN_PRODUCTION" && nextStage && (
         <div className="space-y-2">
           <p
@@ -351,7 +334,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── Mark as Shipped ── */}
+      {/* Mark as Shipped */}
       {order.status === "IN_PRODUCTION" &&
         order.productionStage === "READY" && (
           <div className="space-y-2">
@@ -372,7 +355,7 @@ export default function OrderActions({ order }: { order: Order }) {
           </div>
         )}
 
-      {/* ── Mark as Delivered ── */}
+      {/* Mark as Delivered */}
       {order.status === "SHIPPED" && (
         <div className="space-y-2">
           <Button
@@ -381,8 +364,7 @@ export default function OrderActions({ order }: { order: Order }) {
             onClick={() =>
               action(
                 "delivered",
-                () =>
-                  call("/status", "PATCH", { status: "DELIVERED" }),
+                () => call("/status", "PATCH", { status: "DELIVERED" }),
                 "Order marked as delivered"
               )
             }
@@ -393,7 +375,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── Add Admin Note ── */}
+      {/* Add Admin Note */}
       <div
         className="space-y-2 pt-3 border-t"
         style={{ borderColor: "var(--border)" }}
@@ -436,7 +418,7 @@ export default function OrderActions({ order }: { order: Order }) {
         </Button>
       </div>
 
-      {/* ── Cancel Order ── */}
+      {/* Cancel Order */}
       {["AWAITING_PAYMENT", "PAYMENT_FAILED", "CONFIRMED"].includes(
         order.status
       ) && (

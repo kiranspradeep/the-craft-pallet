@@ -6,14 +6,7 @@ import Textarea from "@/components/ui/Textarea";
 import Select from "@/components/ui/Select";
 import Toggle from "@/components/ui/Toggle";
 import Button from "@/components/ui/Button";
-
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-const getToken = () =>
-  document.cookie
-    .split("; ")
-    .find((r) => r.startsWith("tcp_admin_token="))
-    ?.split("=")[1] || "";
+import FileUpload from "@/components/ui/FileUpload";
 
 function generateSlug(name: string) {
   return name
@@ -59,12 +52,9 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
     setError("");
     setSuccess(false);
     try {
-      const res = await fetch(`${API}/api/admin/products/${product.id}`, {
+      const res = await fetch(`/api/admin/products/${product.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${getToken()}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const data = await res.json();
@@ -130,7 +120,10 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
               required
               value={form.categoryId}
               onChange={(e) => set("categoryId", e.target.value)}
-              options={categories.map((c) => ({ value: c.id, label: c.name }))}
+              options={categories.map((c) => ({
+                value: c.id,
+                label: c.name,
+              }))}
             />
             <Input
               label="Product Name"
@@ -175,7 +168,9 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
               type="number"
               min={0}
               value={form.sortOrder}
-              onChange={(e) => set("sortOrder", parseInt(e.target.value) || 0)}
+              onChange={(e) =>
+                set("sortOrder", parseInt(e.target.value) || 0)
+              }
             />
           </div>
         </div>
@@ -207,12 +202,15 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
               value={form.metaKeywords}
               onChange={(e) => set("metaKeywords", e.target.value)}
             />
-            <Input
-              label="OG Image URL"
-              type="url"
-              value={form.ogImageUrl}
-              onChange={(e) => set("ogImageUrl", e.target.value)}
-            />
+           <FileUpload
+  label="OG Image (Social Media Preview)"
+  multiple={false}
+  maxFiles={1}
+  value={form.ogImageUrl || undefined}
+  onUpload={(urls) => set("ogImageUrl", urls[0] ?? "")}
+  onRemove={() => set("ogImageUrl", "")}
+  helpText="Optional. Used when sharing on Facebook, WhatsApp, etc."
+/>
           </div>
         </div>
 

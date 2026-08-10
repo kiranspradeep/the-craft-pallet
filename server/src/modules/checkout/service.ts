@@ -184,17 +184,30 @@ export const checkoutService = {
     return session;
   },
 
-  getBuyNowSession: async (id: string) => {
-    const session = await checkoutRepository.findCheckoutSession(id);
-    if (!session) throw new NotFoundError("Checkout session not found");
-    if (session.expiresAt < new Date()) {
-      await checkoutRepository.deleteCheckoutSession(id);
-      throw new BadRequestError(
-        "Checkout session has expired. Please start over."
-      );
+  // service.ts
+getBuyNowSession: async (id: string) => {
+  const session = await checkoutRepository.findCheckoutSession(id);
+  if (!session) throw new NotFoundError("Checkout session not found");
+  if (session.expiresAt < new Date()) {
+    await checkoutRepository.deleteCheckoutSession(id);
+    throw new BadRequestError("Checkout session has expired. Please start over.");
+  }
+
+  // Attach product configuration to the response
+  const product = await prisma.product.findUnique({
+    where: { id: session.productId },
+    select: {
+      configuration: {
+        select: { uploadRequired: true }
+      }
     }
-    return session;
-  },
+  });
+
+  return {
+    ...session,
+    uploadRequired: product?.configuration?.uploadRequired ?? false,
+  };
+},
 
   updateBuyNowSession: async (
     id: string,
@@ -445,24 +458,38 @@ export const checkoutService = {
 
         // Create customizations from Buy Now session
         const customizations = (buyNowSession.customizations as any[]) ?? [];
-        for (const c of customizations) {
-          await tx.customization.create({
-            data: {
-              customFieldId: c.customFieldId,
-              orderItemId: orderItem.id,
-              fieldLabel: c.fieldLabel,
-              fieldType: c.fieldType,
-              textValue: c.textValue ?? null,
-              numberValue:
-                c.numberValue !== undefined
-                  ? new Decimal(c.numberValue)
-                  : null,
-              dateValue: c.dateValue ? new Date(c.dateValue) : null,
-              booleanValue: c.booleanValue ?? null,
-              assetId: c.assetId ?? buyNowSession.assetId ?? null,
-            },
-          });
-        }
+let sessionAssetAssigned = false;
+
+for (const c of customizations) {
+  let assetId: string | null = c.assetId ?? null;
+
+  if (
+    !assetId &&
+    !sessionAssetAssigned &&
+    c.fieldType === "PHOTO_UPLOAD" &&
+    buyNowSession.assetId
+  ) {
+    assetId = buyNowSession.assetId;
+    sessionAssetAssigned = true;
+  }
+
+  await tx.customization.create({
+    data: {
+      customFieldId: c.customFieldId,
+      orderItemId: orderItem.id,
+      fieldLabel: c.fieldLabel,
+      fieldType: c.fieldType,
+      textValue: c.textValue ?? null,
+      numberValue:
+        c.numberValue !== undefined
+          ? new Decimal(c.numberValue)
+          : null,
+      dateValue: c.dateValue ? new Date(c.dateValue) : null,
+      booleanValue: c.booleanValue ?? null,
+      assetId,
+    },
+  });
+}
       }
 
       // ── 9. Coupon usage ─────────────────────────────────────────────
@@ -742,24 +769,38 @@ export const checkoutService = {
         });
 
         const customizations = (buyNowSession.customizations as any[]) ?? [];
-        for (const c of customizations) {
-          await tx.customization.create({
-            data: {
-              customFieldId: c.customFieldId,
-              orderItemId: orderItem.id,
-              fieldLabel: c.fieldLabel,
-              fieldType: c.fieldType,
-              textValue: c.textValue ?? null,
-              numberValue:
-                c.numberValue !== undefined
-                  ? new Decimal(c.numberValue)
-                  : null,
-              dateValue: c.dateValue ? new Date(c.dateValue) : null,
-              booleanValue: c.booleanValue ?? null,
-              assetId: c.assetId ?? buyNowSession.assetId ?? null,
-            },
-          });
-        }
+let sessionAssetAssigned = false;
+
+for (const c of customizations) {
+  let assetId: string | null = c.assetId ?? null;
+
+  if (
+    !assetId &&
+    !sessionAssetAssigned &&
+    c.fieldType === "PHOTO_UPLOAD" &&
+    buyNowSession.assetId
+  ) {
+    assetId = buyNowSession.assetId;
+    sessionAssetAssigned = true;
+  }
+
+  await tx.customization.create({
+    data: {
+      customFieldId: c.customFieldId,
+      orderItemId: orderItem.id,
+      fieldLabel: c.fieldLabel,
+      fieldType: c.fieldType,
+      textValue: c.textValue ?? null,
+      numberValue:
+        c.numberValue !== undefined
+          ? new Decimal(c.numberValue)
+          : null,
+      dateValue: c.dateValue ? new Date(c.dateValue) : null,
+      booleanValue: c.booleanValue ?? null,
+      assetId,
+    },
+  });
+}
       }
 
       // Coupon usage

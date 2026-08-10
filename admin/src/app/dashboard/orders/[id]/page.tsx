@@ -4,9 +4,10 @@ import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import OrderActions from "./OrderActions";
 
+const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
 async function getOrder(id: string, token: string) {
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-  const res = await fetch(`${API_URL}/api/admin/orders/${id}`, {
+  const res = await fetch(`${API}/api/admin/orders/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
   });
@@ -42,13 +43,7 @@ function Section({
   );
 }
 
-function Row({
-  label,
-  value,
-}: {
-  label: string;
-  value: React.ReactNode;
-}) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div
       className="flex justify-between items-center py-2 border-b last:border-0"
@@ -142,10 +137,7 @@ export default async function OrderDetailPage({
             >
               {order.orderNumber}
             </h1>
-            <p
-              className="text-sm"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               {new Date(order.createdAt).toLocaleString("en-IN", {
                 day: "numeric",
                 month: "short",
@@ -239,7 +231,7 @@ export default async function OrderDetailPage({
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* ── Left column ── */}
+        {/* Left column */}
         <div className="lg:col-span-2 space-y-5">
           {/* Order Items */}
           <Section title={`Order Items (${order.items?.length ?? 0})`}>
@@ -279,7 +271,6 @@ export default async function OrderDetailPage({
                     className="rounded-xl border overflow-hidden"
                     style={{ borderColor: "var(--border)" }}
                   >
-                    {/* Item header */}
                     <div
                       className="flex items-start justify-between p-4"
                       style={{ backgroundColor: "var(--bg-primary)" }}
@@ -315,7 +306,6 @@ export default async function OrderDetailPage({
                       </span>
                     </div>
 
-                    {/* Customizations */}
                     {item.customizations?.length > 0 && (
                       <div
                         className="px-4 py-3 border-t space-y-3"
@@ -329,7 +319,6 @@ export default async function OrderDetailPage({
                         </p>
                         {item.customizations.map((c) => (
                           <div key={c.id}>
-                            {/* Text / Number / Date / Boolean fields */}
                             {c.fieldType !== "PHOTO_UPLOAD" && (
                               <div className="flex justify-between">
                                 <span
@@ -358,7 +347,6 @@ export default async function OrderDetailPage({
                               </div>
                             )}
 
-                            {/* Photo uploads */}
                             {c.fieldType === "PHOTO_UPLOAD" && c.asset && (
                               <div>
                                 <div className="flex items-center justify-between mb-2">
@@ -366,8 +354,8 @@ export default async function OrderDetailPage({
                                     className="text-xs font-medium"
                                     style={{ color: "var(--text-secondary)" }}
                                   >
-                                    {c.fieldLabel} (
-                                    {c.asset.files.length} files)
+                                    {c.fieldLabel} ({c.asset.files.length}{" "}
+                                    files)
                                   </span>
                                   <span
                                     className="text-xs px-2 py-0.5 rounded-full"
@@ -386,59 +374,55 @@ export default async function OrderDetailPage({
                                   </span>
                                 </div>
 
-                                {/* Image thumbnails */}
                                 {c.asset.files.length > 0 && (
                                   <div className="grid grid-cols-4 gap-2">
-                                    {c.asset.files
-                                      .slice(0, 8)
-                                      .map((file) => (
+                                    {c.asset.files.slice(0, 8).map((file) => (
+                                      <div
+                                        key={file.id}
+                                        className="relative group"
+                                      >
                                         <div
-                                          key={file.id}
-                                          className="relative group"
+                                          className="aspect-square rounded-lg overflow-hidden border"
+                                          style={{
+                                            borderColor: "var(--border)",
+                                          }}
                                         >
-                                          <div
-                                            className="aspect-square rounded-lg overflow-hidden border"
-                                            style={{
-                                              borderColor: "var(--border)",
-                                            }}
-                                          >
-                                            {file.previewPath ? (
-                                              <img
-                                                src={`${process.env.NEXT_PUBLIC_API_URL}/${file.previewPath}`}
-                                                alt={file.originalName}
-                                                className="w-full h-full object-cover"
-                                              />
-                                            ) : (
-                                              <div
-                                                className="w-full h-full flex items-center justify-center text-xs"
-                                                style={{
-                                                  backgroundColor:
-                                                    "var(--bg-primary)",
-                                                  color:
-                                                    "var(--text-secondary)",
-                                                }}
-                                              >
-                                                IMG
-                                              </div>
-                                            )}
-                                          </div>
-                                          <a
-                                            href={`${process.env.NEXT_PUBLIC_API_URL}/${file.storagePath}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg transition-opacity"
-                                            style={{
-                                              backgroundColor:
-                                                "rgba(0,0,0,0.5)",
-                                            }}
-                                          >
-                                            <Download
-                                              size={14}
-                                              className="text-white"
+                                          {file.previewPath ? (
+                                            <img
+                                              src={`${API}/${file.previewPath}`}
+                                              alt={file.originalName}
+                                              className="w-full h-full object-cover"
                                             />
-                                          </a>
+                                          ) : (
+                                            <div
+                                              className="w-full h-full flex items-center justify-center text-xs"
+                                              style={{
+                                                backgroundColor:
+                                                  "var(--bg-primary)",
+                                                color:
+                                                  "var(--text-secondary)",
+                                              }}
+                                            >
+                                              IMG
+                                            </div>
+                                          )}
                                         </div>
-                                      ))}
+                                        <a
+                                          href={`${API}/${file.storagePath}`}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 rounded-lg transition-opacity"
+                                          style={{
+                                            backgroundColor: "rgba(0,0,0,0.5)",
+                                          }}
+                                        >
+                                          <Download
+                                            size={14}
+                                            className="text-white"
+                                          />
+                                        </a>
+                                      </div>
+                                    ))}
                                     {c.asset.files.length > 8 && (
                                       <div
                                         className="aspect-square rounded-lg flex items-center justify-center text-xs font-medium"
@@ -465,140 +449,120 @@ export default async function OrderDetailPage({
             </div>
           </Section>
 
-          {/* Customer Note */}
           {order.customerNote && (
             <Section title="Customer Note">
-              <p
-                className="text-sm"
-                style={{ color: "var(--text-primary)" }}
-              >
+              <p className="text-sm" style={{ color: "var(--text-primary)" }}>
                 {order.customerNote}
               </p>
             </Section>
           )}
 
-          {/* Admin Note */}
           {order.adminNote && (
             <Section title="Admin Note">
-              <p
-                className="text-sm"
-                style={{ color: "var(--text-primary)" }}
-              >
+              <p className="text-sm" style={{ color: "var(--text-primary)" }}>
                 {order.adminNote}
               </p>
             </Section>
           )}
 
-          {/* Timeline */}
           <Section title="Order Timeline">
             {order.timeline?.length > 0 ? (
               <div className="space-y-1">
-                {[...order.timeline]
-                  .reverse()
-                  .map(
-                    (
-                      event: {
-                        id: string;
-                        title: string;
-                        description: string | null;
-                        createdAt: string;
-                        actorType: string;
-                        isVisibleToCustomer: boolean;
-                      },
-                      i: number,
-                      arr: unknown[]
-                    ) => (
-                      <div key={event.id} className="flex gap-3">
-                        <div className="flex flex-col items-center">
+                {[...order.timeline].reverse().map(
+                  (
+                    event: {
+                      id: string;
+                      title: string;
+                      description: string | null;
+                      createdAt: string;
+                      actorType: string;
+                      isVisibleToCustomer: boolean;
+                    },
+                    i: number,
+                    arr: unknown[]
+                  ) => (
+                    <div key={event.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div
+                          className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
+                          style={{
+                            backgroundColor:
+                              i === 0 ? "var(--brand)" : "var(--border)",
+                          }}
+                        />
+                        {i < arr.length - 1 && (
                           <div
-                            className="w-2 h-2 rounded-full mt-2 flex-shrink-0"
-                            style={{
-                              backgroundColor:
-                                i === 0
-                                  ? "var(--brand)"
-                                  : "var(--border)",
-                            }}
+                            className="w-px flex-1 mt-1"
+                            style={{ backgroundColor: "var(--border)" }}
                           />
-                          {i < arr.length - 1 && (
-                            <div
-                              className="w-px flex-1 mt-1"
-                              style={{
-                                backgroundColor: "var(--border)",
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="pb-4">
+                        )}
+                      </div>
+                      <div className="pb-4">
+                        <p
+                          className="text-sm font-medium"
+                          style={{ color: "var(--text-primary)" }}
+                        >
+                          {event.title}
+                        </p>
+                        {event.description && (
                           <p
-                            className="text-sm font-medium"
-                            style={{ color: "var(--text-primary)" }}
+                            className="text-xs mt-0.5"
+                            style={{ color: "var(--text-secondary)" }}
                           >
-                            {event.title}
+                            {event.description}
                           </p>
-                          {event.description && (
-                            <p
-                              className="text-xs mt-0.5"
-                              style={{ color: "var(--text-secondary)" }}
-                            >
-                              {event.description}
-                            </p>
-                          )}
-                          <div className="flex items-center gap-2 mt-1">
-                            <p
-                              className="text-xs"
-                              style={{ color: "var(--text-secondary)" }}
-                            >
-                              {new Date(event.createdAt).toLocaleString(
-                                "en-IN",
-                                {
-                                  day: "numeric",
-                                  month: "short",
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }
-                              )}
-                            </p>
+                        )}
+                        <div className="flex items-center gap-2 mt-1">
+                          <p
+                            className="text-xs"
+                            style={{ color: "var(--text-secondary)" }}
+                          >
+                            {new Date(event.createdAt).toLocaleString(
+                              "en-IN",
+                              {
+                                day: "numeric",
+                                month: "short",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </p>
+                          <span
+                            className="text-xs px-1.5 py-0.5 rounded"
+                            style={{
+                              backgroundColor: "var(--bg-primary)",
+                              color: "var(--text-secondary)",
+                            }}
+                          >
+                            {event.actorType}
+                          </span>
+                          {event.isVisibleToCustomer && (
                             <span
                               className="text-xs px-1.5 py-0.5 rounded"
                               style={{
-                                backgroundColor: "var(--bg-primary)",
-                                color: "var(--text-secondary)",
+                                backgroundColor: "rgba(142,159,130,0.12)",
+                                color: "var(--success)",
                               }}
                             >
-                              {event.actorType}
+                              Customer visible
                             </span>
-                            {event.isVisibleToCustomer && (
-                              <span
-                                className="text-xs px-1.5 py-0.5 rounded"
-                                style={{
-                                  backgroundColor:
-                                    "rgba(142,159,130,0.12)",
-                                  color: "var(--success)",
-                                }}
-                              >
-                                Customer visible
-                              </span>
-                            )}
-                          </div>
+                          )}
                         </div>
                       </div>
-                    )
-                  )}
+                    </div>
+                  )
+                )}
               </div>
             ) : (
-              <p
-                className="text-sm"
-                style={{ color: "var(--text-secondary)" }}
-              >
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 No timeline events yet
               </p>
             )}
           </Section>
         </div>
 
-        {/* ── Right column ── */}
+        {/* Right column */}
         <div className="space-y-5">
-          {/* Customer */}
           <Section title="Customer">
             <Row label="Name" value={order.customer.name} />
             <Row label="Phone" value={order.customer.phone} />
@@ -607,7 +571,6 @@ export default async function OrderDetailPage({
             )}
           </Section>
 
-          {/* Shipping Address */}
           <Section title="Shipping Address">
             <div
               className="text-sm space-y-1"
@@ -629,7 +592,6 @@ export default async function OrderDetailPage({
             </div>
           </Section>
 
-          {/* Payment Summary */}
           <Section title="Payment">
             <Row
               label="Status"
@@ -710,7 +672,6 @@ export default async function OrderDetailPage({
             )}
           </Section>
 
-          {/* Shipment Info */}
           {order.shipment && (
             <Section title="Shipment">
               <Row
@@ -740,7 +701,6 @@ export default async function OrderDetailPage({
             </Section>
           )}
 
-          {/* Actions */}
           <Section title="Actions">
             <OrderActions order={order} />
           </Section>
