@@ -1,9 +1,9 @@
 import { apiGet, apiGetList } from "@/lib/api";
 import HeroSection from "@/components/home/HeroSection";
-import TrustBar from "@/components/home/TrustBar";
+import BestSellersSection from "@/components/home/BestSellersSection";
 import CategoriesSection from "@/components/home/CategoriesSection";
 import FeaturedStory from "@/components/home/FeaturedStory";
-import BestSellersSection from "@/components/home/BestSellersSection";
+import TrustBar from "@/components/home/TrustBar";
 import FaqSection from "@/components/home/FaqSection";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
 
@@ -64,12 +64,25 @@ export default async function HomePage() {
 
   return (
     <>
+      {/* 1. Brand statement + immediate shop CTA */}
       <HeroSection />
-      <TrustBar />
-      <CategoriesSection categories={categories} />
-      <FeaturedStory />
+
+      {/* 2. Products first — people came to see what you sell */}
       <BestSellersSection products={featuredProducts} />
+
+      {/* 3. Help them browse by category */}
+      <CategoriesSection categories={categories} />
+
+      {/* 4. Brand story — build emotional connection after product interest */}
+      <FeaturedStory />
+
+      {/* 5. Reassurance — reinforce quality before objections */}
+      <TrustBar />
+
+      {/* 6. Answer final objections */}
       <FaqSection />
+
+      {/* 7. Always available */}
       <WhatsAppButton />
     </>
   );

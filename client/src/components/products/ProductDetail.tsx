@@ -9,9 +9,10 @@ import {
   Truck,
   Shield,
   Award,
-  Zap,
   MessageCircle,
   Check,
+  ChevronRight,
+  ImageIcon,
 } from "lucide-react";
 import { cartApi, buyNowApi, formatPrice } from "@/lib/cart";
 
@@ -31,39 +32,30 @@ export default function ProductDetail({ product }: Props) {
   const [quantity, setQuantity] = useState<number>(() => {
     const p = product.pricingConfig;
     if (!p) return 1;
-    if (p.strategy === "TIERED_PRICING" && p.tiers[0])
-      return p.tiers[0].quantity;
+    if (p.strategy === "TIERED_PRICING" && p.tiers[0]) return p.tiers[0].quantity;
     if (p.strategy === "INCREMENTAL_QUANTITY")
       return p.minimumOrderQuantity || p.incrementQuantity || 1;
     return 1;
   });
-
-  const [customFieldValues, setCustomFieldValues] = useState<
-    Record<string, string>
-  >({});
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
   const [buying, setBuying] = useState(false);
   const [added, setAdded] = useState(false);
   const [error, setError] = useState("");
 
-  // ── Derived values ────────────────────────────────────────────────────
-
   const selectedVariant = useMemo(
     () => product.variants.find((v: any) => v.id === selectedVariantId),
     [selectedVariantId, product.variants]
   );
 
-  // Step size for quantity buttons
   const quantityStep = useMemo(() => {
     const p = product.pricingConfig;
     if (!p) return 1;
-    if (p.strategy === "INCREMENTAL_QUANTITY")
-      return p.incrementQuantity || 1;
+    if (p.strategy === "INCREMENTAL_QUANTITY") return p.incrementQuantity || 1;
     return 1;
   }, [product.pricingConfig]);
 
-  // Minimum allowed quantity
   const quantityMin = useMemo(() => {
     const p = product.pricingConfig;
     if (!p) return 1;
@@ -78,9 +70,7 @@ export default function ProductDetail({ product }: Props) {
 
     switch (p.strategy) {
       case "PER_UNIT":
-        return p.unitPrice
-          ? formatPrice(Number(p.unitPrice) * quantity)
-          : "—";
+        return p.unitPrice ? formatPrice(Number(p.unitPrice) * quantity) : "—";
       case "INCREMENTAL_QUANTITY": {
         if (!p.incrementPrice || !p.incrementQuantity) return "—";
         const inc = Math.ceil(quantity / p.incrementQuantity);
@@ -89,8 +79,7 @@ export default function ProductDetail({ product }: Props) {
       case "TIERED_PRICING": {
         const tier = p.tiers.find((t: any) => t.quantity === selectedTier);
         if (tier) return formatPrice(tier.price);
-        if (p.baseUnitPrice)
-          return formatPrice(Number(p.baseUnitPrice) * quantity);
+        if (p.baseUnitPrice) return formatPrice(Number(p.baseUnitPrice) * quantity);
         return "—";
       }
       case "FIXED_VARIANTS":
@@ -103,8 +92,6 @@ export default function ProductDetail({ product }: Props) {
         return "—";
     }
   }, [product.pricingConfig, quantity, selectedTier, selectedVariant]);
-
-  // ── Validation ────────────────────────────────────────────────────────
 
   const validate = (): boolean => {
     for (const field of product.customFields || []) {
@@ -120,36 +107,18 @@ export default function ProductDetail({ product }: Props) {
 
   const buildCustomizations = () =>
     (product.customFields || [])
-      .filter(
-        (f: any) => customFieldValues[f.id] && f.type !== "PHOTO_UPLOAD"
-      )
+      .filter((f: any) => customFieldValues[f.id] && f.type !== "PHOTO_UPLOAD")
       .map((f: any) => {
-        const base = {
-          customFieldId: f.id,
-          fieldLabel: f.label,
-          fieldType: f.type,
-        };
-        if (f.type === "NUMBER")
-          return { ...base, numberValue: Number(customFieldValues[f.id]) };
-        if (f.type === "DATE")
-          return {
-            ...base,
-            dateValue: new Date(customFieldValues[f.id]).toISOString(),
-          };
-        if (f.type === "CHECKBOX")
-          return {
-            ...base,
-            booleanValue: customFieldValues[f.id] === "true",
-          };
+        const base = { customFieldId: f.id, fieldLabel: f.label, fieldType: f.type };
+        if (f.type === "NUMBER") return { ...base, numberValue: Number(customFieldValues[f.id]) };
+        if (f.type === "DATE") return { ...base, dateValue: new Date(customFieldValues[f.id]).toISOString() };
+        if (f.type === "CHECKBOX") return { ...base, booleanValue: customFieldValues[f.id] === "true" };
         return { ...base, textValue: customFieldValues[f.id] };
       });
-
-  // ── Handlers ──────────────────────────────────────────────────────────
 
   const handleAddToCart = async () => {
     setError("");
     if (!validate()) return;
-
     setAdding(true);
     try {
       await cartApi.addItem({
@@ -160,11 +129,8 @@ export default function ProductDetail({ product }: Props) {
         notes: notes || undefined,
         customizations: buildCustomizations(),
       });
-
       setAdded(true);
-      setTimeout(() => {
-        router.push("/cart");
-      }, 800);
+      setTimeout(() => router.push("/cart"), 800);
     } catch (err: any) {
       setError(err.message || "Failed to add to cart");
       setAdding(false);
@@ -174,7 +140,6 @@ export default function ProductDetail({ product }: Props) {
   const handleBuyNow = async () => {
     setError("");
     if (!validate()) return;
-
     setBuying(true);
     try {
       const session = await buyNowApi.create({
@@ -185,7 +150,6 @@ export default function ProductDetail({ product }: Props) {
         notes: notes || undefined,
         customizations: buildCustomizations(),
       });
-
       router.push(`/checkout/upload-method?bn=${session.id}`);
     } catch (err: any) {
       setError(err.message || "Failed to start checkout");
@@ -193,13 +157,31 @@ export default function ProductDetail({ product }: Props) {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────
+  const inputStyle = {
+    width: "100%",
+    padding: "11px 14px",
+    borderRadius: "var(--radius-input)",
+    border: "1px solid var(--border)",
+    fontSize: "14px",
+    backgroundColor: "var(--surface)",
+    color: "var(--text-primary)",
+    transition: "border-color 200ms ease",
+  };
+
+  const labelStyle = {
+    display: "block",
+    fontSize: "11px",
+    fontWeight: 500,
+    letterSpacing: "0.1em",
+    textTransform: "uppercase" as const,
+    color: "var(--text-tertiary)",
+    marginBottom: "10px",
+  };
 
   return (
-    <div className="tcp-container">
+    <div className="tcp-container" style={{ padding: "48px 32px 80px" }}>
       <div
-        className="grid"
-        style={{ gridTemplateColumns: "1fr", gap: "48px" }}
+        style={{ display: "grid", gridTemplateColumns: "1fr", gap: "48px" }}
       >
         <style>{`
           @media (min-width: 1024px) {
@@ -211,32 +193,26 @@ export default function ProductDetail({ product }: Props) {
         `}</style>
 
         <div
-          className="pdp-grid grid"
-          style={{ gridTemplateColumns: "1fr", gap: "48px" }}
+          className="pdp-grid"
+          style={{ display: "grid", gridTemplateColumns: "1fr", gap: "48px" }}
         >
-          {/* ── Left — Gallery ── */}
+          {/* ── Gallery ── */}
           <div>
+            {/* Main image */}
             <div
               style={{
                 aspectRatio: "1/1",
-                borderRadius: "24px",
+                borderRadius: "var(--radius-card)",
                 overflow: "hidden",
-                background:
-                  "linear-gradient(135deg, #F5EFE8 0%, #E8DDD1 100%)",
-                marginBottom: "16px",
+                backgroundColor: "var(--brand-soft)",
+                marginBottom: "12px",
               }}
             >
               {product.images?.[activeImageIdx] ? (
                 <img
                   src={product.images[activeImageIdx].url}
-                  alt={
-                    product.images[activeImageIdx].altText || product.name
-                  }
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    objectFit: "cover",
-                  }}
+                  alt={product.images[activeImageIdx].altText || product.name}
+                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
                 />
               ) : (
                 <div
@@ -246,46 +222,47 @@ export default function ProductDetail({ product }: Props) {
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "80px",
-                    opacity: 0.4,
                   }}
                 >
-                  📸
+                  <ImageIcon
+                    size={40}
+                    strokeWidth={1}
+                    style={{ color: "var(--border)", opacity: 0.5 }}
+                  />
                 </div>
               )}
             </div>
 
+            {/* Thumbnails */}
             {product.images && product.images.length > 1 && (
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))",
-                  gap: "12px",
+                  gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))",
+                  gap: "8px",
                 }}
               >
                 {product.images.map((img: any, i: number) => (
                   <button
                     key={img.id}
+                    aria-label={`View image ${i + 1}`}
                     onClick={() => setActiveImageIdx(i)}
                     style={{
                       aspectRatio: "1/1",
-                      borderRadius: "12px",
+                      borderRadius: "var(--radius-card)",
                       overflow: "hidden",
                       border:
                         activeImageIdx === i
-                          ? "2px solid var(--brand)"
+                          ? "1.5px solid var(--text-primary)"
                           : "1px solid var(--border)",
                       cursor: "pointer",
+                      transition: "border-color 200ms ease",
                     }}
                   >
                     <img
                       src={img.url}
                       alt=""
-                      style={{
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                      }}
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     />
                   </button>
                 ))}
@@ -293,36 +270,51 @@ export default function ProductDetail({ product }: Props) {
             )}
           </div>
 
-          {/* ── Right — Info ── */}
+          {/* ── Product Info ── */}
           <div>
-            <p className="tcp-eyebrow">{product.category.name}</p>
+            {/* Breadcrumb category */}
+            <p
+              style={{
+                fontSize: "11px",
+                fontWeight: 500,
+                letterSpacing: "0.12em",
+                textTransform: "uppercase",
+                color: "var(--text-tertiary)",
+                marginBottom: "12px",
+              }}
+            >
+              {product.category.name}
+            </p>
+
+            {/* Title */}
             <h1
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: "clamp(28px, 4vw, 42px)",
+                fontSize: "clamp(26px, 3.5vw, 38px)",
                 fontWeight: 500,
                 letterSpacing: "-0.02em",
                 color: "var(--text-primary)",
-                marginBottom: "12px",
                 lineHeight: 1.15,
+                marginBottom: "16px",
               }}
             >
               {product.name}
             </h1>
+
             {product.shortDescription && (
               <p
                 style={{
-                  fontSize: "16px",
+                  fontSize: "15px",
                   color: "var(--text-secondary)",
-                  lineHeight: 1.7,
-                  marginBottom: "24px",
+                  lineHeight: 1.75,
+                  marginBottom: "28px",
                 }}
               >
                 {product.shortDescription}
               </p>
             )}
 
-            {/* Price */}
+            {/* Price block */}
             <div
               style={{
                 padding: "20px 0",
@@ -331,22 +323,14 @@ export default function ProductDetail({ product }: Props) {
                 marginBottom: "28px",
               }}
             >
-              <div
-                style={{
-                  fontSize: "12px",
-                  color: "var(--text-tertiary)",
-                  marginBottom: "4px",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                TOTAL PRICE
-              </div>
+              <p style={labelStyle}>Total Price</p>
               <div
                 style={{
                   fontFamily: "'Playfair Display', serif",
-                  fontSize: "36px",
+                  fontSize: "34px",
                   fontWeight: 600,
-                  color: "var(--accent)",
+                  color: "var(--text-primary)",
+                  letterSpacing: "-0.02em",
                 }}
               >
                 {displayPrice}
@@ -355,53 +339,43 @@ export default function ProductDetail({ product }: Props) {
 
             {/* Variants */}
             {product.variants?.length > 0 && (
-              <div style={{ marginBottom: "28px" }}>
-                <label
-                  style={{
-                    display: "block",
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
-                    marginBottom: "12px",
-                  }}
-                >
-                  Select Size / Variant
-                </label>
-                <div
-                  style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}
-                >
+              <div style={{ marginBottom: "24px" }}>
+                <p style={labelStyle}>Size / Variant</p>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                   {product.variants.map((v: any) => (
                     <button
                       key={v.id}
                       onClick={() => setSelectedVariantId(v.id)}
                       style={{
-                        padding: "12px 20px",
-                        borderRadius: "12px",
+                        padding: "10px 18px",
+                        borderRadius: "var(--radius-input)",
                         border:
                           selectedVariantId === v.id
                             ? "1.5px solid var(--text-primary)"
-                            : "1.5px solid var(--border)",
+                            : "1px solid var(--border)",
                         backgroundColor:
                           selectedVariantId === v.id
-                            ? "var(--brand-soft)"
-                            : "var(--surface)",
-                        color: "var(--text-primary)",
+                            ? "var(--text-primary)"
+                            : "transparent",
+                        color: selectedVariantId === v.id ? "#fff" : "var(--text-primary)",
                         fontSize: "13px",
                         fontWeight: 500,
                         cursor: "pointer",
+                        transition: "all 200ms ease",
                       }}
                     >
                       {v.name}
-                      <div
+                      <span
                         style={{
+                          display: "block",
                           fontSize: "12px",
-                          color: "var(--accent)",
-                          marginTop: "2px",
-                          fontWeight: 600,
+                          fontWeight: 400,
+                          opacity: 0.75,
+                          marginTop: "1px",
                         }}
                       >
                         {formatPrice(v.price)}
-                      </div>
+                      </span>
                     </button>
                   ))}
                 </div>
@@ -411,24 +385,13 @@ export default function ProductDetail({ product }: Props) {
             {/* Tiers */}
             {product.pricingConfig?.strategy === "TIERED_PRICING" &&
               product.pricingConfig.tiers.length > 0 && (
-                <div style={{ marginBottom: "28px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      color: "var(--text-primary)",
-                      marginBottom: "12px",
-                    }}
-                  >
-                    Choose a Set
-                  </label>
+                <div style={{ marginBottom: "24px" }}>
+                  <p style={labelStyle}>Choose a Set</p>
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns:
-                        "repeat(auto-fit, minmax(140px, 1fr))",
-                      gap: "10px",
+                      gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                      gap: "8px",
                     }}
                   >
                     {product.pricingConfig.tiers.map((t: any) => (
@@ -440,18 +403,23 @@ export default function ProductDetail({ product }: Props) {
                         }}
                         style={{
                           position: "relative",
-                          padding: "16px",
-                          borderRadius: "16px",
+                          padding: "14px 16px",
+                          borderRadius: "var(--radius-input)",
                           border:
                             selectedTier === t.quantity
                               ? "1.5px solid var(--text-primary)"
-                              : "1.5px solid var(--border)",
+                              : "1px solid var(--border)",
                           backgroundColor:
                             selectedTier === t.quantity
-                              ? "var(--brand-soft)"
-                              : "var(--surface)",
+                              ? "var(--text-primary)"
+                              : "transparent",
+                          color:
+                            selectedTier === t.quantity
+                              ? "#fff"
+                              : "var(--text-primary)",
                           textAlign: "left",
                           cursor: "pointer",
+                          transition: "all 200ms ease",
                         }}
                       >
                         {t.isSpecialOffer && (
@@ -459,23 +427,25 @@ export default function ProductDetail({ product }: Props) {
                             style={{
                               position: "absolute",
                               top: "-8px",
-                              right: "10px",
-                              padding: "3px 10px",
-                              borderRadius: "999px",
-                              fontSize: "10px",
+                              right: "8px",
+                              padding: "2px 8px",
+                              borderRadius: "var(--radius-badge)",
+                              fontSize: "9px",
                               fontWeight: 600,
+                              letterSpacing: "0.08em",
+                              textTransform: "uppercase",
                               backgroundColor: "var(--accent)",
                               color: "#fff",
                             }}
                           >
-                            BEST VALUE
+                            Best Value
                           </span>
                         )}
                         <div
                           style={{
-                            fontSize: "14px",
+                            fontSize: "13px",
                             fontWeight: 600,
-                            color: "var(--text-primary)",
+                            marginBottom: "2px",
                           }}
                         >
                           {t.quantity} prints
@@ -484,8 +454,8 @@ export default function ProductDetail({ product }: Props) {
                           <div
                             style={{
                               fontSize: "11px",
-                              color: "var(--text-secondary)",
-                              marginTop: "2px",
+                              opacity: 0.65,
+                              marginBottom: "4px",
                             }}
                           >
                             {t.label}
@@ -493,21 +463,13 @@ export default function ProductDetail({ product }: Props) {
                         )}
                         <div
                           style={{
-                            fontSize: "18px",
+                            fontSize: "16px",
                             fontWeight: 700,
-                            color: "var(--accent)",
-                            marginTop: "6px",
                           }}
                         >
                           {formatPrice(t.price)}
                         </div>
-                        <div
-                          style={{
-                            fontSize: "11px",
-                            color: "var(--text-tertiary)",
-                            marginTop: "2px",
-                          }}
-                        >
+                        <div style={{ fontSize: "11px", opacity: 0.6, marginTop: "2px" }}>
                           ₹{(Number(t.price) / t.quantity).toFixed(1)}/print
                         </div>
                       </button>
@@ -521,18 +483,10 @@ export default function ProductDetail({ product }: Props) {
               ?.filter((f: any) => f.type !== "PHOTO_UPLOAD")
               .map((field: any) => (
                 <div key={field.id} style={{ marginBottom: "20px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      marginBottom: "8px",
-                      color: "var(--text-primary)",
-                    }}
-                  >
+                  <label style={labelStyle}>
                     {field.label}
                     {field.isRequired && (
-                      <span style={{ color: "var(--accent)" }}> *</span>
+                      <span style={{ color: "var(--accent)", marginLeft: "2px" }}>*</span>
                     )}
                   </label>
 
@@ -540,66 +494,31 @@ export default function ProductDetail({ product }: Props) {
                     <input
                       type={field.type === "URL" ? "url" : "text"}
                       placeholder={field.placeholder || ""}
-                      maxLength={
-                        field.validationJson?.maxTextLength || undefined
-                      }
+                      maxLength={field.validationJson?.maxTextLength || undefined}
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({
-                          ...v,
-                          [field.id]: e.target.value,
-                        }))
+                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
                       }
-                      style={{
-                        width: "100%",
-                        padding: "14px 18px",
-                        borderRadius: "12px",
-                        border: "1.5px solid var(--border)",
-                        fontSize: "14px",
-                        backgroundColor: "var(--surface)",
-                      }}
+                      style={inputStyle}
                     />
                   ) : field.type === "TEXTAREA" ? (
                     <textarea
                       rows={3}
                       placeholder={field.placeholder || ""}
-                      maxLength={
-                        field.validationJson?.maxTextLength || undefined
-                      }
+                      maxLength={field.validationJson?.maxTextLength || undefined}
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({
-                          ...v,
-                          [field.id]: e.target.value,
-                        }))
+                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
                       }
-                      style={{
-                        width: "100%",
-                        padding: "14px 18px",
-                        borderRadius: "12px",
-                        border: "1.5px solid var(--border)",
-                        fontSize: "14px",
-                        backgroundColor: "var(--surface)",
-                        resize: "vertical",
-                      }}
+                      style={{ ...inputStyle, resize: "vertical" }}
                     />
                   ) : field.type === "SELECT" || field.type === "RADIO" ? (
                     <select
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({
-                          ...v,
-                          [field.id]: e.target.value,
-                        }))
+                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
                       }
-                      style={{
-                        width: "100%",
-                        padding: "14px 18px",
-                        borderRadius: "12px",
-                        border: "1.5px solid var(--border)",
-                        fontSize: "14px",
-                        backgroundColor: "var(--surface)",
-                      }}
+                      style={inputStyle}
                     >
                       <option value="">Choose {field.label}</option>
                       {field.options?.map((opt: any) => (
@@ -616,38 +535,18 @@ export default function ProductDetail({ product }: Props) {
                       max={field.validationJson?.max ?? undefined}
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({
-                          ...v,
-                          [field.id]: e.target.value,
-                        }))
+                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
                       }
-                      style={{
-                        width: "100%",
-                        padding: "14px 18px",
-                        borderRadius: "12px",
-                        border: "1.5px solid var(--border)",
-                        fontSize: "14px",
-                        backgroundColor: "var(--surface)",
-                      }}
+                      style={inputStyle}
                     />
                   ) : field.type === "DATE" ? (
                     <input
                       type="date"
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({
-                          ...v,
-                          [field.id]: e.target.value,
-                        }))
+                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
                       }
-                      style={{
-                        width: "100%",
-                        padding: "14px 18px",
-                        borderRadius: "12px",
-                        border: "1.5px solid var(--border)",
-                        fontSize: "14px",
-                        backgroundColor: "var(--surface)",
-                      }}
+                      style={inputStyle}
                     />
                   ) : null}
 
@@ -655,48 +554,13 @@ export default function ProductDetail({ product }: Props) {
                     <p
                       style={{
                         fontSize: "12px",
-                        color: "var(--text-secondary)",
+                        color: "var(--text-tertiary)",
                         marginTop: "6px",
                       }}
                     >
                       {field.helpText}
                     </p>
                   )}
-
-                  {/* Show min/max hint for NUMBER fields */}
-                  {field.type === "NUMBER" &&
-                    (field.validationJson?.min !== undefined ||
-                      field.validationJson?.max !== undefined) && (
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                          marginTop: "6px",
-                        }}
-                      >
-                        {field.validationJson?.min !== undefined &&
-                          field.validationJson?.max !== undefined
-                          ? `Enter a value between ${field.validationJson.min} and ${field.validationJson.max}`
-                          : field.validationJson?.min !== undefined
-                          ? `Minimum: ${field.validationJson.min}`
-                          : `Maximum: ${field.validationJson.max}`}
-                      </p>
-                    )}
-
-                  {/* Show char count hint for TEXT fields */}
-                  {(field.type === "TEXT" || field.type === "TEXTAREA") &&
-                    field.validationJson?.maxTextLength && (
-                      <p
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                          marginTop: "6px",
-                        }}
-                      >
-                        {(customFieldValues[field.id] || "").length} /{" "}
-                        {field.validationJson.maxTextLength} characters
-                      </p>
-                    )}
                 </div>
               ))}
 
@@ -705,7 +569,7 @@ export default function ProductDetail({ product }: Props) {
               <div
                 style={{
                   padding: "14px 16px",
-                  borderRadius: "12px",
+                  borderRadius: "var(--radius-input)",
                   backgroundColor: "var(--brand-soft)",
                   border: "1px solid var(--border-soft)",
                   marginBottom: "24px",
@@ -714,85 +578,73 @@ export default function ProductDetail({ product }: Props) {
                 <p
                   style={{
                     fontSize: "13px",
-                    color: "var(--brand)",
                     fontWeight: 500,
+                    color: "var(--brand)",
                     marginBottom: "4px",
                   }}
                 >
-                  📸 Photo upload required
+                  Photo upload required
                 </p>
-                <p
-                  style={{
-                    fontSize: "12px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
-                  You&apos;ll upload{" "}
-                  {product.configuration.minImages ===
-                  product.configuration.maxImages
+                <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                  You'll upload{" "}
+                  {product.configuration.minImages === product.configuration.maxImages
                     ? `${product.configuration.maxImages}`
-                    : `${product.configuration.minImages || 1}–${
-                        product.configuration.maxImages
-                      }`}{" "}
+                    : `${product.configuration.minImages || 1}–${product.configuration.maxImages}`}{" "}
                   photos in the next step.
                 </p>
               </div>
             )}
 
-            {/* Quantity — not shown for TIERED or FIXED_VARIANTS */}
+            {/* Quantity */}
             {product.pricingConfig?.strategy !== "TIERED_PRICING" &&
               product.pricingConfig?.strategy !== "FIXED_VARIANTS" && (
                 <div style={{ marginBottom: "24px" }}>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: "13px",
-                      fontWeight: 500,
-                      marginBottom: "8px",
-                      color: "var(--text-primary)",
-                    }}
-                  >
+                  <p style={labelStyle}>
                     Quantity
-                    {product.pricingConfig?.strategy ===
-                      "INCREMENTAL_QUANTITY" && (
+                    {product.pricingConfig?.strategy === "INCREMENTAL_QUANTITY" && (
                       <span
                         style={{
                           marginLeft: "8px",
-                          fontSize: "11px",
-                          color: "var(--text-secondary)",
+                          fontSize: "10px",
+                          color: "var(--text-tertiary)",
                           fontWeight: 400,
+                          textTransform: "none",
+                          letterSpacing: 0,
                         }}
                       >
-                        (steps of {quantityStep})
+                        Steps of {quantityStep}
                       </span>
                     )}
-                  </label>
+                  </p>
                   <div
                     style={{
                       display: "inline-flex",
                       alignItems: "center",
-                      gap: "16px",
-                      padding: "6px 8px",
-                      border: "1.5px solid var(--border)",
-                      borderRadius: "999px",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--radius-input)",
+                      overflow: "hidden",
                     }}
                   >
-                    {/* MINUS — steps down by quantityStep, never below quantityMin */}
                     <button
+                      aria-label="Decrease quantity"
                       onClick={() =>
-                        setQuantity((q) =>
-                          Math.max(quantityMin, q - quantityStep)
-                        )
+                        setQuantity((q) => Math.max(quantityMin, q - quantityStep))
                       }
                       style={{
-                        width: "36px",
-                        height: "36px",
-                        borderRadius: "999px",
-                        backgroundColor: "var(--brand-soft)",
-                        color: "var(--brand)",
+                        width: "44px",
+                        height: "44px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        color: "var(--text-primary)",
+                        borderRight: "1px solid var(--border)",
+                        transition: "background-color 150ms ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
                       }}
                     >
                       <Minus size={14} strokeWidth={2} />
@@ -800,29 +652,34 @@ export default function ProductDetail({ product }: Props) {
 
                     <span
                       style={{
-                        minWidth: "40px",
+                        minWidth: "52px",
                         textAlign: "center",
-                        fontSize: "16px",
+                        fontSize: "15px",
                         fontWeight: 600,
+                        color: "var(--text-primary)",
                       }}
                     >
                       {quantity}
                     </span>
 
-                    {/* PLUS — steps up by quantityStep */}
                     <button
-                      onClick={() =>
-                        setQuantity((q) => q + quantityStep)
-                      }
+                      aria-label="Increase quantity"
+                      onClick={() => setQuantity((q) => q + quantityStep)}
                       style={{
-                        width: "36px",
-                        height: "36px",
-                        borderRadius: "999px",
-                        backgroundColor: "var(--brand-soft)",
-                        color: "var(--brand)",
+                        width: "44px",
+                        height: "44px",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
+                        color: "var(--text-primary)",
+                        borderLeft: "1px solid var(--border)",
+                        transition: "background-color 150ms ease",
+                      }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg)";
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
                       }}
                     >
                       <Plus size={14} strokeWidth={2} />
@@ -833,40 +690,24 @@ export default function ProductDetail({ product }: Props) {
 
             {/* Notes */}
             <div style={{ marginBottom: "24px" }}>
-              <label
-                style={{
-                  display: "block",
-                  fontSize: "13px",
-                  fontWeight: 500,
-                  marginBottom: "8px",
-                  color: "var(--text-primary)",
-                }}
-              >
-                Special Instructions (optional)
-              </label>
+              <label style={labelStyle}>Special Instructions (optional)</label>
               <textarea
                 rows={2}
                 placeholder="Any special requests..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                style={{
-                  width: "100%",
-                  padding: "14px 18px",
-                  borderRadius: "12px",
-                  border: "1.5px solid var(--border)",
-                  fontSize: "14px",
-                  backgroundColor: "var(--surface)",
-                  resize: "vertical",
-                }}
+                style={{ ...inputStyle, resize: "vertical" }}
               />
             </div>
 
+            {/* Error */}
             {error && (
               <div
                 style={{
-                  padding: "12px 16px",
-                  borderRadius: "12px",
+                  padding: "12px 14px",
+                  borderRadius: "var(--radius-input)",
                   backgroundColor: "#FEF2F2",
+                  border: "1px solid #FECACA",
                   color: "#DC2626",
                   fontSize: "13px",
                   marginBottom: "16px",
@@ -880,7 +721,7 @@ export default function ProductDetail({ product }: Props) {
             <div
               style={{
                 display: "flex",
-                gap: "12px",
+                gap: "10px",
                 marginBottom: "20px",
                 flexWrap: "wrap",
               }}
@@ -889,39 +730,39 @@ export default function ProductDetail({ product }: Props) {
                 onClick={handleBuyNow}
                 disabled={buying || adding || added}
                 className="btn-primary"
-                style={{ flex: 1, minWidth: "180px", padding: "16px" }}
+                style={{
+                  flex: 1,
+                  minWidth: "160px",
+                  backgroundColor: "var(--accent)",
+                }}
               >
-                {buying ? (
-                  "Starting checkout..."
-                ) : (
-                  <>
-                    <Zap size={16} strokeWidth={2} />
-                    Buy Now
-                  </>
-                )}
+                {buying ? "Starting..." : "Buy Now"}
+                {!buying && <ChevronRight size={15} strokeWidth={2} />}
               </button>
+
               <button
                 onClick={handleAddToCart}
                 disabled={adding || buying || added}
                 className="btn-secondary"
-                style={{ flex: 1, minWidth: "180px", padding: "15px" }}
+                style={{ flex: 1, minWidth: "160px" }}
               >
                 {added ? (
                   <>
-                    <Check size={16} strokeWidth={2} />
-                    Added to Cart
+                    <Check size={15} strokeWidth={2} />
+                    Added
                   </>
                 ) : adding ? (
                   "Adding..."
                 ) : (
                   <>
-                    <ShoppingBag size={16} strokeWidth={2} />
+                    <ShoppingBag size={15} strokeWidth={2} />
                     Add to Cart
                   </>
                 )}
               </button>
             </div>
 
+            {/* WhatsApp help */}
             <a
               href="https://wa.me/918086415357"
               target="_blank"
@@ -929,13 +770,15 @@ export default function ProductDetail({ product }: Props) {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                gap: "8px",
-                fontSize: "13px",
-                color: "var(--text-secondary)",
-                marginBottom: "24px",
+                gap: "7px",
+                fontSize: "12px",
+                color: "var(--text-tertiary)",
+                marginBottom: "28px",
+                transition: "color 200ms ease",
               }}
+              className="hover:text-[var(--text-primary)]"
             >
-              <MessageCircle size={14} strokeWidth={1.75} />
+              <MessageCircle size={13} strokeWidth={1.75} />
               Need help? Chat with us on WhatsApp
             </a>
 
@@ -944,7 +787,7 @@ export default function ProductDetail({ product }: Props) {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(3, 1fr)",
-                gap: "12px",
+                gap: "8px",
                 paddingTop: "24px",
                 borderTop: "1px solid var(--border-soft)",
               }}
@@ -954,16 +797,28 @@ export default function ProductDetail({ product }: Props) {
                 { icon: Shield, label: "Secure Pay" },
                 { icon: Award, label: "Premium" },
               ].map(({ icon: Icon, label }) => (
-                <div key={label} style={{ textAlign: "center" }}>
+                <div
+                  key={label}
+                  style={{
+                    textAlign: "center",
+                    padding: "14px 8px",
+                    border: "1px solid var(--border-soft)",
+                    borderRadius: "var(--radius-input)",
+                  }}
+                >
                   <Icon
-                    size={18}
+                    size={16}
                     strokeWidth={1.5}
-                    style={{ color: "var(--brand)", margin: "0 auto 6px" }}
+                    style={{
+                      color: "var(--text-tertiary)",
+                      margin: "0 auto 6px",
+                    }}
                   />
                   <div
                     style={{
                       fontSize: "11px",
                       color: "var(--text-secondary)",
+                      fontWeight: 500,
                     }}
                   >
                     {label}
@@ -974,16 +829,23 @@ export default function ProductDetail({ product }: Props) {
           </div>
         </div>
 
-        {/* Description */}
+        {/* Product Description */}
         {product.description && (
-          <div style={{ marginTop: "80px", maxWidth: "800px" }}>
+          <div
+            style={{
+              paddingTop: "64px",
+              borderTop: "1px solid var(--border-soft)",
+              maxWidth: "680px",
+            }}
+          >
             <h2
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: "24px",
+                fontSize: "22px",
                 fontWeight: 600,
                 marginBottom: "20px",
                 color: "var(--text-primary)",
+                letterSpacing: "-0.01em",
               }}
             >
               About This Product
@@ -991,7 +853,7 @@ export default function ProductDetail({ product }: Props) {
             <p
               style={{
                 fontSize: "15px",
-                lineHeight: 1.8,
+                lineHeight: 1.85,
                 color: "var(--text-secondary)",
                 whiteSpace: "pre-wrap",
               }}

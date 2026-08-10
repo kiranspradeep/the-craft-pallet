@@ -14,6 +14,7 @@ import {
   Check,
   Loader2,
   MessageCircle,
+  AlertCircle,
 } from "lucide-react";
 import { assetApi, cartApi, buyNowApi } from "@/lib/cart";
 
@@ -31,12 +32,10 @@ export default function UploadPage() {
   } | null>(null);
   const [productIdForUpload, setProductIdForUpload] = useState<string | null>(null);
   const [cartItemInfo, setCartItemInfo] = useState<any>(null);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Common file state
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
@@ -44,8 +43,6 @@ export default function UploadPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [uploading, setUploading] = useState(false);
   const [assetId, setAssetId] = useState<string | null>(null);
-
-  // Google Drive
   const [driveLink, setDriveLink] = useState("");
   const [driveLoading, setDriveLoading] = useState(false);
 
@@ -55,8 +52,6 @@ export default function UploadPage() {
         if (buyNowId) {
           const session = await buyNowApi.get(buyNowId);
           setProductIdForUpload(session.productId);
-
-          // Fetch product to get configuration
           const res = await fetch(`${API}/api/products/${session.productId}`);
           const data = await res.json();
           if (data.data?.configuration) {
@@ -72,12 +67,10 @@ export default function UploadPage() {
             router.push("/cart");
             return;
           }
-          // Use first item that requires upload
           const uploadItem = cartRes.cart.items.find(
             (i: any) => i.product?.configuration?.uploadRequired
           );
           if (!uploadItem) {
-            // No upload needed — skip to checkout
             router.push("/checkout");
             return;
           }
@@ -119,22 +112,19 @@ export default function UploadPage() {
 
   const uploadFiles = async () => {
     if (files.length === 0) return;
-    if (
-      productConfig?.minImages &&
-      files.length < productConfig.minImages
-    ) {
+    if (productConfig?.minImages && files.length < productConfig.minImages) {
       setError(`Please add at least ${productConfig.minImages} photos`);
       return;
     }
-
     setUploading(true);
     setError("");
     try {
-      const asset = await assetApi.uploadDirect(files, productIdForUpload || undefined);
+      const asset = await assetApi.uploadDirect(
+        files,
+        productIdForUpload || undefined
+      );
       setAssetId(asset.id);
-      setSuccess(`${files.length} photos uploaded successfully!`);
-
-      // Attach to buy-now session
+      setSuccess(`${files.length} photos uploaded successfully`);
       if (buyNowId) {
         await buyNowApi.update(buyNowId, { assetId: asset.id });
       }
@@ -149,9 +139,12 @@ export default function UploadPage() {
     setUploading(true);
     setError("");
     try {
-      const asset = await assetApi.uploadZip(file, productIdForUpload || undefined);
+      const asset = await assetApi.uploadZip(
+        file,
+        productIdForUpload || undefined
+      );
       setAssetId(asset.id);
-      setSuccess("ZIP extracted and uploaded!");
+      setSuccess("ZIP extracted and uploaded");
       if (buyNowId) {
         await buyNowApi.update(buyNowId, { assetId: asset.id });
       }
@@ -169,7 +162,7 @@ export default function UploadPage() {
     try {
       const asset = await assetApi.uploadDriveLink(driveLink.trim());
       setAssetId(asset.id);
-      setSuccess("Google Drive link saved!");
+      setSuccess("Google Drive link saved");
       if (buyNowId) {
         await buyNowApi.update(buyNowId, { assetId: asset.id });
       }
@@ -192,27 +185,38 @@ export default function UploadPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "120px 0", textAlign: "center" }}>
-        <p style={{ color: "var(--text-secondary)" }}>Loading...</p>
+      <div
+        style={{
+          padding: "160px 0",
+          textAlign: "center",
+          backgroundColor: "var(--bg)",
+        }}
+      >
+        <p style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ backgroundColor: "var(--bg)", padding: "60px 0 120px" }}>
-      <div className="tcp-container" style={{ maxWidth: "900px" }}>
+    <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
+      <div className="tcp-container" style={{ maxWidth: "860px" }}>
         <Link
           href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
           style={{
             display: "inline-flex",
             alignItems: "center",
             gap: "6px",
-            fontSize: "13px",
-            color: "var(--text-secondary)",
+            fontSize: "12px",
+            color: "var(--text-tertiary)",
             marginBottom: "32px",
+            letterSpacing: "0.02em",
+            transition: "color 200ms ease",
           }}
+          className="hover:text-[var(--text-primary)]"
         >
-          <ArrowLeft size={14} strokeWidth={1.75} />
+          <ArrowLeft size={13} strokeWidth={1.75} />
           Back
         </Link>
 
@@ -222,58 +226,64 @@ export default function UploadPage() {
           <h1
             style={{
               fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(28px, 4vw, 40px)",
+              fontSize: "clamp(26px, 4vw, 38px)",
               fontWeight: 500,
               color: "var(--text-primary)",
               letterSpacing: "-0.02em",
               marginBottom: "12px",
             }}
           >
-            Send us your{" "}
+            Upload your{" "}
             <em style={{ fontStyle: "italic", color: "var(--brand)" }}>
               photos
             </em>
           </h1>
           {cartItemInfo && (
-            <p
-              style={{
-                fontSize: "15px",
-                color: "var(--text-secondary)",
-              }}
-            >
-              For: <strong>{cartItemInfo.productName}</strong>
+            <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>
+              For:{" "}
+              <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>
+                {cartItemInfo.productName}
+              </span>
               {productConfig?.minImages && productConfig?.maxImages && (
-                <>
+                <span style={{ color: "var(--text-tertiary)" }}>
                   {" · "}
                   {productConfig.minImages === productConfig.maxImages
                     ? `${productConfig.maxImages} photos required`
                     : `${productConfig.minImages}–${productConfig.maxImages} photos`}
-                </>
+                </span>
               )}
             </p>
           )}
         </div>
 
+        {/* Error / Success */}
         {error && (
           <div
             style={{
               padding: "12px 16px",
-              borderRadius: "12px",
+              borderRadius: "var(--radius-input)",
               backgroundColor: "#FEF2F2",
+              border: "1px solid #FECACA",
               color: "#DC2626",
               fontSize: "13px",
               marginBottom: "20px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
+            <AlertCircle size={14} strokeWidth={1.75} />
             {error}
           </div>
         )}
+
         {success && (
           <div
             style={{
               padding: "12px 16px",
-              borderRadius: "12px",
-              backgroundColor: "rgba(142,159,130,0.15)",
+              borderRadius: "var(--radius-input)",
+              backgroundColor: "rgba(142,159,130,0.12)",
+              border: "1px solid rgba(142,159,130,0.25)",
               color: "var(--success)",
               fontSize: "13px",
               marginBottom: "20px",
@@ -282,47 +292,47 @@ export default function UploadPage() {
               gap: "8px",
             }}
           >
-            <Check size={16} strokeWidth={2} />
+            <Check size={14} strokeWidth={2} />
             {success}
           </div>
         )}
 
-        {/* Upload Options */}
+        {/* Upload method cards */}
         <p
           style={{
-            fontSize: "13px",
-            fontWeight: 500,
-            color: "var(--text-secondary)",
-            letterSpacing: "0.05em",
-            marginBottom: "16px",
+            fontSize: "10px",
+            fontWeight: 600,
+            letterSpacing: "0.16em",
             textTransform: "uppercase",
+            color: "var(--text-tertiary)",
+            marginBottom: "14px",
           }}
         >
-          Choose how you&apos;d like to send your photos
+          Upload Method
         </p>
 
         <div
-          className="grid"
           style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "16px",
-            marginBottom: "32px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+            gap: "12px",
+            marginBottom: "28px",
           }}
         >
           <UploadCard
-            icon={<Upload size={22} strokeWidth={1.75} />}
+            icon={<Upload size={18} strokeWidth={1.75} />}
             title="Upload Photos"
-            description="Drag & drop or browse files"
+            description="Browse or drag & drop files"
             onClick={() => fileInputRef.current?.click()}
           />
           <UploadCard
-            icon={<Folder size={22} strokeWidth={1.75} />}
+            icon={<Folder size={18} strokeWidth={1.75} />}
             title="Upload Folder"
-            description="Recommended for 100+ photos"
+            description="Best for 100+ photos"
             onClick={() => folderInputRef.current?.click()}
           />
           <UploadCard
-            icon={<FileArchive size={22} strokeWidth={1.75} />}
+            icon={<FileArchive size={18} strokeWidth={1.75} />}
             title="Upload ZIP"
             description="Fastest for large collections"
             onClick={() => zipInputRef.current?.click()}
@@ -359,45 +369,52 @@ export default function UploadPage() {
           }}
         />
 
-        {/* Google Drive card */}
+        {/* Google Drive */}
         <div
           style={{
-            padding: "24px",
-            borderRadius: "20px",
+            padding: "20px",
+            borderRadius: "var(--radius-card)",
             border: "1px solid var(--border-soft)",
             backgroundColor: "var(--surface)",
-            marginBottom: "32px",
+            marginBottom: "28px",
           }}
         >
           <div
-            className="flex items-center"
-            style={{ gap: "12px", marginBottom: "12px" }}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginBottom: "14px",
+            }}
           >
             <div
               style={{
-                width: "40px",
-                height: "40px",
-                borderRadius: "12px",
+                width: "36px",
+                height: "36px",
+                borderRadius: "var(--radius-input)",
                 backgroundColor: "var(--brand-soft)",
                 color: "var(--brand)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                flexShrink: 0,
               }}
             >
-              <Cloud size={20} strokeWidth={1.75} />
+              <Cloud size={16} strokeWidth={1.75} />
             </div>
             <div>
               <h4
                 style={{
-                  fontSize: "15px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   color: "var(--text-primary)",
                 }}
               >
                 Google Drive
               </h4>
-              <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+              <p
+                style={{ fontSize: "12px", color: "var(--text-tertiary)" }}
+              >
                 Paste your sharing link
               </p>
             </div>
@@ -411,18 +428,26 @@ export default function UploadPage() {
               onChange={(e) => setDriveLink(e.target.value)}
               style={{
                 flex: 1,
-                padding: "12px 16px",
-                borderRadius: "12px",
-                border: "1.5px solid var(--border)",
+                padding: "11px 14px",
+                borderRadius: "var(--radius-input)",
+                border: "1px solid var(--border)",
                 fontSize: "14px",
                 backgroundColor: "var(--bg)",
+                color: "var(--text-primary)",
+                transition: "border-color 200ms ease",
+              }}
+              onFocus={(e) => {
+                e.currentTarget.style.borderColor = "var(--brand)";
+              }}
+              onBlur={(e) => {
+                e.currentTarget.style.borderColor = "var(--border)";
               }}
             />
             <button
               onClick={submitDriveLink}
               disabled={driveLoading || !driveLink.trim()}
-              className="btn-primary"
-              style={{ padding: "12px 20px" }}
+              className="btn-secondary"
+              style={{ padding: "11px 18px", fontSize: "12px" }}
             >
               {driveLoading ? "Saving..." : "Import"}
             </button>
@@ -431,22 +456,23 @@ export default function UploadPage() {
 
         {/* File previews */}
         {files.length > 0 && (
-          <div style={{ marginBottom: "32px" }}>
+          <div style={{ marginBottom: "28px" }}>
             <p
               style={{
-                fontSize: "13px",
+                fontSize: "12px",
                 fontWeight: 500,
-                color: "var(--text-primary)",
+                color: "var(--text-secondary)",
                 marginBottom: "12px",
+                letterSpacing: "0.02em",
               }}
             >
-              {files.length} photo{files.length !== 1 && "s"} selected
+              {files.length} photo{files.length !== 1 ? "s" : ""} selected
             </p>
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
-                gap: "10px",
+                gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
+                gap: "8px",
                 marginBottom: "16px",
               }}
             >
@@ -456,9 +482,9 @@ export default function UploadPage() {
                   style={{
                     position: "relative",
                     aspectRatio: "1/1",
-                    borderRadius: "12px",
+                    borderRadius: "var(--radius-card)",
                     overflow: "hidden",
-                    border: "1px solid var(--border)",
+                    border: "1px solid var(--border-soft)",
                   }}
                 >
                   <img
@@ -472,21 +498,22 @@ export default function UploadPage() {
                   />
                   <button
                     onClick={() => removeFile(i)}
+                    aria-label="Remove photo"
                     style={{
                       position: "absolute",
-                      top: "6px",
-                      right: "6px",
-                      width: "22px",
-                      height: "22px",
-                      borderRadius: "999px",
-                      backgroundColor: "rgba(0,0,0,0.6)",
+                      top: "4px",
+                      right: "4px",
+                      width: "20px",
+                      height: "20px",
+                      borderRadius: "4px",
+                      backgroundColor: "rgba(0,0,0,0.55)",
                       color: "#fff",
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                     }}
                   >
-                    <X size={12} strokeWidth={2} />
+                    <X size={11} strokeWidth={2} />
                   </button>
                 </div>
               ))}
@@ -497,15 +524,15 @@ export default function UploadPage() {
                 onClick={uploadFiles}
                 disabled={uploading}
                 className="btn-primary"
-                style={{ width: "100%", padding: "14px" }}
+                style={{ width: "100%", justifyContent: "center" }}
               >
                 {uploading ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" strokeWidth={2} />
+                    <Loader2 size={15} className="animate-spin" strokeWidth={2} />
                     Uploading {files.length} photos...
                   </>
                 ) : (
-                  `Upload ${files.length} Photos`
+                  `Upload ${files.length} Photo${files.length !== 1 ? "s" : ""}`
                 )}
               </button>
             )}
@@ -515,9 +542,8 @@ export default function UploadPage() {
         {/* Continue */}
         <div
           style={{
-            marginTop: "24px",
-            padding: "20px 24px",
-            borderRadius: "20px",
+            padding: "20px",
+            borderRadius: "var(--radius-card)",
             backgroundColor: "var(--surface)",
             border: "1px solid var(--border-soft)",
           }}
@@ -526,10 +552,10 @@ export default function UploadPage() {
             onClick={goToCheckout}
             disabled={!assetId && productConfig?.uploadRequired !== false}
             className="btn-primary"
-            style={{ width: "100%", padding: "16px", fontSize: "15px" }}
+            style={{ width: "100%", justifyContent: "center" }}
           >
             Continue to Checkout
-            <ArrowRight size={16} strokeWidth={2} />
+            <ArrowRight size={15} strokeWidth={2} />
           </button>
 
           <button
@@ -538,15 +564,18 @@ export default function UploadPage() {
               width: "100%",
               marginTop: "12px",
               padding: "10px",
-              fontSize: "13px",
-              color: "var(--text-secondary)",
+              fontSize: "12px",
+              color: "var(--text-tertiary)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               gap: "6px",
+              transition: "color 200ms ease",
+              letterSpacing: "0.02em",
             }}
+            className="hover:text-[var(--text-primary)]"
           >
-            <MessageCircle size={14} strokeWidth={1.75} />
+            <MessageCircle size={13} strokeWidth={1.75} />
             Or continue on WhatsApp instead
           </button>
         </div>
@@ -554,8 +583,6 @@ export default function UploadPage() {
     </div>
   );
 }
-
-// ── Upload Card Component ────────────────────────────────────────────────
 
 function UploadCard({
   icon,
@@ -572,45 +599,43 @@ function UploadCard({
     <button
       onClick={onClick}
       style={{
-        padding: "24px",
-        borderRadius: "20px",
+        padding: "20px",
+        borderRadius: "var(--radius-card)",
         border: "1px solid var(--border)",
         backgroundColor: "var(--surface)",
         cursor: "pointer",
-        transition: "all 300ms ease",
         textAlign: "left",
+        transition: "border-color 250ms ease, box-shadow 250ms ease",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor = "var(--brand)";
-        (e.currentTarget as HTMLElement).style.transform = "translateY(-2px)";
-        (e.currentTarget as HTMLElement).style.boxShadow =
-          "var(--shadow-sm)";
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = "var(--brand)";
+        el.style.boxShadow = "var(--shadow-sm)";
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLElement).style.borderColor =
-          "var(--border)";
-        (e.currentTarget as HTMLElement).style.transform = "translateY(0)";
-        (e.currentTarget as HTMLElement).style.boxShadow = "none";
+        const el = e.currentTarget as HTMLElement;
+        el.style.borderColor = "var(--border)";
+        el.style.boxShadow = "none";
       }}
     >
       <div
         style={{
-          width: "44px",
-          height: "44px",
-          borderRadius: "12px",
+          width: "38px",
+          height: "38px",
+          borderRadius: "var(--radius-input)",
           backgroundColor: "var(--brand-soft)",
           color: "var(--brand)",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          marginBottom: "14px",
+          marginBottom: "12px",
         }}
       >
         {icon}
       </div>
       <h4
         style={{
-          fontSize: "15px",
+          fontSize: "14px",
           fontWeight: 600,
           color: "var(--text-primary)",
           marginBottom: "4px",
@@ -618,13 +643,7 @@ function UploadCard({
       >
         {title}
       </h4>
-      <p
-        style={{
-          fontSize: "12px",
-          color: "var(--text-secondary)",
-          lineHeight: 1.5,
-        }}
-      >
+      <p style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.5 }}>
         {description}
       </p>
     </button>

@@ -1,6 +1,6 @@
 import { apiGet } from "@/lib/api";
 import Link from "next/link";
-import { ArrowRight, Package } from "lucide-react";
+import { ArrowRight, Package, ImageIcon } from "lucide-react";
 
 interface Category {
   id: string;
@@ -24,60 +24,91 @@ export default async function CategoriesPage() {
 
   return (
     <div style={{ backgroundColor: "var(--bg)" }}>
-      {/* Hero */}
-      <section style={{ padding: "80px 0 40px", textAlign: "center" }}>
+      {/* Header */}
+      <section style={{ padding: "72px 0 48px" }}>
         <div className="tcp-container">
           <p className="tcp-eyebrow">Browse</p>
-          <h1
+          <div
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(36px, 5vw, 56px)",
-              fontWeight: 500,
-              letterSpacing: "-0.02em",
-              marginBottom: "16px",
-              color: "var(--text-primary)",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: "24px",
+              flexWrap: "wrap",
             }}
           >
-            All{" "}
-            <em style={{ fontStyle: "italic", color: "var(--brand)" }}>
-              Categories
-            </em>
-          </h1>
-          <p
-            style={{
-              fontSize: "16px",
-              color: "var(--text-secondary)",
-              maxWidth: "500px",
-              margin: "0 auto",
-            }}
-          >
-            Discover our curated collections of handcrafted personalised gifts.
-          </p>
+            <h1
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "clamp(32px, 5vw, 52px)",
+                fontWeight: 500,
+                letterSpacing: "-0.02em",
+                color: "var(--text-primary)",
+                lineHeight: 1.1,
+              }}
+            >
+              All{" "}
+              <em
+                style={{
+                  fontStyle: "italic",
+                  color: "var(--brand)",
+                  fontWeight: 500,
+                }}
+              >
+                Collections
+              </em>
+            </h1>
+            <p
+              style={{
+                fontSize: "15px",
+                color: "var(--text-secondary)",
+                maxWidth: "400px",
+                lineHeight: 1.7,
+              }}
+            >
+              Discover our curated collections of handcrafted personalised
+              gifts.
+            </p>
+          </div>
         </div>
       </section>
 
       {/* Grid */}
-      <section style={{ padding: "40px 0 120px" }}>
+      <section style={{ padding: "0 0 120px" }}>
         <div className="tcp-container">
           {categories.length === 0 ? (
             <div
               style={{
                 textAlign: "center",
                 padding: "80px 20px",
-                borderRadius: "24px",
                 border: "1px solid var(--border-soft)",
+                borderRadius: "var(--radius-card)",
                 backgroundColor: "var(--surface)",
               }}
             >
-              <Package size={40} strokeWidth={1.5} style={{ color: "var(--text-tertiary)", margin: "0 auto 16px" }} />
-              <p style={{ color: "var(--text-secondary)" }}>No categories yet</p>
+              <Package
+                size={32}
+                strokeWidth={1.25}
+                style={{
+                  color: "var(--text-tertiary)",
+                  margin: "0 auto 16px",
+                }}
+              />
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                No categories yet
+              </p>
             </div>
           ) : (
             <div
-              className="grid"
               style={{
-                gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-                gap: "32px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: "2px",
               }}
             >
               {categories.map((cat) => (
@@ -87,25 +118,28 @@ export default async function CategoriesPage() {
                   className="group"
                   style={{
                     display: "block",
-                    borderRadius: "24px",
                     overflow: "hidden",
-                    aspectRatio: "1/1",
+                    aspectRatio: "3/4",
                     position: "relative",
+                    backgroundColor: "var(--brand-soft)",
                   }}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: cat.imageUrl
-                        ? `url(${cat.imageUrl}) center/cover`
-                        : "linear-gradient(135deg, #F5EFE8 0%, #E8DDD1 100%)",
-                      transition: "transform 700ms ease",
-                    }}
-                    className="group-hover:scale-105"
-                  />
-
-                  {!cat.imageUrl && (
+                  {/* Background image */}
+                  {cat.imageUrl ? (
+                    <img
+                      src={cat.imageUrl}
+                      alt={cat.name}
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                        transition: "transform 600ms ease",
+                      }}
+                      className="group-hover:scale-[1.02]"
+                    />
+                  ) : (
                     <div
                       style={{
                         position: "absolute",
@@ -113,40 +147,45 @@ export default async function CategoriesPage() {
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: "80px",
-                        opacity: 0.4,
                       }}
                     >
-                      🖼️
+                      <ImageIcon
+                        size={40}
+                        strokeWidth={1}
+                        style={{ color: "var(--border)", opacity: 0.4 }}
+                      />
                     </div>
                   )}
 
+                  {/* Gradient overlay */}
                   <div
                     style={{
                       position: "absolute",
                       inset: 0,
                       background:
-                        "linear-gradient(to top, rgba(43,43,43,0.75) 0%, transparent 60%)",
+                        "linear-gradient(to top, rgba(43,43,43,0.68) 0%, rgba(43,43,43,0.08) 55%, transparent 100%)",
                     }}
                   />
 
+                  {/* Content */}
                   <div
                     style={{
                       position: "absolute",
                       bottom: 0,
                       left: 0,
                       right: 0,
-                      padding: "32px",
+                      padding: "28px",
                       color: "#fff",
                     }}
                   >
                     <p
                       style={{
-                        fontSize: "11px",
-                        letterSpacing: "0.15em",
+                        fontSize: "10px",
+                        letterSpacing: "0.16em",
                         textTransform: "uppercase",
-                        opacity: 0.85,
-                        marginBottom: "10px",
+                        fontWeight: 500,
+                        opacity: 0.65,
+                        marginBottom: "6px",
                       }}
                     >
                       {cat.productCount} products
@@ -154,9 +193,11 @@ export default async function CategoriesPage() {
                     <h3
                       style={{
                         fontFamily: "'Playfair Display', serif",
-                        fontSize: "28px",
+                        fontSize: "22px",
                         fontWeight: 500,
-                        marginBottom: "8px",
+                        marginBottom: "12px",
+                        letterSpacing: "-0.01em",
+                        lineHeight: 1.2,
                       }}
                     >
                       {cat.name}
@@ -165,8 +206,9 @@ export default async function CategoriesPage() {
                       <p
                         style={{
                           fontSize: "13px",
-                          opacity: 0.85,
-                          marginBottom: "16px",
+                          opacity: 0.75,
+                          marginBottom: "14px",
+                          lineHeight: 1.5,
                           overflow: "hidden",
                           display: "-webkit-box",
                           WebkitLineClamp: 2,
@@ -177,15 +219,21 @@ export default async function CategoriesPage() {
                       </p>
                     )}
                     <span
-                      className="inline-flex items-center"
                       style={{
+                        display: "inline-flex",
+                        alignItems: "center",
                         gap: "6px",
-                        fontSize: "13px",
+                        fontSize: "12px",
                         fontWeight: 500,
+                        letterSpacing: "0.04em",
+                        textTransform: "uppercase",
+                        opacity: 0.85,
+                        transition: "gap 250ms ease",
                       }}
+                      className="group-hover:gap-[10px]"
                     >
-                      Explore Collection
-                      <ArrowRight size={14} strokeWidth={2} />
+                      Explore
+                      <ArrowRight size={13} strokeWidth={2} />
                     </span>
                   </div>
                 </Link>

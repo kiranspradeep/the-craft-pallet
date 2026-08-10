@@ -1,18 +1,20 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, ImageIcon } from "lucide-react";
 
 export default function FeaturedStory() {
   return (
     <section
+      id="about"
       className="tcp-section"
-      style={{ backgroundColor: "var(--bg)" }}
+      style={{ backgroundColor: "var(--surface)" }}
     >
       <div className="tcp-container">
         <div
-          className="grid items-center"
           style={{
+            display: "grid",
             gridTemplateColumns: "1fr",
-            gap: "60px",
+            gap: "64px",
+            alignItems: "center",
           }}
         >
           <style>{`
@@ -25,22 +27,22 @@ export default function FeaturedStory() {
           `}</style>
 
           <div
-            className="story-grid grid items-center"
+            className="story-grid"
             style={{
+              display: "grid",
               gridTemplateColumns: "1fr",
-              gap: "60px",
+              gap: "64px",
+              alignItems: "center",
             }}
           >
             {/* Image */}
             <div
               style={{
                 position: "relative",
-                aspectRatio: "5/6",
-                borderRadius: "24px",
+                aspectRatio: "4/5",
+                borderRadius: "var(--radius-card)",
                 overflow: "hidden",
-                background:
-                  "linear-gradient(135deg, #E8DDD1 0%, #D4C4B3 100%)",
-                boxShadow: "var(--shadow-lg)",
+                backgroundColor: "var(--brand-soft)",
               }}
             >
               <div
@@ -50,35 +52,36 @@ export default function FeaturedStory() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  flexDirection: "column",
-                  color: "var(--brand)",
                 }}
               >
-                <div style={{ fontSize: "100px", opacity: 0.4 }}>🖼️</div>
+                <ImageIcon
+                  size={40}
+                  strokeWidth={1}
+                  style={{ color: "var(--border)", opacity: 0.5 }}
+                />
               </div>
             </div>
 
-            {/* Story */}
-            <div>
+            {/* Text */}
+            <div style={{ maxWidth: "520px" }}>
               <p className="tcp-eyebrow">Our Story</p>
+
               <h2
                 style={{
                   fontFamily: "'Playfair Display', serif",
-                  fontSize: "clamp(32px, 4vw, 48px)",
+                  fontSize: "clamp(30px, 4vw, 46px)",
                   fontWeight: 500,
                   lineHeight: 1.15,
                   letterSpacing: "-0.02em",
                   color: "var(--text-primary)",
-                  marginBottom: "24px",
+                  marginBottom: "28px",
                 }}
               >
-                Every memory
+                Every memory deserves
                 <br />
-                deserves to be
-                <br />
+                to be{" "}
                 <em
                   style={{
-                    fontFamily: "'Playfair Display', serif",
                     fontStyle: "italic",
                     color: "var(--brand)",
                     fontWeight: 500,
@@ -87,34 +90,37 @@ export default function FeaturedStory() {
                   preserved beautifully.
                 </em>
               </h2>
+
               <p
                 style={{
-                  fontSize: "16px",
+                  fontSize: "15px",
                   lineHeight: 1.8,
                   color: "var(--text-secondary)",
                   marginBottom: "20px",
                 }}
               >
-                At The Craft Pallet, we believe photographs are more than just
-                images—they're windows into moments that matter. Every polaroid
-                we print, every gift we craft, is made with the care your
-                memories deserve.
+                At The Craft Pallet, we believe photographs are more than
+                images — they are windows into moments that matter. Every
+                polaroid we print, every gift we craft, is made with the
+                care your memories deserve.
               </p>
+
               <p
                 style={{
-                  fontSize: "16px",
+                  fontSize: "15px",
                   lineHeight: 1.8,
                   color: "var(--text-secondary)",
                   marginBottom: "40px",
                 }}
               >
                 From premium photo paper to hand-finished touches, we treat
-                every order like a personal gift because that's exactly what it
-                is.
+                every order like a personal gift — because that's exactly
+                what it is.
               </p>
-              <Link href="/products" className="btn-primary">
+
+              <Link href="/products" className="btn-ghost">
                 Explore Our Craft
-                <ArrowRight size={16} strokeWidth={2} />
+                <ArrowRight size={14} strokeWidth={2} />
               </Link>
             </div>
           </div>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { formatPrice } from "@/lib/cart";
+import { ImageIcon } from "lucide-react";
 
 interface Product {
   id: string;
@@ -35,7 +36,9 @@ function getStartingPrice(product: Product): string {
         ? `From ${formatPrice(p.incrementPrice)}`
         : "Contact us";
     case "TIERED_PRICING": {
-      const sorted = [...p.tiers].sort((a, b) => Number(a.price) - Number(b.price));
+      const sorted = [...p.tiers].sort(
+        (a, b) => Number(a.price) - Number(b.price)
+      );
       if (sorted.length > 0) return `From ${formatPrice(sorted[0].price)}`;
       if (p.baseUnitPrice) return `${formatPrice(p.baseUnitPrice)}/print`;
       return "Contact us";
@@ -68,9 +71,9 @@ export default function ProductCard({ product }: { product: Product }) {
         style={{
           position: "relative",
           aspectRatio: "1/1",
-          borderRadius: "16px",
+          borderRadius: "var(--radius-card)",
           overflow: "hidden",
-          background: "linear-gradient(135deg, #F5EFE8 0%, #E8DDD1 100%)",
+          backgroundColor: "var(--brand-soft)",
           marginBottom: "16px",
         }}
       >
@@ -82,9 +85,9 @@ export default function ProductCard({ product }: { product: Product }) {
               width: "100%",
               height: "100%",
               objectFit: "cover",
-              transition: "transform 700ms ease",
+              transition: "transform 500ms ease",
             }}
-            className="group-hover:scale-105"
+            className="group-hover:scale-[1.03]"
           />
         ) : (
           <div
@@ -94,11 +97,13 @@ export default function ProductCard({ product }: { product: Product }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "56px",
-              opacity: 0.4,
             }}
           >
-            📸
+            <ImageIcon
+              size={32}
+              strokeWidth={1}
+              style={{ color: "var(--border)", opacity: 0.6 }}
+            />
           </div>
         )}
       </div>
@@ -108,39 +113,44 @@ export default function ProductCard({ product }: { product: Product }) {
         <h3
           style={{
             fontFamily: "'Playfair Display', serif",
-            fontSize: "18px",
+            fontSize: "16px",
             fontWeight: 500,
             color: "var(--text-primary)",
-            marginBottom: "6px",
+            marginBottom: "5px",
             letterSpacing: "-0.01em",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            transition: "color 200ms ease",
           }}
+          className="group-hover:text-[var(--brand)]"
         >
           {product.name}
         </h3>
+
         {product.shortDescription && (
           <p
             style={{
               fontSize: "13px",
-              color: "var(--text-secondary)",
+              color: "var(--text-tertiary)",
               lineHeight: 1.5,
-              marginBottom: "12px",
+              marginBottom: "10px",
               overflow: "hidden",
               display: "-webkit-box",
-              WebkitLineClamp: 2,
+              WebkitLineClamp: 1,
               WebkitBoxOrient: "vertical",
             }}
           >
             {product.shortDescription}
           </p>
         )}
+
         <p
           style={{
-            fontSize: "15px",
+            fontSize: "14px",
             fontWeight: 600,
-            color: "var(--accent)",
+            color: "var(--text-primary)",
+            fontFamily: "'Poppins', sans-serif",
           }}
         >
           {price}

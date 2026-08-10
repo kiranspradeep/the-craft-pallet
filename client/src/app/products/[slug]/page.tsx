@@ -1,3 +1,5 @@
+// app/products/[slug]/page.tsx
+
 import { apiGet } from "@/lib/api";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -34,52 +36,98 @@ export default async function ProductPage({ params }: Props) {
   }
 
   return (
-    <div style={{ backgroundColor: "var(--bg)", padding: "40px 0 120px" }}>
+    <div
+      style={{
+        backgroundColor: "var(--bg)",
+        paddingTop: "28px",
+        paddingBottom: "120px",
+      }}
+    >
       {/* Breadcrumb */}
-      <div className="tcp-container" style={{ marginBottom: "32px" }}>
+      <div className="tcp-container" style={{ marginBottom: "40px" }}>
         <div
-          className="flex items-center"
           style={{
-            gap: "8px",
-            fontSize: "13px",
-            color: "var(--text-secondary)",
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "12px",
+            color: "var(--text-tertiary)",
+            flexWrap: "wrap",
           }}
         >
-          <Link href="/" className="hover:text-[var(--brand)]">
+          <Link
+            href="/"
+            style={{ transition: "color 200ms ease" }}
+            className="hover:text-[var(--text-primary)]"
+          >
             Home
           </Link>
-          <ChevronRight size={14} strokeWidth={1.75} />
-          <Link href="/products" className="hover:text-[var(--brand)]">
+          <ChevronRight size={13} strokeWidth={1.75} />
+          <Link
+            href="/products"
+            style={{ transition: "color 200ms ease" }}
+            className="hover:text-[var(--text-primary)]"
+          >
             Products
           </Link>
-          <ChevronRight size={14} strokeWidth={1.75} />
+          <ChevronRight size={13} strokeWidth={1.75} />
           <Link
             href={`/categories/${product.category.slug}`}
-            className="hover:text-[var(--brand)]"
+            style={{ transition: "color 200ms ease" }}
+            className="hover:text-[var(--text-primary)]"
           >
             {product.category.name}
           </Link>
-          <ChevronRight size={14} strokeWidth={1.75} />
-          <span style={{ color: "var(--text-primary)" }}>{product.name}</span>
+          <ChevronRight size={13} strokeWidth={1.75} />
+          <span
+            style={{
+              color: "var(--text-primary)",
+              fontWeight: 500,
+              maxWidth: "200px",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {product.name}
+          </span>
         </div>
       </div>
 
       {/* Product detail */}
       <ProductDetail product={product} />
 
-      {/* Related */}
+      {/* Related products */}
       {product.relatedProducts?.length > 0 && (
-        <section style={{ marginTop: "100px" }}>
+        <section
+          style={{
+            marginTop: "96px",
+            paddingTop: "64px",
+            borderTop: "1px solid var(--border-soft)",
+          }}
+        >
           <div className="tcp-container">
-            <div style={{ marginBottom: "40px" }}>
-              <p className="tcp-eyebrow">You May Also Like</p>
-              <h2 className="tcp-heading">Related Products</h2>
-            </div>
             <div
-              className="grid"
               style={{
-                gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                display: "flex",
+                alignItems: "flex-end",
+                justifyContent: "space-between",
                 gap: "24px",
+                marginBottom: "48px",
+                flexWrap: "wrap",
+              }}
+            >
+              <div>
+                <p className="tcp-eyebrow">You May Also Like</p>
+                <h2 className="tcp-heading">Related Products</h2>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gap: "40px 28px",
               }}
             >
               {product.relatedProducts.map((p: any) => (

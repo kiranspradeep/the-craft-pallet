@@ -21,13 +21,11 @@ async function getCategoryData(slug: string) {
       productsRes.status === "fulfilled" ? productsRes.value.data : [];
 
     const total =
-      productsRes.status === "fulfilled" ? productsRes.value.meta.total : 0;
+      productsRes.status === "fulfilled"
+        ? productsRes.value.meta.total
+        : 0;
 
-    return {
-      category: categoryRes.value,
-      products,
-      total,
-    };
+    return { category: categoryRes.value, products, total };
   } catch {
     return null;
   }
@@ -42,42 +40,86 @@ export default async function CategoryDetailPage({ params }: Props) {
   return (
     <div style={{ backgroundColor: "var(--bg)" }}>
       {/* Breadcrumb */}
-      <div className="tcp-container" style={{ paddingTop: "32px" }}>
+      <div
+        className="tcp-container"
+        style={{ paddingTop: "28px", paddingBottom: "0" }}
+      >
         <div
-          className="flex items-center"
-          style={{ gap: "8px", fontSize: "13px", color: "var(--text-secondary)" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "6px",
+            fontSize: "12px",
+            color: "var(--text-tertiary)",
+          }}
         >
-          <Link href="/" className="hover:text-[var(--brand)]">Home</Link>
-          <ChevronRight size={14} strokeWidth={1.75} />
-          <Link href="/categories" className="hover:text-[var(--brand)]">Categories</Link>
-          <ChevronRight size={14} strokeWidth={1.75} />
-          <span style={{ color: "var(--text-primary)" }}>{data.category.name}</span>
+          <Link
+            href="/"
+            style={{ transition: "color 200ms ease" }}
+            className="hover:text-[var(--text-primary)]"
+          >
+            Home
+          </Link>
+          <ChevronRight size={13} strokeWidth={1.75} />
+          <Link
+            href="/categories"
+            style={{ transition: "color 200ms ease" }}
+            className="hover:text-[var(--text-primary)]"
+          >
+            Collections
+          </Link>
+          <ChevronRight size={13} strokeWidth={1.75} />
+          <span style={{ color: "var(--text-primary)" }}>
+            {data.category.name}
+          </span>
         </div>
       </div>
 
       {/* Header */}
-      <section style={{ padding: "40px 0", textAlign: "center" }}>
+      <section style={{ padding: "40px 0 56px" }}>
         <div className="tcp-container">
           <p className="tcp-eyebrow">Collection</p>
-          <h1
+          <div
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(36px, 5vw, 56px)",
-              fontWeight: 500,
-              letterSpacing: "-0.02em",
-              color: "var(--text-primary)",
-              marginBottom: "16px",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: "24px",
+              flexWrap: "wrap",
             }}
           >
-            {data.category.name}
-          </h1>
+            <h1
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "clamp(30px, 5vw, 50px)",
+                fontWeight: 500,
+                letterSpacing: "-0.02em",
+                color: "var(--text-primary)",
+                lineHeight: 1.1,
+              }}
+            >
+              {data.category.name}
+            </h1>
+
+            <p
+              style={{
+                fontSize: "13px",
+                color: "var(--text-tertiary)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              {data.total} product{data.total !== 1 ? "s" : ""}
+            </p>
+          </div>
+
           {data.category.description && (
             <p
               style={{
-                fontSize: "16px",
+                fontSize: "15px",
                 color: "var(--text-secondary)",
                 maxWidth: "560px",
-                margin: "0 auto",
+                lineHeight: 1.75,
+                marginTop: "16px",
               }}
             >
               {data.category.description}
@@ -86,19 +128,43 @@ export default async function CategoryDetailPage({ params }: Props) {
         </div>
       </section>
 
+      {/* Divider */}
+      <div
+        className="tcp-container"
+        style={{
+          borderTop: "1px solid var(--border-soft)",
+          marginBottom: "56px",
+        }}
+      />
+
       {/* Products */}
-      <section style={{ padding: "40px 0 120px" }}>
+      <section style={{ padding: "0 0 120px" }}>
         <div className="tcp-container">
           {data.products.length === 0 ? (
-            <p style={{ textAlign: "center", color: "var(--text-secondary)" }}>
-              No products in this category yet.
-            </p>
+            <div
+              style={{
+                textAlign: "center",
+                padding: "80px 20px",
+                border: "1px solid var(--border-soft)",
+                borderRadius: "var(--radius-card)",
+                backgroundColor: "var(--surface)",
+              }}
+            >
+              <p
+                style={{
+                  fontSize: "14px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                No products in this collection yet.
+              </p>
+            </div>
           ) : (
             <div
-              className="grid"
               style={{
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: "32px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                gap: "40px 28px",
               }}
             >
               {data.products.map((p: any) => (

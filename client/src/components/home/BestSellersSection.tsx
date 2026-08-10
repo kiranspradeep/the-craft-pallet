@@ -37,25 +37,33 @@ export default function BestSellersSection({
       style={{ backgroundColor: "var(--surface)" }}
     >
       <div className="tcp-container">
+        {/* Header */}
         <div
-          className="flex flex-col md:flex-row md:items-end md:justify-between"
-          style={{ marginBottom: "64px", gap: "24px" }}
+          style={{
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+            gap: "24px",
+            marginBottom: "56px",
+            flexWrap: "wrap",
+          }}
         >
           <div>
             <p className="tcp-eyebrow">Most Loved</p>
             <h2 className="tcp-heading">Best Sellers</h2>
           </div>
-          <Link href="/products" className="btn-ghost hidden md:inline-flex">
+          <Link href="/products" className="btn-ghost">
             View All Products
-            <ArrowRight size={16} strokeWidth={2} />
+            <ArrowRight size={14} strokeWidth={2} />
           </Link>
         </div>
 
+        {/* Product Grid */}
         <div
-          className="grid"
           style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-            gap: "24px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+            gap: "40px 28px",
           }}
         >
           {products.map((product) => (
@@ -63,11 +71,25 @@ export default function BestSellersSection({
           ))}
         </div>
 
-        <div className="mt-10 text-center md:hidden">
+        {/* Mobile CTA */}
+        <div
+          style={{
+            marginTop: "48px",
+            textAlign: "center",
+            display: "none",
+          }}
+          className="mobile-cta"
+        >
           <Link href="/products" className="btn-secondary">
             View All Products
           </Link>
         </div>
+
+        <style>{`
+          @media (max-width: 768px) {
+            .mobile-cta { display: block !important; }
+          }
+        `}</style>
       </div>
     </section>
   );

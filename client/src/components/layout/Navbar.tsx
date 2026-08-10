@@ -2,18 +2,30 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { ShoppingBag, Menu, X, Search } from "lucide-react";
 import { cartApi } from "@/lib/cart";
 
 export default function Navbar() {
+  const pathname = usePathname();
+
   const [menuOpen, setMenuOpen] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [scrolled, setScrolled] = useState(false);
+  const [hash, setHash] = useState("");
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll);
+    const onScroll = () => setScrolled(window.scrollY > 24);
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    const updateHash = () => setHash(window.location.hash || "");
+    updateHash();
+
+    window.addEventListener("hashchange", updateHash);
+    return () => window.removeEventListener("hashchange", updateHash);
   }, []);
 
   useEffect(() => {
@@ -25,17 +37,41 @@ export default function Navbar() {
 
   const navLinks = [
     { href: "/products", label: "Shop" },
-    { href: "/categories", label: "Categories" },
+    { href: "/categories", label: "Collections" },
     { href: "/#about", label: "About" },
     { href: "/#faq", label: "FAQ" },
   ];
 
+  const isActiveLink = (href: string) => {
+    if (href === "/products") {
+      return pathname === "/products" || pathname.startsWith("/products/");
+    }
+
+    if (href === "/categories") {
+      return pathname === "/categories" || pathname.startsWith("/categories/");
+    }
+
+    if (href === "/#about") {
+      return pathname === "/" && hash === "#about";
+    }
+
+    if (href === "/#faq") {
+      return pathname === "/" && hash === "#faq";
+    }
+
+    return pathname === href;
+  };
+
   return (
     <header
-      className="sticky top-0 z-50"
       style={{
-        backgroundColor: scrolled ? "rgba(250,249,246,0.85)" : "var(--bg)",
-        backdropFilter: scrolled ? "blur(16px)" : "none",
+        position: "sticky",
+        top: 0,
+        zIndex: 50,
+        backgroundColor: scrolled
+          ? "rgba(250,249,246,0.92)"
+          : "var(--bg)",
+        backdropFilter: scrolled ? "blur(12px)" : "none",
         borderBottom: scrolled
           ? "1px solid var(--border-soft)"
           : "1px solid transparent",
@@ -44,29 +80,40 @@ export default function Navbar() {
     >
       <div className="tcp-container">
         <div
-          className="flex items-center justify-between"
-          style={{ height: "80px" }}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            height: "72px",
+          }}
         >
           {/* Logo */}
-          <Link href="/" className="flex flex-col leading-tight">
+          <Link
+            href="/"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              lineHeight: 1.2,
+            }}
+          >
             <span
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: "22px",
+                fontSize: "20px",
                 fontWeight: 600,
                 color: "var(--text-primary)",
-                letterSpacing: "-0.01em",
+                letterSpacing: "-0.02em",
               }}
             >
               The Craft Pallet
             </span>
             <span
               style={{
-                fontSize: "10px",
-                letterSpacing: "0.2em",
+                fontSize: "9px",
+                letterSpacing: "0.22em",
                 textTransform: "uppercase",
                 color: "var(--text-tertiary)",
-                marginTop: "2px",
+                marginTop: "1px",
               }}
             >
               Personalised Gifts
@@ -74,63 +121,91 @@ export default function Navbar() {
           </Link>
 
           {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center" style={{ gap: "40px" }}>
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  color: "var(--text-primary)",
-                  transition: "color 200ms",
-                }}
-                className="hover:text-[var(--brand)]"
-              >
-                {link.label}
-              </Link>
-            ))}
+          <nav
+            className="hidden md:flex items-center"
+            style={{ gap: "36px" }}
+          >
+            {navLinks.map((link) => {
+              const active = isActiveLink(link.href);
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  style={{
+                    position: "relative",
+                    fontSize: "13px",
+                    fontWeight: active ? 600 : 500,
+                    color: active
+                      ? "var(--text-primary)"
+                      : "var(--text-secondary)",
+                    letterSpacing: "0.02em",
+                    transition: "color 200ms ease",
+                    paddingBottom: "4px",
+                    borderBottom: active
+                      ? "1px solid var(--text-primary)"
+                      : "1px solid transparent",
+                  }}
+                  className="hover:text-[var(--text-primary)]"
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </nav>
 
           {/* Actions */}
-          <div className="flex items-center" style={{ gap: "8px" }}>
-            <Link
+          <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+            {/* <Link
               href="/products"
-              className="hidden md:flex items-center justify-center transition-colors"
+              aria-label="Search products"
+              className="hidden md:flex hover:text-[var(--text-primary)]"
               style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "999px",
-                color: "var(--text-primary)",
+                width: "40px",
+                height: "40px",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                color: "var(--text-secondary)",
+                transition: "color 200ms ease",
               }}
             >
               <Search size={18} strokeWidth={1.75} />
-            </Link>
+            </Link> */}
 
             <Link
               href="/cart"
-              className="relative flex items-center justify-center transition-colors"
+              aria-label="Open shopping bag"
+              className="flex hover:text-[var(--text-primary)]"
               style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "999px",
-                color: "var(--text-primary)",
+                position: "relative",
+                width: "40px",
+                height: "40px",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                color: "var(--text-secondary)",
+                transition: "color 200ms ease",
               }}
             >
               <ShoppingBag size={18} strokeWidth={1.75} />
               {cartCount > 0 && (
                 <span
-                  className="absolute flex items-center justify-center"
                   style={{
-                    top: "6px",
-                    right: "6px",
-                    width: "18px",
-                    height: "18px",
+                    position: "absolute",
+                    top: "7px",
+                    right: "7px",
+                    width: "16px",
+                    height: "16px",
                     borderRadius: "999px",
-                    fontSize: "10px",
+                    fontSize: "9px",
                     fontWeight: 600,
                     color: "#fff",
-                    backgroundColor: "var(--accent)",
+                    backgroundColor: "var(--text-primary)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
                   {cartCount}
@@ -139,14 +214,18 @@ export default function Navbar() {
             </Link>
 
             <button
-              className="md:hidden flex items-center justify-center"
-              style={{
-                width: "42px",
-                height: "42px",
-                borderRadius: "999px",
-                color: "var(--text-primary)",
-              }}
+              aria-label={menuOpen ? "Close menu" : "Open menu"}
               onClick={() => setMenuOpen((v) => !v)}
+              className="flex md:hidden hover:text-[var(--text-primary)]"
+              style={{
+                width: "40px",
+                height: "40px",
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: "4px",
+                color: "var(--text-secondary)",
+                transition: "color 200ms ease",
+              }}
             >
               {menuOpen ? (
                 <X size={20} strokeWidth={1.75} />
@@ -158,6 +237,7 @@ export default function Navbar() {
         </div>
       </div>
 
+      {/* Mobile Menu */}
       {menuOpen && (
         <div
           className="md:hidden"
@@ -166,23 +246,34 @@ export default function Navbar() {
             borderTop: "1px solid var(--border-soft)",
           }}
         >
-          <div className="tcp-container" style={{ padding: "16px 32px" }}>
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMenuOpen(false)}
-                style={{
-                  display: "block",
-                  padding: "14px 0",
-                  fontSize: "15px",
-                  fontWeight: 500,
-                  color: "var(--text-primary)",
-                }}
-              >
-                {link.label}
-              </Link>
-            ))}
+          <div
+            className="tcp-container"
+            style={{ paddingTop: "8px", paddingBottom: "20px" }}
+          >
+            {navLinks.map((link) => {
+              const active = isActiveLink(link.href);
+
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  aria-current={active ? "page" : undefined}
+                  onClick={() => setMenuOpen(false)}
+                  style={{
+                    display: "block",
+                    padding: "13px 0",
+                    fontSize: "14px",
+                    fontWeight: active ? 600 : 500,
+                    color: active
+                      ? "var(--text-primary)"
+                      : "var(--text-secondary)",
+                    borderBottom: "1px solid var(--border-soft)",
+                  }}
+                >
+                  {link.label}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

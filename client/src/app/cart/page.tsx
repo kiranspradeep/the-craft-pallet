@@ -3,7 +3,17 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Trash2, Plus, Minus, ArrowRight, ShoppingBag, Tag } from "lucide-react";
+import {
+  Trash2,
+  Plus,
+  Minus,
+  ArrowRight,
+  ShoppingBag,
+  Tag,
+  ImageIcon,
+  Paperclip,
+  Check,
+} from "lucide-react";
 import { cartApi, formatPrice } from "@/lib/cart";
 
 export default function CartPage() {
@@ -82,29 +92,47 @@ export default function CartPage() {
 
   if (loading) {
     return (
-      <div style={{ padding: "120px 0", textAlign: "center" }}>
-        <p style={{ color: "var(--text-secondary)" }}>Loading your cart...</p>
+      <div
+        style={{
+          padding: "160px 0",
+          textAlign: "center",
+          backgroundColor: "var(--bg)",
+        }}
+      >
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--text-tertiary)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          Loading your cart...
+        </p>
       </div>
     );
   }
 
   const items = cart?.items ?? [];
   const isEmpty = items.length === 0;
-
   const subtotal = Number(totals?.subtotal ?? 0);
   const discount = appliedCoupon ? Number(appliedCoupon.discountAmount) : 0;
   const total = subtotal - discount;
 
   return (
-    <div style={{ backgroundColor: "var(--bg)", padding: "48px 0 120px" }}>
+    <div
+      style={{
+        backgroundColor: "var(--bg)",
+        padding: "56px 0 120px",
+      }}
+    >
       <div className="tcp-container">
         {/* Header */}
-        <div style={{ marginBottom: "48px", textAlign: "center" }}>
+        <div style={{ marginBottom: "56px" }}>
           <p className="tcp-eyebrow">Your Selection</p>
           <h1
             style={{
               fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(32px, 4vw, 44px)",
+              fontSize: "clamp(30px, 4vw, 44px)",
               fontWeight: 500,
               color: "var(--text-primary)",
               letterSpacing: "-0.02em",
@@ -115,22 +143,23 @@ export default function CartPage() {
         </div>
 
         {isEmpty ? (
+          /* ── Empty state ── */
           <div
             style={{
               textAlign: "center",
               padding: "80px 20px",
-              borderRadius: "24px",
               border: "1px solid var(--border-soft)",
+              borderRadius: "var(--radius-card)",
               backgroundColor: "var(--surface)",
-              maxWidth: "500px",
+              maxWidth: "480px",
               margin: "0 auto",
             }}
           >
             <div
               style={{
-                width: "72px",
-                height: "72px",
-                borderRadius: "999px",
+                width: "64px",
+                height: "64px",
+                borderRadius: "var(--radius-card)",
                 backgroundColor: "var(--brand-soft)",
                 display: "flex",
                 alignItems: "center",
@@ -139,15 +168,15 @@ export default function CartPage() {
                 color: "var(--brand)",
               }}
             >
-              <ShoppingBag size={28} strokeWidth={1.5} />
+              <ShoppingBag size={24} strokeWidth={1.5} />
             </div>
             <h3
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: "24px",
+                fontSize: "22px",
                 fontWeight: 500,
                 color: "var(--text-primary)",
-                marginBottom: "12px",
+                marginBottom: "10px",
               }}
             >
               Your cart is empty
@@ -156,39 +185,76 @@ export default function CartPage() {
               style={{
                 fontSize: "14px",
                 color: "var(--text-secondary)",
-                marginBottom: "28px",
+                lineHeight: 1.7,
+                marginBottom: "32px",
+                maxWidth: "320px",
+                margin: "0 auto 32px",
               }}
             >
               Start exploring our collection to add beautiful keepsakes.
             </p>
             <Link href="/products" className="btn-primary">
               Browse Products
-              <ArrowRight size={16} strokeWidth={2} />
+              <ArrowRight size={15} strokeWidth={2} />
             </Link>
           </div>
         ) : (
-          <div
-            className="grid"
-            style={{
-              gridTemplateColumns: "1fr",
-              gap: "32px",
-            }}
-          >
+          /* ── Cart with items ── */
+          <>
             <style>{`
               @media (min-width: 900px) {
                 .cart-grid {
-                  grid-template-columns: 1fr 380px !important;
-                  gap: 48px !important;
+                  grid-template-columns: 1fr 360px !important;
+                  gap: 56px !important;
                 }
               }
             `}</style>
 
             <div
-              className="cart-grid grid"
-              style={{ gridTemplateColumns: "1fr", gap: "32px" }}
+              className="cart-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "32px",
+              }}
             >
-              {/* Left — Items */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* ── Left — Items ── */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                {/* Column headers — desktop only */}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr auto",
+                    gap: "16px",
+                    padding: "0 0 12px",
+                    borderBottom: "1px solid var(--border-soft)",
+                    marginBottom: "4px",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    Product
+                  </span>
+                  <span
+                    style={{
+                      fontSize: "11px",
+                      fontWeight: 500,
+                      letterSpacing: "0.12em",
+                      textTransform: "uppercase",
+                      color: "var(--text-tertiary)",
+                    }}
+                  >
+                    Total
+                  </span>
+                </div>
+
                 {items.map((item: any) => (
                   <CartItem
                     key={item.id}
@@ -200,25 +266,25 @@ export default function CartPage() {
                 ))}
               </div>
 
-              {/* Right — Summary */}
+              {/* ── Right — Summary ── */}
               <div>
                 <div
                   style={{
                     position: "sticky",
-                    top: "100px",
+                    top: "96px",
                     backgroundColor: "var(--surface)",
-                    borderRadius: "20px",
+                    borderRadius: "var(--radius-card)",
                     border: "1px solid var(--border-soft)",
                     padding: "28px",
-                    boxShadow: "var(--shadow-sm)",
                   }}
                 >
                   <h3
                     style={{
                       fontFamily: "'Playfair Display', serif",
-                      fontSize: "22px",
+                      fontSize: "20px",
                       fontWeight: 600,
                       color: "var(--text-primary)",
+                      letterSpacing: "-0.01em",
                       marginBottom: "24px",
                     }}
                   >
@@ -230,92 +296,102 @@ export default function CartPage() {
                     <label
                       style={{
                         display: "block",
-                        fontSize: "12px",
-                        fontWeight: 500,
-                        color: "var(--text-secondary)",
-                        marginBottom: "8px",
-                        letterSpacing: "0.05em",
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        letterSpacing: "0.14em",
+                        textTransform: "uppercase",
+                        color: "var(--text-tertiary)",
+                        marginBottom: "10px",
                       }}
                     >
-                      HAVE A COUPON?
+                      Have a Coupon?
                     </label>
                     <div style={{ display: "flex", gap: "8px" }}>
                       <input
                         type="text"
                         placeholder="Enter code"
                         value={couponCode}
-                        onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                        onChange={(e) =>
+                          setCouponCode(e.target.value.toUpperCase())
+                        }
                         style={{
                           flex: 1,
-                          padding: "12px 14px",
-                          borderRadius: "10px",
-                          border: "1.5px solid var(--border)",
+                          padding: "11px 14px",
+                          borderRadius: "var(--radius-input)",
+                          border: "1px solid var(--border)",
                           fontSize: "13px",
                           backgroundColor: "var(--bg)",
-                          textTransform: "uppercase",
+                          color: "var(--text-primary)",
+                          letterSpacing: "0.05em",
+                          transition: "border-color 200ms ease",
+                        }}
+                        onFocus={(e) => {
+                          e.currentTarget.style.borderColor = "var(--brand)";
+                        }}
+                        onBlur={(e) => {
+                          e.currentTarget.style.borderColor = "var(--border)";
                         }}
                       />
                       <button
                         onClick={handleApplyCoupon}
-                        style={{
-                          padding: "12px 18px",
-                          borderRadius: "10px",
-                          border: "1.5px solid var(--text-primary)",
-                          backgroundColor: "var(--text-primary)",
-                          color: "#fff",
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          cursor: "pointer",
-                        }}
+                        className="btn-secondary"
+                        style={{ padding: "11px 16px", fontSize: "12px" }}
                       >
                         Apply
                       </button>
                     </div>
+
                     {couponError && (
                       <p
                         style={{
                           fontSize: "12px",
                           color: "#DC2626",
-                          marginTop: "6px",
+                          marginTop: "8px",
                         }}
                       >
                         {couponError}
                       </p>
                     )}
+
                     {appliedCoupon && (
                       <div
                         style={{
                           marginTop: "10px",
                           padding: "10px 14px",
-                          borderRadius: "10px",
-                          backgroundColor: "rgba(142,159,130,0.15)",
+                          borderRadius: "var(--radius-input)",
+                          backgroundColor: "rgba(142,159,130,0.12)",
+                          border: "1px solid rgba(142,159,130,0.25)",
                           color: "var(--success)",
                           fontSize: "12px",
                           fontWeight: 500,
                           display: "flex",
                           alignItems: "center",
-                          gap: "6px",
+                          gap: "7px",
                         }}
                       >
-                        <Tag size={13} strokeWidth={1.75} />
-                        {appliedCoupon.coupon.code} applied — save {formatPrice(discount)}
+                        <Check size={13} strokeWidth={2} />
+                        {appliedCoupon.coupon.code} — save{" "}
+                        {formatPrice(discount)}
                       </div>
                     )}
                   </div>
 
-                  {/* Totals */}
+                  {/* Line items */}
                   <div
                     style={{
                       borderTop: "1px solid var(--border-soft)",
                       paddingTop: "20px",
-                      marginBottom: "24px",
+                      marginBottom: "4px",
                     }}
                   >
-                    <SummaryRow label="Subtotal" value={formatPrice(subtotal)} />
+                    <SummaryRow
+                      label="Subtotal"
+                      value={formatPrice(subtotal)}
+                    />
                     {discount > 0 && (
                       <SummaryRow
                         label="Discount"
-                        value={`-${formatPrice(discount)}`}
+                        value={`−${formatPrice(discount)}`}
                         color="var(--success)"
                       />
                     )}
@@ -326,21 +402,25 @@ export default function CartPage() {
                     />
                   </div>
 
+                  {/* Total */}
                   <div
                     style={{
                       display: "flex",
                       justifyContent: "space-between",
                       alignItems: "baseline",
-                      paddingTop: "20px",
+                      padding: "20px 0 24px",
                       borderTop: "1px solid var(--border-soft)",
+                      borderBottom: "1px solid var(--border-soft)",
                       marginBottom: "24px",
                     }}
                   >
                     <span
                       style={{
-                        fontSize: "14px",
+                        fontSize: "13px",
                         fontWeight: 500,
                         color: "var(--text-primary)",
+                        letterSpacing: "0.03em",
+                        textTransform: "uppercase",
                       }}
                     >
                       Total
@@ -350,7 +430,8 @@ export default function CartPage() {
                         fontFamily: "'Playfair Display', serif",
                         fontSize: "28px",
                         fontWeight: 600,
-                        color: "var(--accent)",
+                        color: "var(--text-primary)",
+                        letterSpacing: "-0.02em",
                       }}
                     >
                       {formatPrice(total)}
@@ -360,10 +441,10 @@ export default function CartPage() {
                   <button
                     onClick={handleCheckout}
                     className="btn-primary"
-                    style={{ width: "100%", padding: "16px", fontSize: "14px" }}
+                    style={{ width: "100%", justifyContent: "center" }}
                   >
                     Proceed to Checkout
-                    <ArrowRight size={16} strokeWidth={2} />
+                    <ArrowRight size={15} strokeWidth={2} />
                   </button>
 
                   <Link
@@ -371,24 +452,27 @@ export default function CartPage() {
                     style={{
                       display: "block",
                       textAlign: "center",
-                      marginTop: "14px",
-                      fontSize: "13px",
-                      color: "var(--text-secondary)",
+                      marginTop: "16px",
+                      fontSize: "12px",
+                      color: "var(--text-tertiary)",
+                      letterSpacing: "0.02em",
+                      transition: "color 200ms ease",
                     }}
+                    className="hover:text-[var(--text-primary)]"
                   >
                     Continue Shopping
                   </Link>
                 </div>
               </div>
             </div>
-          </div>
+          </>
         )}
       </div>
     </div>
   );
 }
 
-// ── Cart Item Component ───────────────────────────────────────────────────
+/* ── Cart Item ─────────────────────────────────────────────────────────────── */
 
 function CartItem({
   item,
@@ -402,6 +486,7 @@ function CartItem({
   onRemove: () => void;
 }) {
   const thumb = item.product?.images?.[0];
+
   const uploadedFiles = item.customizations
     ?.filter((c: any) => c.fieldType === "PHOTO_UPLOAD" && c.asset)
     .flatMap((c: any) => c.asset.files ?? []);
@@ -415,22 +500,23 @@ function CartItem({
       style={{
         backgroundColor: "var(--surface)",
         border: "1px solid var(--border-soft)",
-        borderRadius: "20px",
+        borderRadius: "var(--radius-card)",
         padding: "20px",
         display: "flex",
         gap: "20px",
         opacity: updating ? 0.5 : 1,
         transition: "opacity 200ms ease",
+        marginBottom: "8px",
       }}
     >
-      {/* Image */}
+      {/* Thumbnail */}
       <div
         style={{
-          width: "100px",
-          height: "100px",
-          borderRadius: "14px",
+          width: "88px",
+          height: "88px",
+          borderRadius: "var(--radius-card)",
           overflow: "hidden",
-          background: "linear-gradient(135deg, #F5EFE8 0%, #E8DDD1 100%)",
+          backgroundColor: "var(--brand-soft)",
           flexShrink: 0,
         }}
       >
@@ -448,57 +534,84 @@ function CartItem({
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              fontSize: "36px",
-              opacity: 0.4,
             }}
           >
-            📸
+            <ImageIcon
+              size={24}
+              strokeWidth={1}
+              style={{ color: "var(--border)", opacity: 0.6 }}
+            />
           </div>
         )}
       </div>
 
       {/* Details */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="flex items-start justify-between" style={{ marginBottom: "8px" }}>
+        {/* Title row */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: "12px",
+            marginBottom: "6px",
+          }}
+        >
           <div style={{ flex: 1, minWidth: 0 }}>
             <Link
               href={`/products/${item.product?.slug}`}
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: "17px",
+                fontSize: "16px",
                 fontWeight: 500,
                 color: "var(--text-primary)",
                 display: "block",
-                marginBottom: "2px",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                letterSpacing: "-0.01em",
+                transition: "color 200ms ease",
               }}
+              className="hover:text-[var(--brand)]"
             >
               {item.product?.name}
             </Link>
             {item.variant && (
-              <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--text-tertiary)",
+                  marginTop: "2px",
+                }}
+              >
                 {item.variant.name}
               </p>
             )}
           </div>
+
           <button
             onClick={onRemove}
-            style={{ color: "var(--text-tertiary)", padding: "4px" }}
+            aria-label="Remove item"
+            style={{
+              color: "var(--text-tertiary)",
+              padding: "4px",
+              flexShrink: 0,
+              transition: "color 200ms ease",
+            }}
+            className="hover:text-[var(--text-primary)]"
           >
-            <Trash2 size={16} strokeWidth={1.75} />
+            <Trash2 size={15} strokeWidth={1.75} />
           </button>
         </div>
 
-        {/* Customizations */}
+        {/* Text customizations */}
         {textCustomizations?.length > 0 && (
           <div
             style={{
-              marginBottom: "8px",
               display: "flex",
-              gap: "8px",
+              gap: "6px",
               flexWrap: "wrap",
+              marginBottom: "8px",
             }}
           >
             {textCustomizations.map((c: any) => (
@@ -507,9 +620,10 @@ function CartItem({
                 style={{
                   fontSize: "11px",
                   padding: "3px 10px",
-                  borderRadius: "999px",
+                  borderRadius: "var(--radius-badge)",
                   backgroundColor: "var(--brand-soft)",
                   color: "var(--brand)",
+                  fontWeight: 500,
                 }}
               >
                 {c.fieldLabel}:{" "}
@@ -519,76 +633,140 @@ function CartItem({
           </div>
         )}
 
+        {/* Photo upload count */}
         {uploadedFiles?.length > 0 && (
-          <p style={{ fontSize: "11px", color: "var(--text-secondary)", marginBottom: "8px" }}>
-            📎 {uploadedFiles.length} photos uploaded
+          <p
+            style={{
+              fontSize: "11px",
+              color: "var(--text-tertiary)",
+              marginBottom: "8px",
+              display: "flex",
+              alignItems: "center",
+              gap: "5px",
+            }}
+          >
+            <Paperclip size={11} strokeWidth={1.75} />
+            {uploadedFiles.length} photos uploaded
           </p>
         )}
 
+        {/* Notes */}
         {item.notes && (
-          <p style={{ fontSize: "12px", color: "var(--text-secondary)", marginBottom: "8px", fontStyle: "italic" }}>
-            "{item.notes}"
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              marginBottom: "8px",
+              fontStyle: "italic",
+              lineHeight: 1.5,
+            }}
+          >
+            &ldquo;{item.notes}&rdquo;
           </p>
         )}
 
-        {/* Price + Qty */}
-        <div className="flex items-center justify-between" style={{ marginTop: "12px" }}>
+        {/* Quantity + Price */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginTop: "14px",
+          }}
+        >
+          {/* Qty control */}
           <div
             style={{
               display: "inline-flex",
               alignItems: "center",
-              gap: "12px",
-              padding: "4px 6px",
               border: "1px solid var(--border)",
-              borderRadius: "999px",
+              borderRadius: "var(--radius-input)",
+              overflow: "hidden",
             }}
           >
             <button
               onClick={() => onQuantityChange(item.quantity - 1)}
               disabled={updating || item.quantity <= 1}
+              aria-label="Decrease quantity"
               style={{
-                width: "26px",
-                height: "26px",
-                borderRadius: "999px",
-                backgroundColor: "var(--brand-soft)",
-                color: "var(--brand)",
+                width: "34px",
+                height: "34px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                color: "var(--text-secondary)",
+                borderRight: "1px solid var(--border)",
+                transition: "background-color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor =
+                  "var(--bg)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor =
+                  "transparent";
               }}
             >
-              <Minus size={11} strokeWidth={2} />
+              <Minus size={12} strokeWidth={2} />
             </button>
-            <span style={{ minWidth: "24px", textAlign: "center", fontSize: "13px", fontWeight: 600 }}>
+
+            <span
+              style={{
+                minWidth: "40px",
+                textAlign: "center",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+              }}
+            >
               {item.quantity}
             </span>
+
             <button
               onClick={() => onQuantityChange(item.quantity + 1)}
               disabled={updating}
+              aria-label="Increase quantity"
               style={{
-                width: "26px",
-                height: "26px",
-                borderRadius: "999px",
-                backgroundColor: "var(--brand-soft)",
-                color: "var(--brand)",
+                width: "34px",
+                height: "34px",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
+                color: "var(--text-secondary)",
+                borderLeft: "1px solid var(--border)",
+                transition: "background-color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor =
+                  "var(--bg)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLElement).style.backgroundColor =
+                  "transparent";
               }}
             >
-              <Plus size={11} strokeWidth={2} />
+              <Plus size={12} strokeWidth={2} />
             </button>
           </div>
 
+          {/* Price */}
           <div style={{ textAlign: "right" }}>
-            <p style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+            <p
+              style={{
+                fontSize: "11px",
+                color: "var(--text-tertiary)",
+                marginBottom: "2px",
+              }}
+            >
               {formatPrice(item.unitPrice)} × {item.quantity}
             </p>
             <p
               style={{
                 fontSize: "16px",
                 fontWeight: 600,
-                color: "var(--accent)",
+                color: "var(--text-primary)",
+                fontFamily: "'Playfair Display', serif",
+                letterSpacing: "-0.01em",
               }}
             >
               {formatPrice(Number(item.unitPrice) * item.quantity)}
@@ -599,6 +777,8 @@ function CartItem({
     </div>
   );
 }
+
+/* ── Summary Row ───────────────────────────────────────────────────────────── */
 
 function SummaryRow({
   label,
@@ -613,15 +793,19 @@ function SummaryRow({
 }) {
   return (
     <div
-      className="flex items-center justify-between"
-      style={{ marginBottom: "12px" }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: "12px",
+      }}
     >
       <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
         {label}
       </span>
       <span
         style={{
-          fontSize: small ? "12px" : "14px",
+          fontSize: small ? "12px" : "13px",
           fontWeight: 500,
           color: color || "var(--text-primary)",
         }}

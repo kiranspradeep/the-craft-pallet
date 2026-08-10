@@ -1,3 +1,5 @@
+// app/products/page.tsx
+
 import { apiGet, apiGetList } from "@/lib/api";
 import ProductCard from "@/components/ui/ProductCard";
 import ProductFilters from "@/components/products/ProductFilters";
@@ -32,11 +34,7 @@ interface Product {
 }
 
 async function getData(params: Record<string, string>) {
-  const query = new URLSearchParams({
-    limit: "24",
-    ...params,
-  }).toString();
-
+  const query = new URLSearchParams({ limit: "24", ...params }).toString();
   try {
     const [categoriesRes, productsRes] = await Promise.allSettled([
       apiGet<Category[]>("/api/categories"),
@@ -73,81 +71,119 @@ export default async function ProductsPage({
 
   const { categories, products, total } = await getData(filterParams);
 
+  const isFiltered = !!(resolved["category"] || resolved["search"]);
+
   return (
     <div style={{ backgroundColor: "var(--bg)" }}>
-      {/* Hero */}
-      <section
-        style={{
-          padding: "80px 0 40px",
-          backgroundColor: "var(--bg)",
-        }}
-      >
-        <div className="tcp-container text-center">
+      {/* Header */}
+      <section style={{ padding: "72px 0 48px" }}>
+        <div className="tcp-container">
           <p className="tcp-eyebrow">Shop</p>
-          <h1
+          <div
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(36px, 5vw, 56px)",
-              fontWeight: 500,
-              letterSpacing: "-0.02em",
-              color: "var(--text-primary)",
-              marginBottom: "16px",
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: "24px",
+              flexWrap: "wrap",
             }}
           >
-            Our{" "}
-            <em style={{ fontStyle: "italic", color: "var(--brand)" }}>
-              Collection
-            </em>
-          </h1>
-          <p
-            style={{
-              fontSize: "16px",
-              color: "var(--text-secondary)",
-              maxWidth: "560px",
-              margin: "0 auto",
-            }}
-          >
-            Handcrafted keepsakes and personalised gifts designed to turn every
-            memory into a treasure.
-          </p>
+            <h1
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "clamp(30px, 5vw, 50px)",
+                fontWeight: 500,
+                letterSpacing: "-0.02em",
+                color: "var(--text-primary)",
+                lineHeight: 1.1,
+              }}
+            >
+              Our{" "}
+              <em
+                style={{
+                  fontStyle: "italic",
+                  color: "var(--brand)",
+                  fontWeight: 500,
+                }}
+              >
+                Collection
+              </em>
+            </h1>
+
+            <p
+              style={{
+                fontSize: "15px",
+                color: "var(--text-secondary)",
+                maxWidth: "400px",
+                lineHeight: 1.7,
+              }}
+            >
+              Handcrafted keepsakes and personalised gifts designed to turn
+              every memory into a treasure.
+            </p>
+          </div>
         </div>
       </section>
 
+      {/* Divider */}
+      <div
+        className="tcp-container"
+        style={{
+          borderTop: "1px solid var(--border-soft)",
+          marginBottom: "40px",
+        }}
+      />
+
       {/* Filters + Products */}
-      <section style={{ padding: "40px 0 120px" }}>
+      <section style={{ paddingBottom: "120px" }}>
         <div className="tcp-container">
+          {/* Filters */}
           <ProductFilters
             categories={categories}
             currentCategory={resolved["category"] || ""}
             currentSearch={resolved["search"] || ""}
           />
 
+          {/* Result count */}
           <div
             style={{
-              marginTop: "32px",
-              marginBottom: "24px",
-              fontSize: "13px",
-              color: "var(--text-secondary)",
+              marginTop: "28px",
+              marginBottom: "32px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "16px",
             }}
           >
-            Showing {products.length} of {total} products
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--text-tertiary)",
+                letterSpacing: "0.02em",
+              }}
+            >
+              {isFiltered
+                ? `${total} result${total !== 1 ? "s" : ""} found`
+                : `${total} product${total !== 1 ? "s" : ""}`}
+            </p>
           </div>
 
+          {/* Empty state */}
           {products.length === 0 ? (
             <div
               style={{
                 textAlign: "center",
                 padding: "80px 20px",
-                borderRadius: "24px",
                 border: "1px solid var(--border-soft)",
+                borderRadius: "var(--radius-card)",
                 backgroundColor: "var(--surface)",
               }}
             >
               <div
                 style={{
-                  width: "64px",
-                  height: "64px",
-                  borderRadius: "999px",
+                  width: "56px",
+                  height: "56px",
+                  borderRadius: "var(--radius-card)",
                   backgroundColor: "var(--brand-soft)",
                   display: "flex",
                   alignItems: "center",
@@ -156,14 +192,16 @@ export default async function ProductsPage({
                   color: "var(--brand)",
                 }}
               >
-                <Package size={24} strokeWidth={1.5} />
+                <Package size={22} strokeWidth={1.5} />
               </div>
               <h3
                 style={{
                   fontFamily: "'Playfair Display', serif",
-                  fontSize: "22px",
+                  fontSize: "20px",
+                  fontWeight: 500,
                   color: "var(--text-primary)",
                   marginBottom: "8px",
+                  letterSpacing: "-0.01em",
                 }}
               >
                 No products found
@@ -172,17 +210,19 @@ export default async function ProductsPage({
                 style={{
                   fontSize: "14px",
                   color: "var(--text-secondary)",
+                  lineHeight: 1.6,
                 }}
               >
                 Try adjusting your filters or search terms.
               </p>
             </div>
           ) : (
+            /* Product grid */
             <div
-              className="grid"
               style={{
-                gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-                gap: "32px",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+                gap: "40px 28px",
               }}
             >
               {products.map((p) => (

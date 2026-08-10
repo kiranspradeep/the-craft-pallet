@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
+import { ImageIcon } from "lucide-react";
 
 interface Category {
   id: string;
@@ -20,41 +21,42 @@ export default function CategoriesSection({
   return (
     <section
       className="tcp-section"
-      style={{ backgroundColor: "var(--surface)" }}
+      style={{ backgroundColor: "var(--bg)" }}
     >
       <div className="tcp-container">
         {/* Header */}
         <div
-          className="flex flex-col md:flex-row md:items-end md:justify-between"
-          style={{ marginBottom: "64px", gap: "24px" }}
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "6px",
+            marginBottom: "56px",
+          }}
         >
-          <div style={{ maxWidth: "600px" }}>
-            <p className="tcp-eyebrow">Collections</p>
+          <p className="tcp-eyebrow">Collections</p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "space-between",
+              gap: "24px",
+              flexWrap: "wrap",
+            }}
+          >
             <h2 className="tcp-heading">Shop by Category</h2>
-            <p
-              style={{
-                marginTop: "16px",
-                fontSize: "16px",
-                color: "var(--text-secondary)",
-                lineHeight: 1.7,
-              }}
-            >
-              Every category is thoughtfully curated to help you find the
-              perfect gift for every memory.
-            </p>
+            <Link href="/categories" className="btn-ghost">
+              View All
+              <ArrowRight size={14} strokeWidth={2} />
+            </Link>
           </div>
-          <Link href="/categories" className="btn-ghost hidden md:inline-flex">
-            View All Collections
-            <ArrowRight size={16} strokeWidth={2} />
-          </Link>
         </div>
 
-        {/* Grid */}
+        {/* Grid — editorial stacked layout */}
         <div
-          className="grid"
           style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "24px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+            gap: "2px",
           }}
         >
           {categories.map((cat) => (
@@ -64,28 +66,28 @@ export default function CategoriesSection({
               className="group"
               style={{
                 position: "relative",
-                borderRadius: "20px",
-                overflow: "hidden",
-                aspectRatio: "4/5",
+                aspectRatio: "3/4",
                 display: "block",
-                transition: "transform 400ms ease",
+                overflow: "hidden",
+                backgroundColor: "var(--brand-soft)",
               }}
             >
-              {/* Background */}
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: cat.imageUrl
-                    ? `url(${cat.imageUrl}) center/cover`
-                    : "linear-gradient(135deg, #F5EFE8 0%, #E8DDD1 100%)",
-                  transition: "transform 700ms ease",
-                }}
-                className="group-hover:scale-105"
-              />
-
-              {/* Placeholder icon */}
-              {!cat.imageUrl && (
+              {/* Background image */}
+              {cat.imageUrl ? (
+                <img
+                  src={cat.imageUrl}
+                  alt={cat.name}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    transition: "transform 600ms ease",
+                  }}
+                  className="group-hover:scale-[1.02]"
+                />
+              ) : (
                 <div
                   style={{
                     position: "absolute",
@@ -93,21 +95,23 @@ export default function CategoriesSection({
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    fontSize: "72px",
-                    opacity: 0.5,
                   }}
                 >
-                  🖼️
+                  <ImageIcon
+                    size={40}
+                    strokeWidth={1}
+                    style={{ color: "var(--border)", opacity: 0.5 }}
+                  />
                 </div>
               )}
 
-              {/* Gradient overlay */}
+              {/* Overlay */}
               <div
                 style={{
                   position: "absolute",
                   inset: 0,
                   background:
-                    "linear-gradient(to top, rgba(43,43,43,0.7) 0%, rgba(43,43,43,0.2) 50%, transparent 100%)",
+                    "linear-gradient(to top, rgba(43,43,43,0.65) 0%, rgba(43,43,43,0.05) 55%, transparent 100%)",
                 }}
               />
 
@@ -118,7 +122,7 @@ export default function CategoriesSection({
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  padding: "28px",
+                  padding: "32px 28px",
                   color: "#fff",
                 }}
               >
@@ -126,10 +130,10 @@ export default function CategoriesSection({
                   style={{
                     fontSize: "11px",
                     fontWeight: 500,
-                    letterSpacing: "0.15em",
+                    letterSpacing: "0.14em",
                     textTransform: "uppercase",
-                    opacity: 0.8,
-                    marginBottom: "8px",
+                    opacity: 0.65,
+                    marginBottom: "6px",
                   }}
                 >
                   {cat.productCount} products
@@ -137,30 +141,31 @@ export default function CategoriesSection({
                 <h3
                   style={{
                     fontFamily: "'Playfair Display', serif",
-                    fontSize: "26px",
-                    fontWeight: 600,
-                    marginBottom: "12px",
+                    fontSize: "24px",
+                    fontWeight: 500,
                     letterSpacing: "-0.01em",
+                    marginBottom: "14px",
+                    lineHeight: 1.2,
                   }}
                 >
                   {cat.name}
                 </h3>
                 <span
-                  className="inline-flex items-center"
                   style={{
+                    display: "inline-flex",
+                    alignItems: "center",
                     gap: "6px",
-                    fontSize: "13px",
+                    fontSize: "12px",
                     fontWeight: 500,
-                    opacity: 0.9,
-                    transition: "gap 300ms ease",
+                    letterSpacing: "0.05em",
+                    textTransform: "uppercase",
+                    opacity: 0.85,
+                    transition: "gap 250ms ease",
                   }}
+                  className="group-hover:gap-[10px]"
                 >
                   Explore
-                  <ArrowRight
-                    size={14}
-                    strokeWidth={2}
-                    className="transition-transform group-hover:translate-x-1"
-                  />
+                  <ArrowRight size={13} strokeWidth={2} />
                 </span>
               </div>
             </Link>

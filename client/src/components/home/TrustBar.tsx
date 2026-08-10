@@ -12,37 +12,42 @@ export default function TrustBar() {
   return (
     <section
       style={{
-        padding: "48px 0",
+        padding: "40px 0",
         borderTop: "1px solid var(--border-soft)",
         borderBottom: "1px solid var(--border-soft)",
-        backgroundColor: "var(--bg)",
+        backgroundColor: "var(--surface)",
       }}
     >
       <div className="tcp-container">
         <div
-          className="grid"
           style={{
-            gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-            gap: "24px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: "20px",
           }}
         >
           {items.map(({ icon: Icon, label }) => (
             <div
               key={label}
-              className="flex items-center justify-center"
-              style={{ gap: "10px" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+              }}
             >
               <Icon
-                size={18}
+                size={16}
                 strokeWidth={1.5}
-                style={{ color: "var(--brand)" }}
+                style={{ color: "var(--brand)", flexShrink: 0 }}
               />
               <span
                 style={{
-                  fontSize: "13px",
+                  fontSize: "12px",
                   fontWeight: 500,
-                  color: "var(--text-primary)",
-                  letterSpacing: "0.01em",
+                  color: "var(--text-secondary)",
+                  letterSpacing: "0.03em",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {label}

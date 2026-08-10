@@ -8,6 +8,8 @@ import {
   CreditCard,
   MessageCircle,
   Loader2,
+  ImageIcon,
+  Lock,
 } from "lucide-react";
 import {
   cartApi,
@@ -70,13 +72,10 @@ function CheckoutContent() {
         );
         const productData = await productRes.json();
         const product = productData.data;
-
         const variant = product?.variants?.find(
           (v: any) => v.id === session.variantId
         );
-
         const total = Number(session.unitPrice) * session.quantity;
-
         setItems([
           {
             id: session.id,
@@ -112,7 +111,6 @@ function CheckoutContent() {
 
     try {
       const couponCode = sessionStorage.getItem("tcp_coupon");
-
       const body = {
         name: form.name.trim(),
         phone: form.phone.trim(),
@@ -129,7 +127,6 @@ function CheckoutContent() {
         couponCode: couponCode || undefined,
         buyNowCheckoutId: buyNowId || undefined,
       };
-
       sessionStorage.removeItem("tcp_coupon");
 
       if (method === "whatsapp") {
@@ -147,7 +144,7 @@ function CheckoutContent() {
 
   const redirectToWhatsApp = (order: any) => {
     const parts = [
-      "Hello Craft Pallet 👋",
+      "Hello Craft Pallet",
       "",
       `Order: ${order.orderNumber}`,
       order.whatsappToken ? `Verification: ${order.whatsappToken}` : "",
@@ -158,14 +155,11 @@ function CheckoutContent() {
     ]
       .filter(Boolean)
       .join("\n");
-
-    const message = encodeURIComponent(parts);
-    window.location.href = `https://wa.me/918086415357?text=${message}`;
+    window.location.href = `https://wa.me/918086415357?text=${encodeURIComponent(parts)}`;
   };
 
   const openRazorpayCheckout = async (order: any) => {
     try {
-      // 1. Create Razorpay Order on backend (enables instant auto-capture)
       const rzpRes = await fetch(
         `${API_URL}/api/checkout/razorpay-order/${order.orderNumber}`,
         {
@@ -177,12 +171,10 @@ function CheckoutContent() {
         }
       );
       const rzpData = await rzpRes.json();
-      if (!rzpRes.ok) {
+      if (!rzpRes.ok)
         throw new Error(rzpData.message || "Failed to initialize payment");
-      }
       const razorpayData = rzpData.data;
 
-      // 2. Open Razorpay checkout with the Razorpay order_id
       const options = {
         key: RAZORPAY_KEY,
         amount: razorpayData.amount,
@@ -195,19 +187,15 @@ function CheckoutContent() {
           email: razorpayData.customer?.email || form.email,
           contact: `+91${razorpayData.customer?.phone || form.phone}`,
         },
-        notes: {
-          orderNumber: order.orderNumber,
-          orderId: order.id,
+        notes: { orderNumber: order.orderNumber, orderId: order.id },
+        theme: { color: "#2B2B2B" },
+        handler: function () {
+          setTimeout(() => {
+            router.push(
+              `/order-confirmation/${order.orderNumber}?phone=${form.phone}&paid=true`
+            );
+          }, 1500);
         },
-        theme: { color: "#C96C4A" },
-        handler: function (response: any) {
-  // Small delay to allow webhook to process before page loads
-  setTimeout(() => {
-    router.push(
-      `/order-confirmation/${order.orderNumber}?phone=${form.phone}&paid=true`
-    );
-  }, 1500);
-},
         modal: {
           ondismiss: function () {
             setPlacing(false);
@@ -233,8 +221,16 @@ function CheckoutContent() {
 
   if (loading) {
     return (
-      <div style={{ padding: "120px 0", textAlign: "center" }}>
-        <p style={{ color: "var(--text-secondary)" }}>Loading checkout...</p>
+      <div
+        style={{
+          padding: "160px 0",
+          textAlign: "center",
+          backgroundColor: "var(--bg)",
+        }}
+      >
+        <p style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+          Loading checkout...
+        </p>
       </div>
     );
   }
@@ -246,26 +242,28 @@ function CheckoutContent() {
         strategy="afterInteractive"
       />
 
-      <div style={{ backgroundColor: "var(--bg)", padding: "48px 0 120px" }}>
+      <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
         <div className="tcp-container">
           {/* Header */}
-          <div style={{ marginBottom: "40px" }}>
+          <div style={{ marginBottom: "48px" }}>
             <Link
-              href={`/checkout/upload-method${
-                buyNowId ? `?bn=${buyNowId}` : ""
-              }`}
+              href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: "6px",
-                fontSize: "13px",
-                color: "var(--text-secondary)",
-                marginBottom: "20px",
+                fontSize: "12px",
+                color: "var(--text-tertiary)",
+                marginBottom: "24px",
+                letterSpacing: "0.02em",
+                transition: "color 200ms ease",
               }}
+              className="hover:text-[var(--text-primary)]"
             >
-              <ArrowLeft size={14} strokeWidth={1.75} />
+              <ArrowLeft size={13} strokeWidth={1.75} />
               Back
             </Link>
+
             <p className="tcp-eyebrow">
               {method === "whatsapp"
                 ? "WhatsApp Order — Step 3 of 3"
@@ -274,7 +272,7 @@ function CheckoutContent() {
             <h1
               style={{
                 fontFamily: "'Playfair Display', serif",
-                fontSize: "clamp(32px, 4vw, 44px)",
+                fontSize: "clamp(28px, 4vw, 42px)",
                 fontWeight: 500,
                 color: "var(--text-primary)",
                 letterSpacing: "-0.02em",
@@ -282,7 +280,7 @@ function CheckoutContent() {
             >
               {method === "whatsapp" ? (
                 <>
-                  Your details for{" "}
+                  Your Details for{" "}
                   <em style={{ fontStyle: "italic", color: "var(--brand)" }}>
                     WhatsApp
                   </em>
@@ -298,30 +296,39 @@ function CheckoutContent() {
             </h1>
           </div>
 
-          <form
-            onSubmit={handleSubmit}
-            className="grid"
-            style={{ gridTemplateColumns: "1fr", gap: "40px" }}
-          >
+          <form onSubmit={handleSubmit}>
             <style>{`
               @media (min-width: 900px) {
                 .checkout-grid {
-                  grid-template-columns: 1fr 380px !important;
-                  gap: 48px !important;
+                  grid-template-columns: 1fr 340px !important;
+                  gap: 56px !important;
+                }
+              }
+              @media (max-width: 640px) {
+                .field-grid-2 {
+                  grid-template-columns: 1fr !important;
+                }
+                .field-grid-3 {
+                  grid-template-columns: 1fr !important;
                 }
               }
             `}</style>
 
             <div
-              className="checkout-grid grid"
-              style={{ gridTemplateColumns: "1fr", gap: "40px" }}
+              className="checkout-grid"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "32px",
+              }}
             >
-              {/* Left — Form */}
+              {/* ── Left — Form ── */}
               <div>
-                <Section title="Contact Information" step={1}>
+                <FormSection title="Contact Information" step={1}>
                   <div
-                    className="grid"
+                    className="field-grid-2"
                     style={{
+                      display: "grid",
                       gridTemplateColumns: "1fr 1fr",
                       gap: "16px",
                     }}
@@ -355,15 +362,15 @@ function CheckoutContent() {
                       onChange={(v) => set("email", v)}
                     />
                   </Field>
-                </Section>
+                </FormSection>
 
-                <Section title="Shipping Address" step={2}>
+                <FormSection title="Shipping Address" step={2}>
                   <label
                     style={{
                       display: "flex",
                       alignItems: "center",
                       gap: "8px",
-                      marginBottom: "16px",
+                      marginBottom: "20px",
                       fontSize: "13px",
                       color: "var(--text-secondary)",
                       cursor: "pointer",
@@ -373,15 +380,16 @@ function CheckoutContent() {
                       type="checkbox"
                       checked={sameShipping}
                       onChange={(e) => setSameShipping(e.target.checked)}
-                      style={{ accentColor: "var(--brand)" }}
+                      style={{ accentColor: "var(--text-primary)" }}
                     />
                     Same as contact info
                   </label>
 
                   {!sameShipping && (
                     <div
-                      className="grid"
+                      className="field-grid-2"
                       style={{
+                        display: "grid",
                         gridTemplateColumns: "1fr 1fr",
                         gap: "16px",
                       }}
@@ -397,10 +405,7 @@ function CheckoutContent() {
                         <Input
                           value={form.shipPhone}
                           onChange={(v) =>
-                            set(
-                              "shipPhone",
-                              v.replace(/\D/g, "").slice(0, 10)
-                            )
+                            set("shipPhone", v.replace(/\D/g, "").slice(0, 10))
                           }
                           maxLength={10}
                           required
@@ -425,8 +430,9 @@ function CheckoutContent() {
                     />
                   </Field>
                   <div
-                    className="grid"
+                    className="field-grid-3"
                     style={{
+                      display: "grid",
                       gridTemplateColumns: "1fr 1fr 1fr",
                       gap: "16px",
                     }}
@@ -449,10 +455,7 @@ function CheckoutContent() {
                       <Input
                         value={form.shipPincode}
                         onChange={(v) =>
-                          set(
-                            "shipPincode",
-                            v.replace(/\D/g, "").slice(0, 6)
-                          )
+                          set("shipPincode", v.replace(/\D/g, "").slice(0, 6))
                         }
                         maxLength={6}
                         pattern="\d{6}"
@@ -460,9 +463,9 @@ function CheckoutContent() {
                       />
                     </Field>
                   </div>
-                </Section>
+                </FormSection>
 
-                <Section title="Order Notes (Optional)" step={3}>
+                <FormSection title="Order Notes" step={3}>
                   <textarea
                     rows={3}
                     placeholder="Special instructions, gift message..."
@@ -470,43 +473,61 @@ function CheckoutContent() {
                     onChange={(e) => set("customerNote", e.target.value)}
                     style={{
                       width: "100%",
-                      padding: "14px 16px",
-                      borderRadius: "12px",
-                      border: "1.5px solid var(--border)",
+                      padding: "11px 14px",
+                      borderRadius: "var(--radius-input)",
+                      border: "1px solid var(--border)",
                       fontSize: "14px",
-                      backgroundColor: "var(--surface)",
+                      backgroundColor: "var(--bg)",
+                      color: "var(--text-primary)",
                       resize: "vertical",
+                      transition: "border-color 200ms ease",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = "var(--brand)";
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = "var(--border)";
                     }}
                   />
-                </Section>
+                  <p
+                    style={{
+                      fontSize: "12px",
+                      color: "var(--text-tertiary)",
+                      marginTop: "6px",
+                    }}
+                  >
+                    Optional
+                  </p>
+                </FormSection>
               </div>
 
-              {/* Right — Summary */}
+              {/* ── Right — Summary ── */}
               <div>
                 <div
                   style={{
                     position: "sticky",
-                    top: "100px",
+                    top: "96px",
                     backgroundColor: "var(--surface)",
-                    borderRadius: "20px",
+                    borderRadius: "var(--radius-card)",
                     border: "1px solid var(--border-soft)",
-                    padding: "28px",
-                    boxShadow: "var(--shadow-sm)",
+                    padding: "24px",
                   }}
                 >
                   <h3
                     style={{
                       fontFamily: "'Playfair Display', serif",
-                      fontSize: "20px",
+                      fontSize: "18px",
                       fontWeight: 600,
                       color: "var(--text-primary)",
+                      letterSpacing: "-0.01em",
                       marginBottom: "20px",
                     }}
                   >
                     Order Summary
                   </h3>
 
-                  <div style={{ marginBottom: "24px" }}>
+                  {/* Items */}
+                  <div style={{ marginBottom: "20px" }}>
                     {items.map((item: any) => (
                       <div
                         key={item.id}
@@ -519,12 +540,11 @@ function CheckoutContent() {
                       >
                         <div
                           style={{
-                            width: "48px",
-                            height: "48px",
-                            borderRadius: "10px",
+                            width: "44px",
+                            height: "44px",
+                            borderRadius: "var(--radius-card)",
                             overflow: "hidden",
-                            background:
-                              "linear-gradient(135deg, #F5EFE8, #E8DDD1)",
+                            backgroundColor: "var(--brand-soft)",
                             flexShrink: 0,
                             display: "flex",
                             alignItems: "center",
@@ -542,7 +562,11 @@ function CheckoutContent() {
                               }}
                             />
                           ) : (
-                            "📸"
+                            <ImageIcon
+                              size={18}
+                              strokeWidth={1}
+                              style={{ color: "var(--border)", opacity: 0.6 }}
+                            />
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -562,7 +586,8 @@ function CheckoutContent() {
                             <p
                               style={{
                                 fontSize: "11px",
-                                color: "var(--text-secondary)",
+                                color: "var(--text-tertiary)",
+                                marginTop: "1px",
                               }}
                             >
                               {item.variant.name}
@@ -571,7 +596,7 @@ function CheckoutContent() {
                           <p
                             style={{
                               fontSize: "11px",
-                              color: "var(--text-secondary)",
+                              color: "var(--text-tertiary)",
                             }}
                           >
                             Qty: {item.quantity}
@@ -582,55 +607,90 @@ function CheckoutContent() {
                             fontSize: "13px",
                             fontWeight: 600,
                             color: "var(--text-primary)",
+                            whiteSpace: "nowrap",
                           }}
                         >
-                          {formatPrice(
-                            Number(item.unitPrice) * item.quantity
-                          )}
+                          {formatPrice(Number(item.unitPrice) * item.quantity)}
                         </span>
                       </div>
                     ))}
                   </div>
 
-                  <div style={{ marginBottom: "20px" }}>
+                  {/* Totals */}
+                  <div style={{ marginBottom: "16px" }}>
                     <div
-                      className="flex items-center justify-between"
-                      style={{ marginBottom: "8px", fontSize: "13px" }}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: "8px",
+                      }}
                     >
-                      <span style={{ color: "var(--text-secondary)" }}>
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          color: "var(--text-secondary)",
+                        }}
+                      >
                         Subtotal
                       </span>
                       <span
                         style={{
-                          color: "var(--text-primary)",
+                          fontSize: "13px",
                           fontWeight: 500,
+                          color: "var(--text-primary)",
                         }}
                       >
                         {formatPrice(subtotal)}
                       </span>
                     </div>
                     <div
-                      className="flex items-center justify-between"
-                      style={{ marginBottom: "8px", fontSize: "12px" }}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
                     >
-                      <span style={{ color: "var(--text-secondary)" }}>
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-tertiary)",
+                        }}
+                      >
                         Shipping
                       </span>
-                      <span style={{ color: "var(--text-secondary)" }}>
-                        Auto-calculated
+                      <span
+                        style={{
+                          fontSize: "12px",
+                          color: "var(--text-tertiary)",
+                        }}
+                      >
+                        Calculated at checkout
                       </span>
                     </div>
                   </div>
 
+                  {/* Total */}
                   <div
-                    className="flex items-baseline justify-between"
                     style={{
-                      paddingTop: "16px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "baseline",
+                      padding: "16px 0",
                       borderTop: "1px solid var(--border-soft)",
+                      borderBottom: "1px solid var(--border-soft)",
                       marginBottom: "20px",
                     }}
                   >
-                    <span style={{ fontSize: "13px", fontWeight: 500 }}>
+                    <span
+                      style={{
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        letterSpacing: "0.1em",
+                        textTransform: "uppercase",
+                        color: "var(--text-tertiary)",
+                      }}
+                    >
                       Estimated Total
                     </span>
                     <span
@@ -638,7 +698,8 @@ function CheckoutContent() {
                         fontFamily: "'Playfair Display', serif",
                         fontSize: "24px",
                         fontWeight: 600,
-                        color: "var(--accent)",
+                        color: "var(--text-primary)",
+                        letterSpacing: "-0.02em",
                       }}
                     >
                       {formatPrice(subtotal)}
@@ -648,9 +709,10 @@ function CheckoutContent() {
                   {error && (
                     <div
                       style={{
-                        padding: "12px",
-                        borderRadius: "12px",
+                        padding: "12px 14px",
+                        borderRadius: "var(--radius-input)",
                         backgroundColor: "#FEF2F2",
+                        border: "1px solid #FECACA",
                         color: "#DC2626",
                         fontSize: "12px",
                         marginBottom: "16px",
@@ -666,42 +728,53 @@ function CheckoutContent() {
                     className="btn-primary"
                     style={{
                       width: "100%",
-                      padding: "16px",
-                      fontSize: "14px",
+                      justifyContent: "center",
+                      backgroundColor:
+                        method === "whatsapp" ? "var(--text-primary)" : "var(--accent)",
                     }}
                   >
                     {placing ? (
                       <>
-                        <Loader2
-                          size={16}
-                          className="animate-spin"
-                          strokeWidth={2}
-                        />
+                        <Loader2 size={15} className="animate-spin" strokeWidth={2} />
                         Processing...
                       </>
                     ) : method === "whatsapp" ? (
                       <>
                         Continue to WhatsApp
-                        <MessageCircle size={16} strokeWidth={2} />
+                        <MessageCircle size={15} strokeWidth={2} />
                       </>
                     ) : (
                       <>
                         Pay Securely
-                        <CreditCard size={16} strokeWidth={2} />
+                        <CreditCard size={15} strokeWidth={2} />
                       </>
                     )}
                   </button>
 
-                  <p
+                  <div
                     style={{
-                      marginTop: "12px",
-                      fontSize: "11px",
-                      color: "var(--text-tertiary)",
-                      textAlign: "center",
+                      marginTop: "14px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "6px",
                     }}
                   >
-                    🔒 Your info is encrypted & secure
-                  </p>
+                    <Lock
+                      size={11}
+                      strokeWidth={1.75}
+                      style={{ color: "var(--text-tertiary)" }}
+                    />
+                    <p
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--text-tertiary)",
+                        letterSpacing: "0.02em",
+                      }}
+                    >
+                      Your information is encrypted and secure
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -712,13 +785,20 @@ function CheckoutContent() {
   );
 }
 
-// Wrap in Suspense because useSearchParams requires it
 export default function CheckoutPage() {
   return (
     <Suspense
       fallback={
-        <div style={{ padding: "120px 0", textAlign: "center" }}>
-          <p style={{ color: "var(--text-secondary)" }}>Loading...</p>
+        <div
+          style={{
+            padding: "160px 0",
+            textAlign: "center",
+            backgroundColor: "var(--bg)",
+          }}
+        >
+          <p style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+            Loading...
+          </p>
         </div>
       }
     >
@@ -727,9 +807,9 @@ export default function CheckoutPage() {
   );
 }
 
-// ── Components ────────────────────────────────────────────────────────────
+/* ── Sub-components ─────────────────────────────────────────────────────── */
 
-function Section({
+function FormSection({
   title,
   step,
   children,
@@ -742,38 +822,43 @@ function Section({
     <div
       style={{
         backgroundColor: "var(--surface)",
-        borderRadius: "20px",
+        borderRadius: "var(--radius-card)",
         border: "1px solid var(--border-soft)",
-        padding: "28px",
-        marginBottom: "20px",
+        padding: "24px",
+        marginBottom: "16px",
       }}
     >
       <div
-        className="flex items-center"
-        style={{ gap: "12px", marginBottom: "20px" }}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "20px",
+        }}
       >
         <span
           style={{
-            width: "28px",
-            height: "28px",
-            borderRadius: "999px",
-            backgroundColor: "var(--brand-soft)",
-            color: "var(--brand)",
+            width: "24px",
+            height: "24px",
+            borderRadius: "4px",
+            backgroundColor: "var(--text-primary)",
+            color: "#fff",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: "12px",
+            fontSize: "11px",
             fontWeight: 600,
+            flexShrink: 0,
           }}
         >
           {step}
         </span>
         <h3
           style={{
-            fontFamily: "'Playfair Display', serif",
-            fontSize: "18px",
+            fontSize: "14px",
             fontWeight: 600,
             color: "var(--text-primary)",
+            letterSpacing: "0.01em",
           }}
         >
           {title}
@@ -794,19 +879,22 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ marginBottom: "16px" }}>
+    <div style={{ marginBottom: "14px" }}>
       <label
         style={{
           display: "block",
-          fontSize: "12px",
+          fontSize: "11px",
           fontWeight: 500,
-          color: "var(--text-secondary)",
-          marginBottom: "6px",
-          letterSpacing: "0.02em",
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "var(--text-tertiary)",
+          marginBottom: "7px",
         }}
       >
         {label}
-        {required && <span style={{ color: "var(--accent)" }}> *</span>}
+        {required && (
+          <span style={{ color: "var(--accent)", marginLeft: "2px" }}>*</span>
+        )}
       </label>
       {children}
     </div>
@@ -829,12 +917,19 @@ function Input({
       onChange={(e) => onChange(e.target.value)}
       style={{
         width: "100%",
-        padding: "12px 14px",
-        borderRadius: "12px",
-        border: "1.5px solid var(--border)",
+        padding: "11px 14px",
+        borderRadius: "var(--radius-input)",
+        border: "1px solid var(--border)",
         fontSize: "14px",
         backgroundColor: "var(--bg)",
-        transition: "border-color 200ms",
+        color: "var(--text-primary)",
+        transition: "border-color 200ms ease",
+      }}
+      onFocus={(e) => {
+        e.currentTarget.style.borderColor = "var(--brand)";
+      }}
+      onBlur={(e) => {
+        e.currentTarget.style.borderColor = "var(--border)";
       }}
     />
   );
