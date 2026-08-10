@@ -1,4 +1,3 @@
-//admin\src\app\dashboard\products\[id]\edit\page.tsx
 import { cookies } from "next/headers";
 import ProductEditTabs from "./ProductEditTabs";
 
@@ -38,8 +37,10 @@ export default async function EditProductPage({
 
   if (!result) {
     return (
-      <div className="text-center py-20">
-        <p style={{ color: "var(--text-secondary)" }}>Product not found</p>
+      <div style={{ textAlign: "center", padding: "80px 20px" }}>
+        <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>
+          Product not found
+        </p>
       </div>
     );
   }

@@ -1,8 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Pencil, ChevronDown, ChevronUp } from "lucide-react";
-import Button from "@/components/ui/Button";
+import {
+  Plus,
+  Trash2,
+  Pencil,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle,
+  Loader2,
+} from "lucide-react";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
 import Toggle from "@/components/ui/Toggle";
@@ -29,7 +36,12 @@ interface CustomField {
   isRequired: boolean;
   sortOrder: number;
   validationJson: any;
-  options: { id: string; label: string; value: string; sortOrder: number }[];
+  options: {
+    id: string;
+    label: string;
+    value: string;
+    sortOrder: number;
+  }[];
 }
 
 interface FieldFormData {
@@ -63,8 +75,11 @@ const emptyField: FieldFormData = {
   maxTextLength: "",
 };
 
-// ── FieldForm extracted outside the parent component ──────────────────────
-// This prevents React from recreating it on every parent re-render
+const formGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "14px",
+};
 
 function FieldForm({
   form,
@@ -84,20 +99,35 @@ function FieldForm({
   error: string;
 }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-4 mt-3">
+    <form
+      onSubmit={onSubmit}
+      style={{
+        marginTop: "14px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "14px",
+      }}
+    >
       {error && (
         <div
-          className="px-4 py-3 rounded-xl text-sm"
           style={{
+            padding: "10px 14px",
+            borderRadius: "6px",
             backgroundColor: "#FEF2F2",
-            color: "#DC2626",
             border: "1px solid #FECACA",
+            color: "#DC2626",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "7px",
           }}
         >
+          <AlertCircle size={13} strokeWidth={1.75} />
           {error}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-4">
+
+      <div style={formGrid}>
         <Input
           label="Field Name (internal)"
           required
@@ -113,6 +143,7 @@ function FieldForm({
           placeholder="Recipient Name"
         />
       </div>
+
       <Select
         label="Field Type"
         value={form.type}
@@ -120,9 +151,8 @@ function FieldForm({
         options={FIELD_TYPES}
       />
 
-      {/* NUMBER type — show min/max range */}
       {form.type === "NUMBER" && (
-        <div className="grid grid-cols-2 gap-4">
+        <div style={formGrid}>
           <Input
             label="Minimum Value"
             type="number"
@@ -142,7 +172,6 @@ function FieldForm({
         </div>
       )}
 
-      {/* TEXT / TEXTAREA — show max length */}
       {(form.type === "TEXT" || form.type === "TEXTAREA") && (
         <Input
           label="Max Character Length"
@@ -155,7 +184,7 @@ function FieldForm({
         />
       )}
 
-      <div className="grid grid-cols-2 gap-4">
+      <div style={formGrid}>
         <Input
           label="Placeholder"
           value={form.placeholder}
@@ -167,34 +196,69 @@ function FieldForm({
           type="number"
           min={0}
           value={form.sortOrder}
-          onChange={(e) => onChange("sortOrder", parseInt(e.target.value) || 0)}
+          onChange={(e) =>
+            onChange("sortOrder", parseInt(e.target.value) || 0)
+          }
         />
       </div>
+
       <Input
         label="Help Text"
         value={form.helpText}
         onChange={(e) => onChange("helpText", e.target.value)}
         placeholder="Additional instructions for customer"
       />
+
       <Toggle
         label="Required"
         helpText="Customer must fill this field before adding to cart"
         checked={form.isRequired}
         onChange={(v) => onChange("isRequired", v)}
       />
-      <div className="flex gap-3">
-        <Button type="submit" loading={loading}>
+
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "7px",
+            padding: "8px 18px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "#fff",
+            backgroundColor: loading
+              ? "var(--text-secondary)"
+              : "var(--text-primary)",
+            border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading && <Loader2 size={13} className="animate-spin" />}
           {submitLabel}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            padding: "8px 18px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "var(--text-secondary)",
+            backgroundColor: "transparent",
+            border: "1px solid var(--border)",
+            cursor: "pointer",
+          }}
+        >
           Cancel
-        </Button>
+        </button>
       </div>
     </form>
   );
 }
-
-// ── Main Component ────────────────────────────────────────────────────────
 
 export default function CustomFieldsTab({ product, onUpdate }: Props) {
   const [showForm, setShowForm] = useState(false);
@@ -217,10 +281,8 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
     if (res.ok) onUpdate(data.data);
   };
 
-  // Build the API payload from form state
   const buildPayload = () => {
     const validationJson: Record<string, unknown> = {};
-
     if (form.type === "NUMBER") {
       if (form.minValue) validationJson.min = Number(form.minValue);
       if (form.maxValue) validationJson.max = Number(form.maxValue);
@@ -229,7 +291,6 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
       if (form.maxTextLength)
         validationJson.maxTextLength = Number(form.maxTextLength);
     }
-
     return {
       name: form.name,
       label: form.label,
@@ -323,7 +384,10 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
         body: JSON.stringify({ label: opt.label, value: opt.value }),
       }
     );
-    setOptionForms((f) => ({ ...f, [fieldId]: { label: "", value: "" } }));
+    setOptionForms((f) => ({
+      ...f,
+      [fieldId]: { label: "", value: "" },
+    }));
     await refreshProduct();
   };
 
@@ -357,41 +421,71 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
 
   return (
     <div
-      className="rounded-2xl border p-6"
       style={{
         backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "20px",
       }}
     >
-      <div className="flex items-center justify-between mb-4">
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "16px",
+        }}
+      >
         <p
-          className="text-sm font-semibold"
-          style={{ color: "var(--text-primary)" }}
+          style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "var(--text-primary)",
+          }}
         >
           Custom Fields ({fields.length})
         </p>
         {!showForm && !editingId && (
-          <Button
-            size="sm"
-            variant="secondary"
+          <button
             onClick={() => setShowForm(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              backgroundColor: "transparent",
+              cursor: "pointer",
+            }}
           >
-            <Plus size={14} />
+            <Plus size={13} strokeWidth={2} />
             Add Field
-          </Button>
+          </button>
         )}
       </div>
 
       {/* Create form */}
       {showForm && (
         <div
-          className="p-4 rounded-xl mb-4"
-          style={{ backgroundColor: "var(--bg-primary)" }}
+          style={{
+            padding: "16px",
+            borderRadius: "6px",
+            backgroundColor: "var(--bg-primary)",
+            border: "1px solid var(--border)",
+            marginBottom: "14px",
+          }}
         >
           <p
-            className="text-sm font-medium"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+            }}
           >
             New Field
           </p>
@@ -411,29 +505,33 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
         </div>
       )}
 
+      {/* Empty */}
       {fields.length === 0 && !showForm ? (
-        <div className="text-center py-10">
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-            No custom fields yet. Add fields like &ldquo;Recipient
-            Name&rdquo;, &ldquo;Message&rdquo;, or &ldquo;Spotify
-            Link&rdquo;.
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
+            No custom fields yet. Add fields like Recipient Name, Message,
+            or Spotify Link.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {fields.map((field) => (
             <div key={field.id}>
               {editingId === field.id ? (
                 <div
-                  className="p-4 rounded-xl border"
                   style={{
-                    borderColor: "var(--brand)",
+                    padding: "16px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--brand)",
                     backgroundColor: "var(--bg-primary)",
                   }}
                 >
                   <p
-                    className="text-sm font-medium"
-                    style={{ color: "var(--brand)" }}
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "var(--brand)",
+                    }}
                   >
                     Editing: {field.label}
                   </p>
@@ -456,32 +554,57 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
                 </div>
               ) : (
                 <div
-                  className="rounded-xl border overflow-hidden"
-                  style={{ borderColor: "var(--border)" }}
+                  style={{
+                    border: "1px solid var(--border-soft)",
+                    borderRadius: "6px",
+                    overflow: "hidden",
+                  }}
                 >
-                  {/* Field header */}
+                  {/* Field row */}
                   <div
-                    className="flex items-center justify-between px-4 py-3"
-                    style={{ backgroundColor: "var(--bg-primary)" }}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "11px 14px",
+                      backgroundColor: "var(--bg-primary)",
+                    }}
                   >
-                    <div
-                      className="flex items-center gap-2 cursor-pointer flex-1"
+                    <button
+                      type="button"
                       onClick={() =>
                         setExpandedId(
                           expandedId === field.id ? null : field.id
                         )
                       }
+                      style={{
+                        flex: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        textAlign: "left",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 0,
+                      }}
                     >
-                      <div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
                         <p
-                          className="text-sm font-medium"
-                          style={{ color: "var(--text-primary)" }}
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 500,
+                            color: "var(--text-primary)",
+                            marginBottom: "1px",
+                          }}
                         >
                           {field.label}
                         </p>
                         <p
-                          className="text-xs"
-                          style={{ color: "var(--text-secondary)" }}
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-secondary)",
+                          }}
                         >
                           {field.type}
                           {field.isRequired && " · Required"}
@@ -498,67 +621,125 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
                       {expandedId === field.id ? (
                         <ChevronUp
                           size={14}
-                          className="ml-auto"
-                          style={{ color: "var(--text-secondary)" }}
+                          strokeWidth={1.75}
+                          style={{ color: "var(--text-tertiary)" }}
                         />
                       ) : (
                         <ChevronDown
                           size={14}
-                          className="ml-auto"
-                          style={{ color: "var(--text-secondary)" }}
+                          strokeWidth={1.75}
+                          style={{ color: "var(--text-tertiary)" }}
                         />
                       )}
-                    </div>
-                    <div className="flex items-center gap-2 ml-3">
+                    </button>
+
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        marginLeft: "12px",
+                      }}
+                    >
                       <button
                         onClick={() => startEdit(field)}
-                        className="p-1.5 rounded-lg"
-                        style={{ color: "var(--brand)" }}
+                        aria-label="Edit field"
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "6px",
+                          color: "var(--brand)",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
                       >
-                        <Pencil size={14} />
+                        <Pencil size={13} strokeWidth={1.75} />
                       </button>
                       <button
                         onClick={() => handleDelete(field.id)}
                         disabled={deleting === field.id}
-                        className="p-1.5 rounded-lg"
-                        style={{ color: "#DC2626" }}
+                        aria-label="Delete field"
+                        style={{
+                          width: "28px",
+                          height: "28px",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          borderRadius: "6px",
+                          color: "#DC2626",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          opacity: deleting === field.id ? 0.5 : 1,
+                        }}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={13} strokeWidth={1.75} />
                       </button>
                     </div>
                   </div>
 
-                  {/* Options for SELECT / RADIO */}
+                  {/* Options panel */}
                   {expandedId === field.id &&
                     ["SELECT", "RADIO"].includes(field.type) && (
                       <div
-                        className="px-4 py-3 border-t"
-                        style={{ borderColor: "var(--border)" }}
+                        style={{
+                          padding: "14px",
+                          borderTop: "1px solid var(--border)",
+                        }}
                       >
                         <p
-                          className="text-xs font-medium mb-2"
-                          style={{ color: "var(--text-secondary)" }}
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            letterSpacing: "0.12em",
+                            textTransform: "uppercase",
+                            color: "var(--text-secondary)",
+                            marginBottom: "10px",
+                          }}
                         >
                           Options
                         </p>
+
                         {field.options.length > 0 && (
-                          <div className="space-y-1.5 mb-3">
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "6px",
+                              marginBottom: "12px",
+                            }}
+                          >
                             {field.options.map((opt) => (
                               <div
                                 key={opt.id}
-                                className="flex items-center justify-between px-3 py-2 rounded-lg"
                                 style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "space-between",
+                                  padding: "8px 12px",
+                                  borderRadius: "6px",
                                   backgroundColor: "var(--bg-primary)",
+                                  border: "1px solid var(--border-soft)",
                                 }}
                               >
                                 <span
-                                  className="text-sm"
-                                  style={{ color: "var(--text-primary)" }}
+                                  style={{
+                                    fontSize: "13px",
+                                    color: "var(--text-primary)",
+                                  }}
                                 >
                                   {opt.label}
                                   <span
-                                    className="ml-2 text-xs"
-                                    style={{ color: "var(--text-secondary)" }}
+                                    style={{
+                                      marginLeft: "8px",
+                                      fontSize: "11px",
+                                      color: "var(--text-tertiary)",
+                                      fontFamily: "monospace",
+                                    }}
                                   >
                                     ({opt.value})
                                   </span>
@@ -567,16 +748,26 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
                                   onClick={() =>
                                     handleDeleteOption(field.id, opt.id)
                                   }
-                                  className="p-1 rounded"
-                                  style={{ color: "#DC2626" }}
+                                  aria-label="Delete option"
+                                  style={{
+                                    color: "#DC2626",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    background: "none",
+                                    border: "none",
+                                    cursor: "pointer",
+                                    padding: "2px",
+                                  }}
                                 >
-                                  <Trash2 size={12} />
+                                  <Trash2 size={12} strokeWidth={1.75} />
                                 </button>
                               </div>
                             ))}
                           </div>
                         )}
-                        <div className="flex gap-2">
+
+                        {/* Add option */}
+                        <div style={{ display: "flex", gap: "8px" }}>
                           <input
                             placeholder="Label"
                             value={optionForms[field.id]?.label || ""}
@@ -589,11 +780,15 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
                                 },
                               }))
                             }
-                            className="flex-1 px-3 py-1.5 rounded-xl text-sm outline-none"
                             style={{
+                              flex: 1,
+                              padding: "8px 12px",
+                              borderRadius: "6px",
                               border: "1px solid var(--border)",
                               backgroundColor: "var(--bg-primary)",
                               color: "var(--text-primary)",
+                              fontSize: "13px",
+                              outline: "none",
                             }}
                           />
                           <input
@@ -608,19 +803,34 @@ export default function CustomFieldsTab({ product, onUpdate }: Props) {
                                 },
                               }))
                             }
-                            className="flex-1 px-3 py-1.5 rounded-xl text-sm outline-none"
                             style={{
+                              flex: 1,
+                              padding: "8px 12px",
+                              borderRadius: "6px",
                               border: "1px solid var(--border)",
                               backgroundColor: "var(--bg-primary)",
                               color: "var(--text-primary)",
+                              fontSize: "13px",
+                              outline: "none",
                             }}
                           />
                           <button
                             onClick={() => handleAddOption(field.id)}
-                            className="px-3 py-1.5 rounded-xl text-sm font-medium text-white"
-                            style={{ backgroundColor: "var(--brand)" }}
+                            style={{
+                              width: "36px",
+                              height: "36px",
+                              borderRadius: "6px",
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              backgroundColor: "var(--text-primary)",
+                              color: "#fff",
+                              border: "none",
+                              cursor: "pointer",
+                              flexShrink: 0,
+                            }}
                           >
-                            <Plus size={14} />
+                            <Plus size={14} strokeWidth={2} />
                           </button>
                         </div>
                       </div>

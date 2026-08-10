@@ -5,19 +5,21 @@ import { logger } from "../shared/logger";
 
 export const errorHandler = (
   err: Error,
-  _req: Request,
+  req: Request,
   res: Response,
   _next: NextFunction
 ): void => {
+  // Log every error with context
+  logger.error(`${req.method} ${req.path} — ${err.message}`, {
+    name: err.name,
+    stack: err.stack,
+  });
+
   if (err instanceof AppError) {
-    if (!err.isOperational) {
-      logger.error("Non-operational error:", err);
-    }
     sendError(res, err.message, err.statusCode);
     return;
   }
 
-  // Unhandled / unexpected errors
-  logger.error("Unexpected error:", err);
+  // Unexpected errors — always return JSON
   sendError(res, "Something went wrong", 500);
 };

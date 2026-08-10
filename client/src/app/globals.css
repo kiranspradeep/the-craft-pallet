@@ -45,7 +45,10 @@
 
 html {
   scroll-behavior: smooth;
+  touch-action: pan-x pan-y;
 }
+
+
 
 body {
   background-color: var(--bg);

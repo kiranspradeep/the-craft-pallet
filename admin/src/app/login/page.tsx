@@ -39,74 +39,137 @@ export default function LoginPage() {
     }
   };
 
+  const inputStyle = {
+    width: "100%",
+    padding: "11px 14px 11px 40px",
+    borderRadius: "6px",
+    border: "1px solid var(--border)",
+    backgroundColor: "var(--bg-primary)",
+    color: "var(--text-primary)",
+    fontSize: "14px",
+    outline: "none",
+    transition: "border-color 200ms ease",
+  };
+
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ backgroundColor: "var(--bg-primary)" }}
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+        backgroundColor: "var(--bg-primary)",
+      }}
     >
-      <div className="w-full max-w-md">
+      <div style={{ width: "100%", maxWidth: "400px" }}>
         {/* Logo */}
-        <div className="text-center mb-10">
+        <div style={{ textAlign: "center", marginBottom: "40px" }}>
           <div
-            className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
-            style={{ backgroundColor: "var(--brand)" }}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              width: "48px",
+              height: "48px",
+              borderRadius: "8px",
+              backgroundColor: "var(--text-primary)",
+              color: "#fff",
+              fontSize: "16px",
+              fontWeight: 700,
+              marginBottom: "16px",
+              letterSpacing: "-0.02em",
+            }}
           >
-            <span className="text-white text-xl font-bold">CP</span>
+            CP
           </div>
           <h1
-            className="text-2xl font-semibold"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontFamily: "var(--font-playfair), serif",
+              fontSize: "22px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.02em",
+              marginBottom: "4px",
+            }}
           >
             The Craft Pallet
           </h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              letterSpacing: "0.04em",
+            }}
+          >
             Admin Dashboard
           </p>
         </div>
 
         {/* Card */}
         <div
-          className="rounded-2xl p-8 shadow-sm border"
           style={{
             backgroundColor: "var(--surface)",
-            borderColor: "var(--border)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "32px",
           }}
         >
           <h2
-            className="text-lg font-semibold mb-6"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontSize: "15px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              marginBottom: "24px",
+            }}
           >
             Sign in to your account
           </h2>
 
           {error && (
             <div
-              className="mb-4 px-4 py-3 rounded-xl text-sm"
               style={{
+                marginBottom: "20px",
+                padding: "10px 14px",
+                borderRadius: "6px",
                 backgroundColor: "#FEF2F2",
-                color: "#DC2626",
                 border: "1px solid #FECACA",
+                color: "#DC2626",
+                fontSize: "13px",
               }}
             >
               {error}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit}>
             {/* Email */}
-            <div>
+            <div style={{ marginBottom: "18px" }}>
               <label
-                className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--text-primary)" }}
+                style={{
+                  display: "block",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--text-secondary)",
+                  marginBottom: "7px",
+                }}
               >
-                Email address
+                Email Address
               </label>
-              <div className="relative">
+              <div style={{ position: "relative" }}>
                 <Mail
-                  size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--text-secondary)" }}
+                  size={15}
+                  strokeWidth={1.75}
+                  style={{
+                    position: "absolute",
+                    left: "14px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text-secondary)",
+                    pointerEvents: "none",
+                  }}
                 />
                 <input
                   type="email"
@@ -116,35 +179,44 @@ export default function LoginPage() {
                     setForm((f) => ({ ...f, email: e.target.value }))
                   }
                   placeholder="admin@craftpallet.com"
-                  className="w-full pl-10 pr-4 py-3 rounded-[14px] text-sm outline-none transition-all"
-                  style={{
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--bg-primary)",
-                    color: "var(--text-primary)",
+                  style={inputStyle}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--brand)";
                   }}
-                  onFocus={(e) =>
-                    (e.target.style.borderColor = "var(--brand)")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.borderColor = "var(--border)")
-                  }
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }}
                 />
               </div>
             </div>
 
             {/* Password */}
-            <div>
+            <div style={{ marginBottom: "24px" }}>
               <label
-                className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--text-primary)" }}
+                style={{
+                  display: "block",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--text-secondary)",
+                  marginBottom: "7px",
+                }}
               >
                 Password
               </label>
-              <div className="relative">
+              <div style={{ position: "relative" }}>
                 <Lock
-                  size={16}
-                  className="absolute left-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--text-secondary)" }}
+                  size={15}
+                  strokeWidth={1.75}
+                  style={{
+                    position: "absolute",
+                    left: "14px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text-secondary)",
+                    pointerEvents: "none",
+                  }}
                 />
                 <input
                   type={showPassword ? "text" : "password"}
@@ -153,27 +225,41 @@ export default function LoginPage() {
                   onChange={(e) =>
                     setForm((f) => ({ ...f, password: e.target.value }))
                   }
-                  placeholder="••••••••"
-                  className="w-full pl-10 pr-12 py-3 rounded-[14px] text-sm outline-none transition-all"
+                  placeholder="Enter your password"
                   style={{
-                    border: "1px solid var(--border)",
-                    backgroundColor: "var(--bg-primary)",
-                    color: "var(--text-primary)",
+                    ...inputStyle,
+                    paddingRight: "44px",
                   }}
-                  onFocus={(e) =>
-                    (e.target.style.borderColor = "var(--brand)")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.borderColor = "var(--border)")
-                  }
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = "var(--brand)";
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2"
-                  style={{ color: "var(--text-secondary)" }}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  style={{
+                    position: "absolute",
+                    right: "12px",
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                    color: "var(--text-secondary)",
+                    display: "flex",
+                    alignItems: "center",
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    padding: "4px",
+                  }}
                 >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  {showPassword ? (
+                    <EyeOff size={15} strokeWidth={1.75} />
+                  ) : (
+                    <Eye size={15} strokeWidth={1.75} />
+                  )}
                 </button>
               </div>
             </div>
@@ -182,29 +268,70 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3 rounded-[12px] text-sm font-semibold text-white transition-all duration-300 flex items-center justify-center gap-2 mt-2"
               style={{
+                width: "100%",
+                minHeight: "44px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+                padding: "12px 24px",
+                borderRadius: "6px",
+                border: "none",
                 backgroundColor: loading
                   ? "var(--text-secondary)"
-                  : "var(--accent)",
+                  : "var(--text-primary)",
+                color: "#fff",
+                fontSize: "13px",
+                fontWeight: 500,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
                 cursor: loading ? "not-allowed" : "pointer",
+                transition: "background-color 250ms ease, transform 250ms ease",
               }}
               onMouseEnter={(e) => {
-                if (!loading)
-                  (e.target as HTMLElement).style.backgroundColor =
-                    "var(--accent-hover)";
+                if (!loading) {
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "#1F1F1F";
+                }
               }}
               onMouseLeave={(e) => {
-                if (!loading)
-                  (e.target as HTMLElement).style.backgroundColor =
-                    "var(--accent)";
+                if (!loading) {
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "var(--text-primary)";
+                }
               }}
             >
-              {loading && <Loader2 size={16} className="animate-spin" />}
-              {loading ? "Signing in..." : "Sign in"}
+              {loading && <Loader2 size={15} className="animate-spin" />}
+              {loading ? "Signing in..." : "Sign In"}
             </button>
           </form>
         </div>
+
+        {/* Footer credit */}
+        <p
+          style={{
+            textAlign: "center",
+            marginTop: "24px",
+            fontSize: "11px",
+            color: "var(--text-secondary)",
+            letterSpacing: "0.02em",
+          }}
+        >
+          Developed by{" "}
+          <a
+            href="https://kiranspradeep.vercel.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              color: "var(--brand)",
+              fontWeight: 500,
+              textDecoration: "none",
+            }}
+          >
+            Kiran S Pradeep
+          </a>
+        </p>
       </div>
     </div>
   );

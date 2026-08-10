@@ -1,4 +1,7 @@
+// dashboard/page.tsx
+
 import { cookies } from "next/headers";
+import Link from "next/link";
 import {
   ShoppingBag,
   Clock,
@@ -6,6 +9,7 @@ import {
   Package,
   Truck,
   CheckCircle,
+  ArrowRight,
 } from "lucide-react";
 
 interface StatCardProps {
@@ -18,33 +22,116 @@ interface StatCardProps {
 function StatCard({ label, value, icon, color }: StatCardProps) {
   return (
     <div
-      className="rounded-2xl p-5 border"
       style={{
         backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "20px",
       }}
     >
-      <div className="flex items-start justify-between">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: "12px",
+        }}
+      >
         <div>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--text-secondary)",
+              letterSpacing: "0.02em",
+              marginBottom: "8px",
+            }}
+          >
             {label}
           </p>
           <p
-            className="text-3xl font-semibold mt-1"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontSize: "28px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.02em",
+              lineHeight: 1,
+            }}
           >
             {value}
           </p>
         </div>
         <div
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ backgroundColor: color + "18" }}
+          style={{
+            width: "38px",
+            height: "38px",
+            borderRadius: "6px",
+            backgroundColor: `${color}14`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: color,
+            flexShrink: 0,
+          }}
         >
-          <div style={{ color }}>{icon}</div>
+          {icon}
         </div>
       </div>
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const config: Record<string, { bg: string; color: string }> = {
+    DELIVERED: {
+      bg: "rgba(142,159,130,0.12)",
+      color: "var(--success)",
+    },
+    CONFIRMED: {
+      bg: "rgba(142,159,130,0.12)",
+      color: "var(--success)",
+    },
+    AWAITING_PAYMENT: {
+      bg: "rgba(201,108,74,0.1)",
+      color: "var(--accent)",
+    },
+    IN_PRODUCTION: {
+      bg: "rgba(107,159,191,0.1)",
+      color: "#6B9FBF",
+    },
+    SHIPPED: {
+      bg: "rgba(166,138,117,0.1)",
+      color: "var(--brand)",
+    },
+    DRAFT: {
+      bg: "var(--bg-primary)",
+      color: "var(--text-secondary)",
+    },
+    CANCELLED: {
+      bg: "#FEF2F2",
+      color: "#DC2626",
+    },
+  };
+
+  const style = config[status] || config.DRAFT;
+
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        fontSize: "10px",
+        fontWeight: 600,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        padding: "4px 10px",
+        borderRadius: "999px",
+        backgroundColor: style.bg,
+        color: style.color,
+        whiteSpace: "nowrap",
+      }}
+    >
+      {status.replace(/_/g, " ")}
+    </span>
   );
 }
 
@@ -59,8 +146,7 @@ async function getDashboardStats(token: string) {
     });
 
     if (!res.ok) return null;
-    const data = await res.json();
-    return data;
+    return await res.json();
   } catch {
     return null;
   }
@@ -79,163 +165,319 @@ export default async function DashboardPage() {
     {
       label: "Total Orders",
       value: totalOrders,
-      icon: <ShoppingBag size={20} />,
+      icon: <ShoppingBag size={18} strokeWidth={1.75} />,
       color: "#A68A75",
     },
     {
       label: "Awaiting Payment",
       value: "—",
-      icon: <Clock size={20} />,
+      icon: <Clock size={18} strokeWidth={1.75} />,
       color: "#C96C4A",
     },
     {
       label: "In Production",
       value: "—",
-      icon: <Package size={20} />,
+      icon: <Package size={18} strokeWidth={1.75} />,
       color: "#8E9F82",
     },
     {
       label: "Ready to Ship",
       value: "—",
-      icon: <Truck size={20} />,
+      icon: <Truck size={18} strokeWidth={1.75} />,
       color: "#6B9FBF",
     },
     {
       label: "Delivered",
       value: "—",
-      icon: <CheckCircle size={20} />,
+      icon: <CheckCircle size={18} strokeWidth={1.75} />,
       color: "#8E9F82",
     },
     {
       label: "Revenue",
       value: "—",
-      icon: <TrendingUp size={20} />,
+      icon: <TrendingUp size={18} strokeWidth={1.75} />,
       color: "#A68A75",
     },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1
-          className="text-2xl font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Welcome back{admin?.name ? `, ${admin.name}` : ""}
-        </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-          Here&apos;s what&apos;s happening with your store today.
-        </p>
-      </div>
+    <>
+      <style>{`
+        .stats-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 14px;
+        }
+        @media (min-width: 1024px) {
+          .stats-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (max-width: 480px) {
+          .stats-grid {
+            grid-template-columns: 1fr;
+          }
+        }
 
-      {/* Stats grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        {stats.map((stat) => (
-          <StatCard key={stat.label} {...stat} />
-        ))}
-      </div>
+        .orders-table-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 14px 20px;
+          gap: 12px;
+          border-bottom: 1px solid var(--border);
+          transition: background-color 100ms ease;
+        }
+        .orders-table-row:last-child {
+          border-bottom: none;
+        }
+        .orders-table-row:hover {
+          background-color: var(--bg-primary);
+        }
+      `}</style>
 
-      {/* Recent Orders */}
-      <div
-        className="rounded-2xl border"
-        style={{
-          backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-        }}
-      >
-        <div
-          className="flex items-center justify-between px-6 py-4 border-b"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <h2
-            className="text-base font-semibold"
-            style={{ color: "var(--text-primary)" }}
+      <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+        {/* Header */}
+        <div>
+          <h1
+            style={{
+              fontSize: "20px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.01em",
+              marginBottom: "4px",
+            }}
           >
-            Recent Orders
-          </h2>
-          <a
-            href="/dashboard/orders"
-            className="text-sm font-medium"
-            style={{ color: "var(--brand)" }}
+            Welcome back{admin?.name ? `, ${admin.name}` : ""}
+          </h1>
+          <p
+            style={{
+              fontSize: "13px",
+              color: "var(--text-secondary)",
+              letterSpacing: "0.02em",
+            }}
           >
-            View all
-          </a>
+            Here&apos;s what&apos;s happening with your store today.
+          </p>
         </div>
 
-        {ordersData?.data && ordersData.data.length > 0 ? (
-          <div className="divide-y" style={{ borderColor: "var(--border)" }}>
-            {ordersData.data.map(
-              (order: {
-                id: string;
-                orderNumber: string;
-                status: string;
-                totalAmount: number;
-                customer: { name: string; phone: string };
-              }) => (
-                <div
-                  key={order.id}
-                  className="flex items-center justify-between px-6 py-4"
+        {/* Stats grid */}
+        <div className="stats-grid">
+          {stats.map((stat) => (
+            <StatCard key={stat.label} {...stat} />
+          ))}
+        </div>
+
+        {/* Recent Orders */}
+        <div
+          style={{
+            backgroundColor: "var(--surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            overflow: "hidden",
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "16px 20px",
+              borderBottom: "1px solid var(--border)",
+            }}
+          >
+            <h2
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                letterSpacing: "0.01em",
+              }}
+            >
+              Recent Orders
+            </h2>
+            <Link
+              href="/dashboard/orders"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                fontSize: "12px",
+                fontWeight: 500,
+                color: "var(--brand)",
+                letterSpacing: "0.02em",
+                textDecoration: "none",
+                transition: "gap 200ms ease",
+              }}
+            >
+              View All
+              <ArrowRight size={12} strokeWidth={2} />
+            </Link>
+          </div>
+
+          {/* Table header */}
+          {ordersData?.data && ordersData.data.length > 0 && (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 20px",
+                gap: "12px",
+                borderBottom: "1px solid var(--border)",
+              }}
+            >
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 600,
+                  letterSpacing: "0.14em",
+                  textTransform: "uppercase",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                Order
+              </span>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "24px",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--text-secondary)",
+                    width: "80px",
+                    textAlign: "right",
+                  }}
                 >
-                  <div>
-                    <p
-                      className="text-sm font-medium"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      {order.orderNumber}
-                    </p>
-                    <p
-                      className="text-xs mt-0.5"
-                      style={{ color: "var(--text-secondary)" }}
-                    >
-                      {order.customer.name} · {order.customer.phone}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="text-sm font-semibold"
-                      style={{ color: "var(--text-primary)" }}
-                    >
-                      ₹{Number(order.totalAmount).toFixed(2)}
-                    </span>
-                    <span
-                      className="text-xs px-2.5 py-1 rounded-full font-medium"
+                  Amount
+                </span>
+                <span
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: 600,
+                    letterSpacing: "0.14em",
+                    textTransform: "uppercase",
+                    color: "var(--text-secondary)",
+                    width: "120px",
+                    textAlign: "right",
+                  }}
+                >
+                  Status
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Rows */}
+          {ordersData?.data && ordersData.data.length > 0 ? (
+            <div>
+              {ordersData.data.map(
+                (order: {
+                  id: string;
+                  orderNumber: string;
+                  status: string;
+                  totalAmount: number;
+                  customer: { name: string; phone: string };
+                }) => (
+                  <Link
+                    key={order.id}
+                    href={`/dashboard/orders/${order.id}`}
+                    className="orders-table-row"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <p
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: "var(--text-primary)",
+                          marginBottom: "2px",
+                        }}
+                      >
+                        {order.orderNumber}
+                      </p>
+                      <p
+                        style={{
+                          fontSize: "11px",
+                          color: "var(--text-secondary)",
+                          letterSpacing: "0.02em",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {order.customer.name} · {order.customer.phone}
+                      </p>
+                    </div>
+
+                    <div
                       style={{
-                        backgroundColor:
-                          order.status === "DELIVERED"
-                            ? "rgba(142,159,130,0.15)"
-                            : order.status === "AWAITING_PAYMENT"
-                            ? "rgba(201,108,74,0.12)"
-                            : "rgba(166,138,117,0.12)",
-                        color:
-                          order.status === "DELIVERED"
-                            ? "var(--success)"
-                            : order.status === "AWAITING_PAYMENT"
-                            ? "var(--accent)"
-                            : "var(--brand)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "24px",
+                        flexShrink: 0,
                       }}
                     >
-                      {order.status.replace(/_/g, " ")}
-                    </span>
-                  </div>
-                </div>
-              )
-            )}
-          </div>
-        ) : (
-          <div className="px-6 py-12 text-center">
-            <ShoppingBag
-              size={32}
-              className="mx-auto mb-3"
-              style={{ color: "var(--border)" }}
-            />
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
-              No orders yet
-            </p>
-          </div>
-        )}
+                      <span
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 600,
+                          color: "var(--text-primary)",
+                          width: "80px",
+                          textAlign: "right",
+                          letterSpacing: "-0.01em",
+                        }}
+                      >
+                        ₹{Number(order.totalAmount).toFixed(0)}
+                      </span>
+                      <div
+                        style={{
+                          width: "120px",
+                          textAlign: "right",
+                        }}
+                      >
+                        <StatusBadge status={order.status} />
+                      </div>
+                    </div>
+                  </Link>
+                )
+              )}
+            </div>
+          ) : (
+            <div
+              style={{
+                padding: "56px 20px",
+                textAlign: "center",
+              }}
+            >
+              <ShoppingBag
+                size={28}
+                strokeWidth={1.25}
+                style={{
+                  color: "var(--border)",
+                  margin: "0 auto 12px",
+                }}
+              />
+              <p
+                style={{
+                  fontSize: "13px",
+                  color: "var(--text-secondary)",
+                }}
+              >
+                No orders yet
+              </p>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

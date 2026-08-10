@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
 import { adminGet, adminPut } from "@/lib/adminApi";
+import {
+  SettingsPageLayout,
+  SettingsSection,
+  SaveButton,
+} from "../SettingsPageLayout";
 
 export default function ImageRetentionSettingsPage() {
   const [loading, setLoading] = useState(false);
@@ -49,14 +51,13 @@ export default function ImageRetentionSettingsPage() {
     setLoading(true);
     setError("");
     setSuccess(false);
-
     try {
       await adminPut("/api/admin/settings/image-retention", {
         retentionDays: parseInt(form.retentionDays),
         maxUploadSizeMb: parseInt(form.maxUploadSizeMb),
         allowedMimeTypes: form.allowedMimeTypes
           .split(",")
-          .map((s: string) => s.trim())
+          .map((s) => s.trim())
           .filter(Boolean),
         storageProvider: form.storageProvider,
         storageBucket: form.storageBucket || undefined,
@@ -73,65 +74,25 @@ export default function ImageRetentionSettingsPage() {
 
   if (fetching) {
     return (
-      <div className="text-center py-20">
-        <p style={{ color: "var(--text-secondary)" }}>Loading...</p>
+      <div style={{ textAlign: "center", padding: "80px 20px" }}>
+        <p style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/settings">
-          <button
-            className="p-2 rounded-xl"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            <ArrowLeft size={18} />
-          </button>
-        </Link>
-        <h1
-          className="text-xl font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Image Retention Settings
-        </h1>
-      </div>
-
-      <div
-        className="rounded-2xl border p-6"
-        style={{
-          backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-        }}
+    <SettingsPageLayout
+      title="Image Retention"
+      error={error}
+      success={success}
+    >
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "24px" }}
       >
-        {error && (
-          <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
-            style={{
-              backgroundColor: "#FEF2F2",
-              color: "#DC2626",
-              border: "1px solid #FECACA",
-            }}
-          >
-            {error}
-          </div>
-        )}
-        {success && (
-          <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
-            style={{
-              backgroundColor: "rgba(142,159,130,0.15)",
-              color: "var(--success)",
-              border: "1px solid rgba(142,159,130,0.3)",
-            }}
-          >
-            Settings saved
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <SettingsSection>
           <Input
             label="Retention Days"
             type="number"
@@ -153,13 +114,22 @@ export default function ImageRetentionSettingsPage() {
             onChange={(e) => set("allowedMimeTypes", e.target.value)}
             helpText="Comma separated. e.g. image/jpeg, image/png"
           />
+        </SettingsSection>
+
+        <SettingsSection label="Storage">
           <Input
             label="Storage Provider"
             value={form.storageProvider}
             onChange={(e) => set("storageProvider", e.target.value)}
             helpText="local, s3, gcs"
           />
-          <div className="grid grid-cols-2 gap-4">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "14px",
+            }}
+          >
             <Input
               label="Storage Bucket"
               value={form.storageBucket}
@@ -173,11 +143,10 @@ export default function ImageRetentionSettingsPage() {
               placeholder="Optional"
             />
           </div>
-          <Button type="submit" loading={loading}>
-            Save Settings
-          </Button>
-        </form>
-      </div>
-    </div>
+        </SettingsSection>
+
+        <SaveButton loading={loading} />
+      </form>
+    </SettingsPageLayout>
   );
 }

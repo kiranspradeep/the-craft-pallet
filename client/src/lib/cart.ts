@@ -1,9 +1,6 @@
 import { v4 as uuidv4 } from "uuid";
 
 const SESSION_KEY = "tcp_session_id";
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
-
-// ── Session ID ─────────────────────────────────────────────────────────────
 
 export const getSessionId = (): string => {
   if (typeof window === "undefined") return "";
@@ -15,8 +12,6 @@ export const getSessionId = (): string => {
   return id;
 };
 
-// ── Cart API ───────────────────────────────────────────────────────────────
-
 const cartHeaders = () => ({
   "Content-Type": "application/json",
   "X-Session-Id": getSessionId(),
@@ -24,9 +19,20 @@ const cartHeaders = () => ({
 
 export const cartApi = {
   getCart: async () => {
-    const res = await fetch(`${API_URL}/api/cart`, {
+    const sessionId = getSessionId();
+    if (!sessionId) return { cart: null, totals: null };
+
+    const res = await fetch(`/api/cart`, {
       headers: cartHeaders(),
     });
+
+    const contentType = res.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      const text = await res.text();
+      console.error("Non-JSON response:", text.slice(0, 300));
+      throw new Error("Server returned non-JSON response");
+    }
+
     const data = await res.json();
     return data.data;
   },
@@ -39,7 +45,7 @@ export const cartApi = {
     customizations?: unknown[];
     notes?: string;
   }) => {
-    const res = await fetch(`${API_URL}/api/cart/items`, {
+    const res = await fetch(`/api/cart/items`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify(body),
@@ -53,7 +59,7 @@ export const cartApi = {
     itemId: string,
     body: { quantity?: number; notes?: string }
   ) => {
-    const res = await fetch(`${API_URL}/api/cart/items/${itemId}`, {
+    const res = await fetch(`/api/cart/items/${itemId}`, {
       method: "PUT",
       headers: cartHeaders(),
       body: JSON.stringify(body),
@@ -64,7 +70,7 @@ export const cartApi = {
   },
 
   removeItem: async (itemId: string) => {
-    const res = await fetch(`${API_URL}/api/cart/items/${itemId}`, {
+    const res = await fetch(`/api/cart/items/${itemId}`, {
       method: "DELETE",
       headers: cartHeaders(),
     });
@@ -74,7 +80,7 @@ export const cartApi = {
   },
 
   applyCoupon: async (code: string) => {
-    const res = await fetch(`${API_URL}/api/cart/apply-coupon`, {
+    const res = await fetch(`/api/cart/apply-coupon`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify({ code }),
@@ -84,8 +90,6 @@ export const cartApi = {
     return data.data;
   },
 };
-
-// ── Buy Now API ────────────────────────────────────────────────────────────
 
 export const buyNowApi = {
   create: async (body: {
@@ -97,7 +101,7 @@ export const buyNowApi = {
     customizations?: unknown[];
     assetId?: string;
   }) => {
-    const res = await fetch(`${API_URL}/api/checkout/buy-now`, {
+    const res = await fetch(`/api/checkout/buy-now`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify(body),
@@ -108,7 +112,7 @@ export const buyNowApi = {
   },
 
   get: async (id: string) => {
-    const res = await fetch(`${API_URL}/api/checkout/buy-now/${id}`, {
+    const res = await fetch(`/api/checkout/buy-now/${id}`, {
       headers: cartHeaders(),
     });
     const data = await res.json();
@@ -120,7 +124,7 @@ export const buyNowApi = {
     id: string,
     body: { assetId?: string; customizations?: unknown[] }
   ) => {
-    const res = await fetch(`${API_URL}/api/checkout/buy-now/${id}`, {
+    const res = await fetch(`/api/checkout/buy-now/${id}`, {
       method: "PATCH",
       headers: cartHeaders(),
       body: JSON.stringify(body),
@@ -131,11 +135,9 @@ export const buyNowApi = {
   },
 };
 
-// ── Checkout API ───────────────────────────────────────────────────────────
-
 export const checkoutApi = {
   placeWebsiteOrder: async (body: any) => {
-    const res = await fetch(`${API_URL}/api/checkout`, {
+    const res = await fetch(`/api/checkout`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify(body),
@@ -146,7 +148,7 @@ export const checkoutApi = {
   },
 
   placeDraftOrder: async (body: any) => {
-    const res = await fetch(`${API_URL}/api/checkout/draft`, {
+    const res = await fetch(`/api/checkout/draft`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify(body),
@@ -157,15 +159,13 @@ export const checkoutApi = {
   },
 };
 
-// ── Assets API ─────────────────────────────────────────────────────────────
-
 export const assetApi = {
   uploadDirect: async (files: File[], productId?: string) => {
     const formData = new FormData();
     if (productId) formData.append("productId", productId);
     files.forEach((f) => formData.append("files", f));
 
-    const res = await fetch(`${API_URL}/api/assets/upload`, {
+    const res = await fetch(`/api/assets/upload`, {
       method: "POST",
       headers: { "X-Session-Id": getSessionId() },
       body: formData,
@@ -180,7 +180,7 @@ export const assetApi = {
     if (productId) formData.append("productId", productId);
     formData.append("file", file);
 
-    const res = await fetch(`${API_URL}/api/assets/upload-zip`, {
+    const res = await fetch(`/api/assets/upload-zip`, {
       method: "POST",
       headers: { "X-Session-Id": getSessionId() },
       body: formData,
@@ -191,7 +191,7 @@ export const assetApi = {
   },
 
   uploadDriveLink: async (driveUrl: string) => {
-    const res = await fetch(`${API_URL}/api/assets/upload-drive-link`, {
+    const res = await fetch(`/api/assets/upload-drive-link`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify({ driveUrl }),
@@ -201,8 +201,6 @@ export const assetApi = {
     return data.data;
   },
 };
-
-// ── Price Formatting ───────────────────────────────────────────────────────
 
 export const formatPrice = (amount: number | string): string => {
   return `₹${Number(amount).toLocaleString("en-IN", {

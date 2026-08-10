@@ -2,12 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Toggle from "@/components/ui/Toggle";
-import Button from "@/components/ui/Button";
 import FileUpload from "@/components/ui/FileUpload";
 
 function generateSlug(name: string) {
@@ -66,50 +65,92 @@ export default function NewCategoryPage() {
   };
 
   return (
-    <div className="max-w-xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Link
-          href="/dashboard/categories"
-          className="p-2 rounded-xl transition-colors"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          <ArrowLeft size={18} />
+    <div style={{ maxWidth: "600px" }}>
+      {/* Page header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
+        <Link href="/dashboard/categories">
+          <button
+            aria-label="Back to categories"
+            style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--surface)",
+              cursor: "pointer",
+              transition: "background-color 150ms ease",
+            }}
+          >
+            <ArrowLeft size={15} strokeWidth={1.75} />
+          </button>
         </Link>
         <div>
           <h1
-            className="text-xl font-semibold"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontSize: "18px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.01em",
+            }}
           >
             New Category
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              marginTop: "2px",
+            }}
+          >
             Add a new product category
           </p>
         </div>
       </div>
 
+      {/* Form card */}
       <div
-        className="rounded-2xl border p-6"
         style={{
           backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
+          padding: "24px",
         }}
       >
         {error && (
           <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
             style={{
+              marginBottom: "20px",
+              padding: "10px 14px",
+              borderRadius: "6px",
               backgroundColor: "#FEF2F2",
-              color: "#DC2626",
               border: "1px solid #FECACA",
+              color: "#DC2626",
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
+            <AlertCircle size={14} strokeWidth={1.75} />
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "18px" }}
+        >
           <Input
             label="Category Name"
             required
@@ -131,8 +172,6 @@ export default function NewCategoryPage() {
             placeholder="Brief description of this category..."
             rows={3}
           />
-
-          {/* Replaced Image URL input with Cloudinary file upload */}
           <FileUpload
             label="Category Image"
             multiple={false}
@@ -140,15 +179,16 @@ export default function NewCategoryPage() {
             value={form.imageUrl || undefined}
             onUpload={(urls) => set("imageUrl", urls[0] ?? "")}
             onRemove={() => set("imageUrl", "")}
-            helpText="Uploaded to Cloudinary. Recommended: square image, at least 400×400px."
+            helpText="Recommended: square image, at least 400×400px."
           />
-
           <Input
             label="Sort Order"
             type="number"
             min={0}
             value={form.sortOrder}
-            onChange={(e) => set("sortOrder", parseInt(e.target.value) || 0)}
+            onChange={(e) =>
+              set("sortOrder", parseInt(e.target.value) || 0)
+            }
             helpText="Lower numbers appear first"
           />
           <Toggle
@@ -157,17 +197,82 @@ export default function NewCategoryPage() {
             checked={form.isActive}
             onChange={(v) => set("isActive", v)}
           />
+
           <div
-            className="flex gap-3 pt-2 border-t"
-            style={{ borderColor: "var(--border)" }}
+            style={{
+              display: "flex",
+              gap: "10px",
+              paddingTop: "16px",
+              borderTop: "1px solid var(--border)",
+              flexWrap: "wrap",
+            }}
           >
-            <Button type="submit" loading={loading}>
-              Create Category
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "9px 20px",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+                color: "#fff",
+                backgroundColor: loading
+                  ? "var(--text-secondary)"
+                  : "var(--text-primary)",
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                transition: "background-color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!loading)
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "#1F1F1F";
+              }}
+              onMouseLeave={(e) => {
+                if (!loading)
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "var(--text-primary)";
+              }}
+            >
+              {loading && (
+                <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+              )}
+              {loading ? "Creating..." : "Create Category"}
+            </button>
+
             <Link href="/dashboard/categories">
-              <Button type="button" variant="secondary">
+              <button
+                type="button"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "9px 20px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                  backgroundColor: "transparent",
+                  border: "1px solid var(--border)",
+                  cursor: "pointer",
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.borderColor = "var(--text-primary)";
+                  el.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.borderColor = "var(--border)";
+                  el.style.color = "var(--text-secondary)";
+                }}
+              >
                 Cancel
-              </Button>
+              </button>
             </Link>
           </div>
         </form>

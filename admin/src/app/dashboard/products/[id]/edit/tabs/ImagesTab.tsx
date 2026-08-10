@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { Trash2, ImageIcon } from "lucide-react";
-import Button from "@/components/ui/Button";
 import Select from "@/components/ui/Select";
 import FileUpload from "@/components/ui/FileUpload";
 
@@ -17,6 +16,16 @@ const IMAGE_TYPES = [
   { value: "BANNER", label: "Banner" },
 ];
 
+const sectionLabel = {
+  fontSize: "10px",
+  fontWeight: 600,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase" as const,
+  color: "var(--text-secondary)",
+  marginBottom: "14px",
+  display: "block",
+};
+
 export default function ImagesTab({ product, onUpdate }: Props) {
   const [imageType, setImageType] = useState("GALLERY");
   const [sortOrder, setSortOrder] = useState(0);
@@ -30,12 +39,10 @@ export default function ImagesTab({ product, onUpdate }: Props) {
     if (res.ok) onUpdate(data.data);
   };
 
-  // Called by FileUpload after Cloudinary upload — receives array of URLs
   const handleUpload = async (urls: string[]) => {
     setSaving(true);
     setError("");
     try {
-      // Save each uploaded URL as a product image record
       for (const url of urls) {
         const res = await fetch(`/api/admin/products/${product.id}/images`, {
           method: "POST",
@@ -74,36 +81,47 @@ export default function ImagesTab({ product, onUpdate }: Props) {
   };
 
   return (
-    <div className="space-y-5">
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
       {/* Existing images */}
       <div
-        className="rounded-2xl border p-6"
         style={{
           backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
+          padding: "20px",
         }}
       >
-        <p
-          className="text-sm font-semibold mb-4"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <span style={sectionLabel}>
           Product Images ({product.images?.length ?? 0})
-        </p>
+        </span>
 
         {product.images?.length === 0 ? (
-          <div className="text-center py-10">
+          <div
+            style={{
+              textAlign: "center",
+              padding: "40px 20px",
+            }}
+          >
             <ImageIcon
-              size={32}
-              className="mx-auto mb-2"
-              style={{ color: "var(--border)" }}
+              size={28}
+              strokeWidth={1.25}
+              style={{
+                color: "var(--border)",
+                margin: "0 auto 10px",
+              }}
             />
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
               No images yet
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(90px, 1fr))",
+              gap: "12px",
+            }}
+          >
             {product.images?.map(
               (img: {
                 id: string;
@@ -112,23 +130,43 @@ export default function ImagesTab({ product, onUpdate }: Props) {
                 altText: string | null;
                 sortOrder: number;
               }) => (
-                <div key={img.id} className="group relative">
+                <div key={img.id}>
                   <div
-                    className="aspect-square rounded-xl overflow-hidden border"
-                    style={{ borderColor: "var(--border)" }}
+                    style={{
+                      aspectRatio: "1/1",
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                      border: "1px solid var(--border)",
+                    }}
                   >
                     <img
                       src={img.url}
                       alt={img.altText || ""}
-                      className="w-full h-full object-cover"
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
                     />
                   </div>
-                  <div className="mt-1.5 flex items-center justify-between">
+                  <div
+                    style={{
+                      marginTop: "6px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: "4px",
+                    }}
+                  >
                     <span
-                      className="text-xs px-2 py-0.5 rounded-full"
                       style={{
+                        fontSize: "10px",
+                        fontWeight: 500,
+                        padding: "2px 7px",
+                        borderRadius: "999px",
                         backgroundColor: "rgba(166,138,117,0.1)",
                         color: "var(--brand)",
+                        letterSpacing: "0.04em",
                       }}
                     >
                       {img.type}
@@ -136,10 +174,19 @@ export default function ImagesTab({ product, onUpdate }: Props) {
                     <button
                       onClick={() => handleDelete(img.id)}
                       disabled={deleting === img.id}
-                      className="p-1 rounded-lg transition-colors"
-                      style={{ color: "#DC2626" }}
+                      aria-label="Delete image"
+                      style={{
+                        color: "#DC2626",
+                        display: "flex",
+                        alignItems: "center",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "2px",
+                        opacity: deleting === img.id ? 0.5 : 1,
+                      }}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} strokeWidth={1.75} />
                     </button>
                   </div>
                 </div>
@@ -149,38 +196,41 @@ export default function ImagesTab({ product, onUpdate }: Props) {
         )}
       </div>
 
-      {/* Upload new image */}
+      {/* Upload new */}
       <div
-        className="rounded-2xl border p-6"
         style={{
           backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
+          padding: "20px",
         }}
       >
-        <p
-          className="text-sm font-semibold mb-4"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Upload Image
-        </p>
+        <span style={sectionLabel}>Upload Image</span>
 
         {error && (
           <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
             style={{
+              marginBottom: "16px",
+              padding: "10px 14px",
+              borderRadius: "6px",
               backgroundColor: "#FEF2F2",
-              color: "#DC2626",
               border: "1px solid #FECACA",
+              color: "#DC2626",
+              fontSize: "13px",
             }}
           >
             {error}
           </div>
         )}
 
-        <div className="space-y-4">
-          {/* Image type selector */}
-          <div className="grid grid-cols-2 gap-4">
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "14px",
+            }}
+          >
             <Select
               label="Image Type"
               value={imageType}
@@ -189,8 +239,15 @@ export default function ImagesTab({ product, onUpdate }: Props) {
             />
             <div>
               <label
-                className="block text-sm font-medium mb-1.5"
-                style={{ color: "var(--text-primary)" }}
+                style={{
+                  display: "block",
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: "var(--text-secondary)",
+                  marginBottom: "7px",
+                }}
               >
                 Sort Order
               </label>
@@ -199,17 +256,20 @@ export default function ImagesTab({ product, onUpdate }: Props) {
                 min={0}
                 value={sortOrder}
                 onChange={(e) => setSortOrder(parseInt(e.target.value) || 0)}
-                className="w-full px-3 py-2 rounded-xl text-sm outline-none"
                 style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: "6px",
                   border: "1px solid var(--border)",
                   backgroundColor: "var(--bg-primary)",
                   color: "var(--text-primary)",
+                  fontSize: "13px",
+                  outline: "none",
                 }}
               />
             </div>
           </div>
 
-          {/* File upload — goes to Cloudinary */}
           <FileUpload
             label="Select Image"
             multiple={true}
@@ -220,7 +280,7 @@ export default function ImagesTab({ product, onUpdate }: Props) {
           />
 
           {saving && (
-            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
               Saving image records...
             </p>
           )}

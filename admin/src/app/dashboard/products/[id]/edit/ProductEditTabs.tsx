@@ -1,4 +1,3 @@
-//admin\src\app\dashboard\products\[id]\edit\ProductEditTabs.tsx
 "use client";
 
 import { useState } from "react";
@@ -33,92 +32,160 @@ export default function ProductEditTabs({ product, categories }: Props) {
   const refresh = (updated: any) => setCurrentProduct(updated);
 
   return (
-    <div className="max-w-4xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <Link href="/dashboard/products">
-            <button
-              className="p-2 rounded-xl"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              <ArrowLeft size={18} />
-            </button>
-          </Link>
-          <div>
-            <h1
-              className="text-xl font-semibold"
-              style={{ color: "var(--text-primary)" }}
-            >
-              {currentProduct.name}
-            </h1>
-            <p
-              className="text-sm font-mono"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              {currentProduct.slug}
-            </p>
-          </div>
-        </div>
-        <Badge
-          label={currentProduct.isActive ? "Active" : "Inactive"}
-          variant={currentProduct.isActive ? "success" : "neutral"}
-        />
-      </div>
+    <>
+      <style>{`
+        .prod-tab-bar {
+          display: flex;
+          gap: 2px;
+          padding: 4px;
+          border-radius: 8px;
+          background-color: var(--bg-primary);
+          overflow-x: auto;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .prod-tab-bar::-webkit-scrollbar { display: none; }
 
-      {/* Tab Bar */}
-      <div
-        className="flex gap-1 p-1 rounded-2xl mb-6"
-        style={{ backgroundColor: "var(--bg-primary)" }}
-      >
-        {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className="flex-1 py-2 px-3 rounded-xl text-sm font-medium transition-all duration-200"
+        .prod-tab-btn {
+          flex-shrink: 0;
+          padding: 7px 14px;
+          border-radius: 6px;
+          font-size: 13px;
+          font-weight: 500;
+          border: none;
+          cursor: pointer;
+          white-space: nowrap;
+          transition: background-color 150ms ease, color 150ms ease;
+        }
+
+        .prod-tab-btn-active {
+          background-color: var(--surface);
+          color: var(--text-primary);
+          box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+        }
+
+        .prod-tab-btn-inactive {
+          background-color: transparent;
+          color: var(--text-secondary);
+        }
+
+        .prod-tab-btn-inactive:hover {
+          color: var(--text-primary);
+          background-color: rgba(255,255,255,0.5);
+        }
+      `}</style>
+
+      <div style={{ maxWidth: "900px" }}>
+        {/* Header */}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "16px",
+            marginBottom: "20px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div
             style={{
-              backgroundColor:
-                activeTab === tab.id ? "var(--surface)" : "transparent",
-              color:
-                activeTab === tab.id
-                  ? "var(--brand)"
-                  : "var(--text-secondary)",
-              boxShadow:
-                activeTab === tab.id
-                  ? "0 2px 8px rgba(0,0,0,0.06)"
-                  : "none",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
             }}
           >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+            <Link href="/dashboard/products">
+              <button
+                aria-label="Back to products"
+                style={{
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "6px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "var(--surface)",
+                  cursor: "pointer",
+                }}
+              >
+                <ArrowLeft size={15} strokeWidth={1.75} />
+              </button>
+            </Link>
+            <div>
+              <h1
+                style={{
+                  fontSize: "17px",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  letterSpacing: "-0.01em",
+                }}
+              >
+                {currentProduct.name}
+              </h1>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontFamily: "monospace",
+                  color: "var(--text-secondary)",
+                  marginTop: "2px",
+                }}
+              >
+                {currentProduct.slug}
+              </p>
+            </div>
+          </div>
 
-      {/* Tab Content */}
-      <div>
-        {activeTab === "general" && (
-          <GeneralTab
-            product={currentProduct}
-            categories={categories}
-            onUpdate={refresh}
+          <Badge
+            label={currentProduct.isActive ? "Active" : "Inactive"}
+            variant={currentProduct.isActive ? "success" : "neutral"}
           />
-        )}
-        {activeTab === "images" && (
-          <ImagesTab product={currentProduct} onUpdate={refresh} />
-        )}
-        {activeTab === "variants" && (
-          <VariantsTab product={currentProduct} onUpdate={refresh} />
-        )}
-        {activeTab === "pricing" && (
-          <PricingTab product={currentProduct} onUpdate={refresh} />
-        )}
-        {activeTab === "configuration" && (
-          <ConfigurationTab product={currentProduct} onUpdate={refresh} />
-        )}
-        {activeTab === "customFields" && (
-          <CustomFieldsTab product={currentProduct} onUpdate={refresh} />
-        )}
+        </div>
+
+        {/* Tab bar */}
+        <div className="prod-tab-bar" style={{ marginBottom: "20px" }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`prod-tab-btn ${
+                activeTab === tab.id
+                  ? "prod-tab-btn-active"
+                  : "prod-tab-btn-inactive"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div>
+          {activeTab === "general" && (
+            <GeneralTab
+              product={currentProduct}
+              categories={categories}
+              onUpdate={refresh}
+            />
+          )}
+          {activeTab === "images" && (
+            <ImagesTab product={currentProduct} onUpdate={refresh} />
+          )}
+          {activeTab === "variants" && (
+            <VariantsTab product={currentProduct} onUpdate={refresh} />
+          )}
+          {activeTab === "pricing" && (
+            <PricingTab product={currentProduct} onUpdate={refresh} />
+          )}
+          {activeTab === "configuration" && (
+            <ConfigurationTab product={currentProduct} onUpdate={refresh} />
+          )}
+          {activeTab === "customFields" && (
+            <CustomFieldsTab product={currentProduct} onUpdate={refresh} />
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

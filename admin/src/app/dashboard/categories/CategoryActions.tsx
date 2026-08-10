@@ -1,7 +1,6 @@
-//admin\src\app\dashboard\categories\CategoryActions.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, Trash2, RotateCcw, MoreHorizontal } from "lucide-react";
 import Link from "next/link";
@@ -15,6 +14,18 @@ export default function CategoryActions({ id, isActive }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
 
   const handleDelete = async () => {
     if (!confirm("Deactivate this category?")) return;
@@ -34,92 +45,120 @@ export default function CategoryActions({ id, isActive }: Props) {
   };
 
   return (
-    <div className="relative inline-block">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="p-1.5 rounded-lg transition-colors"
-        style={{ color: "var(--text-secondary)" }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLElement).style.backgroundColor =
-            "var(--bg-primary)")
+    <>
+      <style>{`
+        .action-menu-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 9px 14px;
+          font-size: 13px;
+          font-weight: 500;
+          width: 100%;
+          text-decoration: none;
+          border: none;
+          background: none;
+          cursor: pointer;
+          transition: background-color 120ms ease;
+          text-align: left;
+          color: var(--text-primary);
         }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLElement).style.backgroundColor =
-            "transparent")
+        .action-menu-item:hover {
+          background-color: var(--bg-primary);
         }
-      >
-        <MoreHorizontal size={16} />
-      </button>
+        .action-menu-item-danger {
+          color: #DC2626;
+        }
+        .action-menu-item-danger:hover {
+          background-color: #FEF2F2;
+        }
+        .action-menu-item-success {
+          color: var(--success);
+        }
+        .action-menu-item-success:hover {
+          background-color: rgba(142,159,130,0.08);
+        }
+        .action-trigger:hover {
+          background-color: var(--bg-primary);
+        }
+      `}</style>
 
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+      <div ref={ref} style={{ position: "relative", display: "inline-block" }}>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          aria-label="Actions"
+          className="action-trigger"
+          style={{
+            width: "30px",
+            height: "30px",
+            borderRadius: "6px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--text-secondary)",
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            transition: "background-color 120ms ease",
+          }}
+        >
+          <MoreHorizontal size={15} strokeWidth={1.75} />
+        </button>
+
+        {open && (
           <div
-            className="absolute right-0 top-8 z-20 w-40 rounded-xl border shadow-lg overflow-hidden"
             style={{
+              position: "absolute",
+              right: 0,
+              top: "calc(100% + 4px)",
+              zIndex: 50,
+              width: "160px",
               backgroundColor: "var(--surface)",
-              borderColor: "var(--border)",
-              boxShadow: "0 10px 30px rgba(0,0,0,0.10)",
+              border: "1px solid var(--border)",
+              borderRadius: "8px",
+              boxShadow: "var(--shadow-md)",
+              overflow: "hidden",
             }}
           >
             <Link
               href={`/dashboard/categories/${id}/edit`}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm transition-colors"
-              style={{ color: "var(--text-primary)" }}
-              onMouseEnter={(e) =>
-                ((e.currentTarget as HTMLElement).style.backgroundColor =
-                  "var(--bg-primary)")
-              }
-              onMouseLeave={(e) =>
-                ((e.currentTarget as HTMLElement).style.backgroundColor =
-                  "transparent")
-              }
+              className="action-menu-item"
               onClick={() => setOpen(false)}
             >
-              <Pencil size={14} />
+              <Pencil size={14} strokeWidth={1.75} />
               Edit
             </Link>
+
+            <div
+              style={{
+                height: "1px",
+                backgroundColor: "var(--border)",
+                margin: "2px 0",
+              }}
+            />
 
             {isActive ? (
               <button
                 disabled={loading}
                 onClick={handleDelete}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm w-full transition-colors"
-                style={{ color: "#DC2626" }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.backgroundColor =
-                    "rgba(220,38,38,0.06)")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.backgroundColor =
-                    "transparent")
-                }
+                className="action-menu-item action-menu-item-danger"
               >
-                <Trash2 size={14} />
-                Deactivate
+                <Trash2 size={14} strokeWidth={1.75} />
+                {loading ? "Working..." : "Deactivate"}
               </button>
             ) : (
               <button
                 disabled={loading}
                 onClick={handleRestore}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm w-full transition-colors"
-                style={{ color: "var(--success)" }}
-                onMouseEnter={(e) =>
-                  ((e.currentTarget as HTMLElement).style.backgroundColor =
-                    "rgba(142,159,130,0.08)")
-                }
-                onMouseLeave={(e) =>
-                  ((e.currentTarget as HTMLElement).style.backgroundColor =
-                    "transparent")
-                }
+                className="action-menu-item action-menu-item-success"
               >
-                <RotateCcw size={14} />
-                Restore
+                <RotateCcw size={14} strokeWidth={1.75} />
+                {loading ? "Working..." : "Restore"}
               </button>
             )}
           </div>
-        </>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }

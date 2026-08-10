@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Select from "@/components/ui/Select";
 import Toggle from "@/components/ui/Toggle";
-import Button from "@/components/ui/Button";
 import FileUpload from "@/components/ui/FileUpload";
 
 function generateSlug(name: string) {
@@ -23,6 +23,16 @@ interface Props {
   categories: { id: string; name: string }[];
   onUpdate: (p: any) => void;
 }
+
+const sectionLabel = {
+  fontSize: "10px",
+  fontWeight: 600,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase" as const,
+  color: "var(--text-secondary)",
+  marginBottom: "16px",
+  display: "block",
+};
 
 export default function GeneralTab({ product, categories, onUpdate }: Props) {
   const [loading, setLoading] = useState(false);
@@ -74,56 +84,67 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
 
   return (
     <div
-      className="rounded-2xl border p-6"
       style={{
         backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "24px",
       }}
     >
       {error && (
         <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
           style={{
+            marginBottom: "20px",
+            padding: "10px 14px",
+            borderRadius: "6px",
             backgroundColor: "#FEF2F2",
-            color: "#DC2626",
             border: "1px solid #FECACA",
+            color: "#DC2626",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <AlertCircle size={14} strokeWidth={1.75} />
           {error}
         </div>
       )}
+
       {success && (
         <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
           style={{
-            backgroundColor: "rgba(142,159,130,0.15)",
-            color: "var(--success)",
+            marginBottom: "20px",
+            padding: "10px 14px",
+            borderRadius: "6px",
+            backgroundColor: "rgba(142,159,130,0.12)",
             border: "1px solid rgba(142,159,130,0.3)",
+            color: "var(--success)",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <CheckCircle size={14} strokeWidth={1.75} />
           Product updated successfully
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "24px" }}
+      >
+        {/* General */}
         <div>
-          <p
-            className="text-xs font-semibold uppercase tracking-wide mb-4"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            General Information
-          </p>
-          <div className="space-y-4">
+          <span style={sectionLabel}>General Information</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <Select
               label="Category"
               required
               value={form.categoryId}
               onChange={(e) => set("categoryId", e.target.value)}
-              options={categories.map((c) => ({
-                value: c.id,
-                label: c.name,
-              }))}
+              options={categories.map((c) => ({ value: c.id, label: c.name }))}
             />
             <Input
               label="Product Name"
@@ -151,7 +172,7 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
               onChange={(e) => set("shortDescription", e.target.value)}
               rows={2}
             />
-            <div className="flex gap-6">
+            <div style={{ display: "flex", gap: "32px" }}>
               <Toggle
                 label="Active"
                 checked={form.isActive}
@@ -175,17 +196,15 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
           </div>
         </div>
 
+        {/* SEO */}
         <div
-          className="pt-5 border-t"
-          style={{ borderColor: "var(--border)" }}
+          style={{
+            paddingTop: "20px",
+            borderTop: "1px solid var(--border)",
+          }}
         >
-          <p
-            className="text-xs font-semibold uppercase tracking-wide mb-4"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            SEO
-          </p>
-          <div className="space-y-4">
+          <span style={sectionLabel}>SEO</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <Input
               label="Meta Title"
               value={form.metaTitle}
@@ -202,25 +221,51 @@ export default function GeneralTab({ product, categories, onUpdate }: Props) {
               value={form.metaKeywords}
               onChange={(e) => set("metaKeywords", e.target.value)}
             />
-           <FileUpload
-  label="OG Image (Social Media Preview)"
-  multiple={false}
-  maxFiles={1}
-  value={form.ogImageUrl || undefined}
-  onUpload={(urls) => set("ogImageUrl", urls[0] ?? "")}
-  onRemove={() => set("ogImageUrl", "")}
-  helpText="Optional. Used when sharing on Facebook, WhatsApp, etc."
-/>
+            <FileUpload
+              label="OG Image (Social Media Preview)"
+              multiple={false}
+              maxFiles={1}
+              value={form.ogImageUrl || undefined}
+              onUpload={(urls) => set("ogImageUrl", urls[0] ?? "")}
+              onRemove={() => set("ogImageUrl", "")}
+              helpText="Optional. Used when sharing on Facebook, WhatsApp, etc."
+            />
           </div>
         </div>
 
+        {/* Submit */}
         <div
-          className="flex gap-3 pt-4 border-t"
-          style={{ borderColor: "var(--border)" }}
+          style={{
+            paddingTop: "16px",
+            borderTop: "1px solid var(--border)",
+          }}
         >
-          <Button type="submit" loading={loading}>
-            Save Changes
-          </Button>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              padding: "9px 20px",
+              borderRadius: "6px",
+              fontSize: "13px",
+              fontWeight: 500,
+              letterSpacing: "0.02em",
+              color: "#fff",
+              backgroundColor: loading
+                ? "var(--text-secondary)"
+                : "var(--text-primary)",
+              border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              transition: "background-color 150ms ease",
+            }}
+          >
+            {loading && (
+              <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+            )}
+            {loading ? "Saving..." : "Save Changes"}
+          </button>
         </div>
       </form>
     </div>

@@ -2,13 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import Input from "@/components/ui/Input";
 import Textarea from "@/components/ui/Textarea";
 import Select from "@/components/ui/Select";
 import Toggle from "@/components/ui/Toggle";
-import Button from "@/components/ui/Button";
 import FileUpload from "@/components/ui/FileUpload";
 
 interface Category {
@@ -25,6 +24,16 @@ function generateSlug(name: string) {
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
+
+const sectionLabel = {
+  fontSize: "10px",
+  fontWeight: 600,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase" as const,
+  color: "var(--text-secondary)",
+  marginBottom: "16px",
+  display: "block",
+};
 
 export default function NewProductPage() {
   const router = useRouter();
@@ -79,60 +88,95 @@ export default function NewProductPage() {
   };
 
   return (
-    <div className="max-w-2xl">
-      <div className="flex items-center gap-3 mb-6">
+    <div style={{ maxWidth: "640px" }}>
+      {/* Page header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
         <Link href="/dashboard/products">
           <button
-            className="p-2 rounded-xl"
-            style={{ color: "var(--text-secondary)" }}
+            aria-label="Back to products"
+            style={{
+              width: "32px",
+              height: "32px",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--surface)",
+              cursor: "pointer",
+            }}
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={15} strokeWidth={1.75} />
           </button>
         </Link>
         <div>
           <h1
-            className="text-xl font-semibold"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontSize: "18px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+              letterSpacing: "-0.01em",
+            }}
           >
             New Product
           </h1>
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              marginTop: "2px",
+            }}
+          >
             After creating, you can add images, variants, pricing and more
           </p>
         </div>
       </div>
 
+      {/* Form card */}
       <div
-        className="rounded-2xl border p-6 space-y-6"
         style={{
           backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
+          padding: "24px",
         }}
       >
         {error && (
           <div
-            className="px-4 py-3 rounded-xl text-sm"
             style={{
+              marginBottom: "20px",
+              padding: "10px 14px",
+              borderRadius: "6px",
               backgroundColor: "#FEF2F2",
-              color: "#DC2626",
               border: "1px solid #FECACA",
+              color: "#DC2626",
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
+            <AlertCircle size={14} strokeWidth={1.75} />
             {error}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "24px" }}
+        >
           {/* General Information */}
           <div>
-            <p
-              className="text-xs font-semibold uppercase tracking-wide mb-4"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              General Information
-            </p>
-            <div className="space-y-4">
+            <span style={sectionLabel}>General Information</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <Select
                 label="Category"
                 required
@@ -174,7 +218,7 @@ export default function NewProductPage() {
                 rows={2}
                 placeholder="Brief summary shown in listings..."
               />
-              <div className="flex gap-6">
+              <div style={{ display: "flex", gap: "32px" }}>
                 <Toggle
                   label="Active"
                   checked={form.isActive}
@@ -200,16 +244,13 @@ export default function NewProductPage() {
 
           {/* SEO */}
           <div
-            className="pt-5 border-t"
-            style={{ borderColor: "var(--border)" }}
+            style={{
+              paddingTop: "20px",
+              borderTop: "1px solid var(--border)",
+            }}
           >
-            <p
-              className="text-xs font-semibold uppercase tracking-wide mb-4"
-              style={{ color: "var(--text-secondary)" }}
-            >
-              SEO
-            </p>
-            <div className="space-y-4">
+            <span style={sectionLabel}>SEO</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
               <Input
                 label="Meta Title"
                 value={form.metaTitle}
@@ -241,17 +282,82 @@ export default function NewProductPage() {
             </div>
           </div>
 
+          {/* Actions */}
           <div
-            className="flex gap-3 pt-4 border-t"
-            style={{ borderColor: "var(--border)" }}
+            style={{
+              display: "flex",
+              gap: "10px",
+              paddingTop: "16px",
+              borderTop: "1px solid var(--border)",
+              flexWrap: "wrap",
+            }}
           >
-            <Button type="submit" loading={loading}>
-              Create Product
-            </Button>
+            <button
+              type="submit"
+              disabled={loading}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "7px",
+                padding: "9px 20px",
+                borderRadius: "6px",
+                fontSize: "13px",
+                fontWeight: 500,
+                letterSpacing: "0.02em",
+                color: "#fff",
+                backgroundColor: loading
+                  ? "var(--text-secondary)"
+                  : "var(--text-primary)",
+                border: "none",
+                cursor: loading ? "not-allowed" : "pointer",
+                transition: "background-color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                if (!loading)
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "#1F1F1F";
+              }}
+              onMouseLeave={(e) => {
+                if (!loading)
+                  (e.currentTarget as HTMLElement).style.backgroundColor =
+                    "var(--text-primary)";
+              }}
+            >
+              {loading && (
+                <Loader2 size={14} strokeWidth={2} className="animate-spin" />
+              )}
+              {loading ? "Creating..." : "Create Product"}
+            </button>
+
             <Link href="/dashboard/products">
-              <Button type="button" variant="secondary">
+              <button
+                type="button"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "9px 20px",
+                  borderRadius: "6px",
+                  fontSize: "13px",
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                  backgroundColor: "transparent",
+                  border: "1px solid var(--border)",
+                  cursor: "pointer",
+                  transition: "all 150ms ease",
+                }}
+                onMouseEnter={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.borderColor = "var(--text-primary)";
+                  el.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  const el = e.currentTarget as HTMLElement;
+                  el.style.borderColor = "var(--border)";
+                  el.style.color = "var(--text-secondary)";
+                }}
+              >
                 Cancel
-              </Button>
+              </button>
             </Link>
           </div>
         </form>

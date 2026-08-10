@@ -7,18 +7,32 @@ export default function AddCategoryButton() {
   return (
     <Link href="/dashboard/categories/new">
       <button
-        className="inline-flex items-center gap-2 px-4 py-2 rounded-[12px] text-sm font-medium text-white transition-all duration-200"
-        style={{ backgroundColor: "var(--accent)" }}
-        onMouseEnter={(e) =>
-          ((e.currentTarget as HTMLElement).style.backgroundColor =
-            "var(--accent-hover)")
-        }
-        onMouseLeave={(e) =>
-          ((e.currentTarget as HTMLElement).style.backgroundColor =
-            "var(--accent)")
-        }
+        className="admin-btn-primary"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "7px",
+          padding: "9px 18px",
+          borderRadius: "6px",
+          fontSize: "13px",
+          fontWeight: 500,
+          letterSpacing: "0.02em",
+          color: "#fff",
+          backgroundColor: "var(--text-primary)",
+          border: "none",
+          cursor: "pointer",
+          transition: "background-color 150ms ease",
+          whiteSpace: "nowrap",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLElement).style.backgroundColor = "#1F1F1F";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLElement).style.backgroundColor =
+            "var(--text-primary)";
+        }}
       >
-        <Plus size={16} />
+        <Plus size={15} strokeWidth={2} />
         Add Category
       </button>
     </Link>

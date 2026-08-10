@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { ArrowRight, ImageIcon } from "lucide-react";
+import Image from "next/image";
+import { ArrowRight } from "lucide-react";
+
+const storyImageSrc = "/images/hero-banner3.png"; // change if you want another one
 
 export default function FeaturedStory() {
   return (
@@ -45,21 +48,15 @@ export default function FeaturedStory() {
                 backgroundColor: "var(--brand-soft)",
               }}
             >
-              <div
+              <Image
+                src={storyImageSrc}
+                alt="Handcrafted personalised photo keepsakes by The Craft Pallet"
+                fill
+                sizes="(max-width: 1024px) 100vw, 50vw"
                 style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
+                  objectFit: "cover",
                 }}
-              >
-                <ImageIcon
-                  size={40}
-                  strokeWidth={1}
-                  style={{ color: "var(--border)", opacity: 0.5 }}
-                />
-              </div>
+              />
             </div>
 
             {/* Text */}
@@ -114,7 +111,7 @@ export default function FeaturedStory() {
                 }}
               >
                 From premium photo paper to hand-finished touches, we treat
-                every order like a personal gift — because that's exactly
+                every order like a personal gift — because that&apos;s exactly
                 what it is.
               </p>
 

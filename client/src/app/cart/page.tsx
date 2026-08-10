@@ -31,17 +31,25 @@ export default function CartPage() {
   }, []);
 
   const loadCart = async () => {
-    setLoading(true);
-    try {
-      const res = await cartApi.getCart();
-      setCart(res.cart);
-      setTotals(res.totals);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
+  setLoading(true);
+  try {
+    const res = await cartApi.getCart();
+
+    // Handle case where session ID wasn't ready
+    if (!res) {
+      setCart(null);
+      setTotals(null);
+      return;
     }
-  };
+
+    setCart(res.cart);
+    setTotals(res.totals);
+  } catch (err) {
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleQuantity = async (itemId: string, newQty: number) => {
     if (newQty < 1) return;

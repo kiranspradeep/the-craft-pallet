@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Button from "@/components/ui/Button";
 import {
   ExternalLink,
   CheckCircle,
   XCircle,
   Truck,
   Package,
+  Copy,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 interface Order {
@@ -84,50 +86,115 @@ export default function OrderActions({ order }: { order: Order }) {
   const nextStage = order.productionStage
     ? NEXT_STAGE[order.productionStage]
     : null;
-
   const nextStageLabel = nextStage
     ? PRODUCTION_STAGES.find((s) => s.value === nextStage)?.label
     : null;
 
+  const inputStyle = {
+    width: "100%",
+    padding: "9px 12px",
+    borderRadius: "6px",
+    border: "1px solid var(--border)",
+    backgroundColor: "var(--surface)",
+    color: "var(--text-primary)",
+    fontSize: "13px",
+    outline: "none",
+    transition: "border-color 200ms ease",
+  };
+
+  const sectionLabelStyle = {
+    fontSize: "10px",
+    fontWeight: 600,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase" as const,
+    color: "var(--text-secondary)",
+    marginBottom: "8px",
+    display: "block",
+  };
+
+  const actionBtnStyle = (color = "var(--text-primary)") => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "8px 14px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "#fff",
+    backgroundColor: color,
+    border: "none",
+    cursor: "pointer",
+    transition: "opacity 150ms ease",
+    width: "100%",
+    justifyContent: "center" as const,
+  });
+
+  const ghostBtnStyle = {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "7px",
+    padding: "8px 14px",
+    borderRadius: "6px",
+    fontSize: "12px",
+    fontWeight: 500,
+    color: "var(--text-secondary)",
+    backgroundColor: "transparent",
+    border: "1px solid var(--border)",
+    cursor: "pointer",
+    transition: "all 150ms ease",
+    width: "100%",
+    justifyContent: "center" as const,
+  };
+
   return (
-    <div className="space-y-4">
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* Error */}
       {error && (
         <div
-          className="px-4 py-3 rounded-xl text-sm"
           style={{
+            padding: "10px 14px",
+            borderRadius: "6px",
             backgroundColor: "#FEF2F2",
-            color: "#DC2626",
             border: "1px solid #FECACA",
+            color: "#DC2626",
+            fontSize: "12px",
+            display: "flex",
+            alignItems: "center",
+            gap: "7px",
           }}
         >
+          <AlertCircle size={13} strokeWidth={1.75} />
           {error}
         </div>
       )}
+
+      {/* Success */}
       {success && (
         <div
-          className="px-4 py-3 rounded-xl text-sm"
           style={{
-            backgroundColor: "rgba(142,159,130,0.15)",
-            color: "var(--success)",
+            padding: "10px 14px",
+            borderRadius: "6px",
+            backgroundColor: "rgba(142,159,130,0.12)",
             border: "1px solid rgba(142,159,130,0.3)",
+            color: "var(--success)",
+            fontSize: "12px",
+            display: "flex",
+            alignItems: "center",
+            gap: "7px",
           }}
         >
+          <CheckCircle size={13} strokeWidth={1.75} />
           {success}
         </div>
       )}
 
       {/* Generate Payment Link */}
       {order.status === "AWAITING_PAYMENT" && (
-        <div className="space-y-2">
-          <p
-            className="text-xs font-semibold uppercase tracking-wide"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Payment
-          </p>
-          <Button
-            size="sm"
-            loading={loading === "paylink"}
+        <div>
+          <span style={sectionLabelStyle}>Payment</span>
+          <button
+            style={actionBtnStyle()}
+            disabled={loading === "paylink"}
             onClick={() =>
               action(
                 "paylink",
@@ -139,36 +206,72 @@ export default function OrderActions({ order }: { order: Order }) {
               )
             }
           >
-            <ExternalLink size={14} />
+            {loading === "paylink" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <ExternalLink size={13} strokeWidth={1.75} />
+            )}
             Generate Payment Link
-          </Button>
+          </button>
 
           {paymentLink && (
             <div
-              className="p-3 rounded-xl text-xs break-all"
               style={{
-                backgroundColor: "rgba(166,138,117,0.08)",
-                color: "var(--brand)",
+                marginTop: "10px",
+                padding: "12px",
+                borderRadius: "6px",
+                backgroundColor: "var(--bg-primary)",
+                border: "1px solid var(--border)",
               }}
             >
-              <p className="font-medium mb-1">Payment Link:</p>
+              <p
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 600,
+                  color: "var(--text-secondary)",
+                  marginBottom: "6px",
+                  letterSpacing: "0.06em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Payment Link
+              </p>
               <a
                 href={paymentLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline"
+                style={{
+                  fontSize: "11px",
+                  color: "var(--brand)",
+                  wordBreak: "break-all",
+                  textDecoration: "underline",
+                  display: "block",
+                  marginBottom: "8px",
+                }}
               >
                 {paymentLink}
               </a>
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(paymentLink);
-                  setSuccess("Link copied to clipboard");
+                  setSuccess("Link copied");
                   setTimeout(() => setSuccess(""), 2000);
                 }}
-                className="mt-2 block px-3 py-1 rounded-lg text-white text-xs"
-                style={{ backgroundColor: "var(--brand)" }}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "5px",
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  fontSize: "11px",
+                  fontWeight: 500,
+                  color: "#fff",
+                  backgroundColor: "var(--brand)",
+                  border: "none",
+                  cursor: "pointer",
+                }}
               >
+                <Copy size={11} strokeWidth={2} />
                 Copy Link
               </button>
             </div>
@@ -178,27 +281,44 @@ export default function OrderActions({ order }: { order: Order }) {
 
       {/* Mark as Paid */}
       {order.status === "AWAITING_PAYMENT" && (
-        <div className="space-y-2">
+        <div>
           {!showMarkPaid ? (
             <button
               onClick={() => setShowMarkPaid(true)}
-              className="flex items-center gap-1.5 text-sm font-medium"
-              style={{ color: "var(--success)" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: "var(--success)",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "0",
+              }}
             >
-              <CheckCircle size={14} />
+              <CheckCircle size={14} strokeWidth={1.75} />
               Mark as Paid (Manual)
             </button>
           ) : (
             <div
-              className="p-3 rounded-xl space-y-3"
               style={{
-                backgroundColor: "var(--bg-primary)",
+                padding: "14px",
+                borderRadius: "6px",
                 border: "1px solid var(--border)",
+                backgroundColor: "var(--bg-primary)",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
               }}
             >
               <p
-                className="text-xs font-semibold"
-                style={{ color: "var(--text-primary)" }}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                }}
               >
                 Manual Payment Verification
               </p>
@@ -206,11 +326,12 @@ export default function OrderActions({ order }: { order: Order }) {
                 placeholder="Reference number (optional)"
                 value={refNumber}
                 onChange={(e) => setRefNumber(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm outline-none"
-                style={{
-                  border: "1px solid var(--border)",
-                  backgroundColor: "var(--surface)",
-                  color: "var(--text-primary)",
+                style={inputStyle}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "var(--brand)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
                 }}
               />
               <textarea
@@ -218,17 +339,21 @@ export default function OrderActions({ order }: { order: Order }) {
                 rows={2}
                 value={paidNote}
                 onChange={(e) => setPaidNote(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl text-sm outline-none resize-none"
-                style={{
-                  border: "1px solid var(--border)",
-                  backgroundColor: "var(--surface)",
-                  color: "var(--text-primary)",
+                style={{ ...inputStyle, resize: "none" }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "var(--brand)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.borderColor = "var(--border)";
                 }}
               />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  loading={loading === "markpaid"}
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  style={{
+                    ...actionBtnStyle("var(--success)"),
+                    flex: 1,
+                  }}
+                  disabled={loading === "markpaid"}
                   onClick={() =>
                     action(
                       "markpaid",
@@ -241,11 +366,13 @@ export default function OrderActions({ order }: { order: Order }) {
                     )
                   }
                 >
-                  Confirm Payment
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
+                  {loading === "markpaid" && (
+                    <Loader2 size={12} className="animate-spin" />
+                  )}
+                  Confirm
+                </button>
+                <button
+                  style={{ ...ghostBtnStyle, flex: 1 }}
                   onClick={() => {
                     setShowMarkPaid(false);
                     setRefNumber("");
@@ -253,7 +380,7 @@ export default function OrderActions({ order }: { order: Order }) {
                   }}
                 >
                   Cancel
-                </Button>
+                </button>
               </div>
             </div>
           )}
@@ -262,147 +389,161 @@ export default function OrderActions({ order }: { order: Order }) {
 
       {/* Move to Production */}
       {order.status === "CONFIRMED" && (
-        <div className="space-y-2">
-          <p
-            className="text-xs font-semibold uppercase tracking-wide"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Production
-          </p>
-          <Button
-            size="sm"
-            variant="secondary"
-            loading={loading === "production"}
+        <div>
+          <span style={sectionLabelStyle}>Production</span>
+          <button
+            style={ghostBtnStyle}
+            disabled={loading === "production"}
             onClick={() =>
               action(
                 "production",
-                () => call("/status", "PATCH", { status: "IN_PRODUCTION" }),
+                () =>
+                  call("/status", "PATCH", { status: "IN_PRODUCTION" }),
                 "Order moved to production"
               )
             }
           >
-            <Package size={14} />
+            {loading === "production" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Package size={13} strokeWidth={1.75} />
+            )}
             Move to Production
-          </Button>
+          </button>
         </div>
       )}
 
       {/* Advance Production Stage */}
       {order.status === "IN_PRODUCTION" && nextStage && (
-        <div className="space-y-2">
-          <p
-            className="text-xs font-semibold uppercase tracking-wide"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            Production Stage
-          </p>
+        <div>
+          <span style={sectionLabelStyle}>Production Stage</span>
           <div
-            className="p-3 rounded-xl"
             style={{
-              backgroundColor: "var(--bg-primary)",
+              padding: "12px",
+              borderRadius: "6px",
               border: "1px solid var(--border)",
+              backgroundColor: "var(--bg-primary)",
+              marginBottom: "8px",
             }}
           >
-            <p
-              className="text-xs mb-2"
-              style={{ color: "var(--text-secondary)" }}
-            >
+            <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
               Current:{" "}
-              <span style={{ color: "var(--brand)" }}>
+              <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
                 {PRODUCTION_STAGES.find(
                   (s) => s.value === order.productionStage
                 )?.label ?? order.productionStage}
               </span>
             </p>
-            <Button
-              size="sm"
-              loading={loading === "stage"}
-              onClick={() =>
-                action(
-                  "stage",
-                  () =>
-                    call("/production-stage", "PATCH", {
-                      productionStage: nextStage,
-                    }),
-                  `Stage advanced to ${nextStageLabel}`
-                )
-              }
-            >
-              Advance to {nextStageLabel}
-            </Button>
           </div>
+          <button
+            style={actionBtnStyle()}
+            disabled={loading === "stage"}
+            onClick={() =>
+              action(
+                "stage",
+                () =>
+                  call("/production-stage", "PATCH", {
+                    productionStage: nextStage,
+                  }),
+                `Stage advanced to ${nextStageLabel}`
+              )
+            }
+          >
+            {loading === "stage" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : null}
+            Advance to {nextStageLabel}
+          </button>
         </div>
       )}
 
       {/* Mark as Shipped */}
       {order.status === "IN_PRODUCTION" &&
         order.productionStage === "READY" && (
-          <div className="space-y-2">
-            <Button
-              size="sm"
-              loading={loading === "ship"}
-              onClick={() =>
-                action(
-                  "ship",
-                  () => call("/status", "PATCH", { status: "SHIPPED" }),
-                  "Order marked as shipped"
-                )
-              }
-            >
-              <Truck size={14} />
-              Mark as Shipped
-            </Button>
-          </div>
+          <button
+            style={actionBtnStyle()}
+            disabled={loading === "ship"}
+            onClick={() =>
+              action(
+                "ship",
+                () =>
+                  call("/status", "PATCH", { status: "SHIPPED" }),
+                "Order marked as shipped"
+              )
+            }
+          >
+            {loading === "ship" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Truck size={13} strokeWidth={1.75} />
+            )}
+            Mark as Shipped
+          </button>
         )}
 
       {/* Mark as Delivered */}
       {order.status === "SHIPPED" && (
-        <div className="space-y-2">
-          <Button
-            size="sm"
-            loading={loading === "delivered"}
-            onClick={() =>
-              action(
-                "delivered",
-                () => call("/status", "PATCH", { status: "DELIVERED" }),
-                "Order marked as delivered"
-              )
-            }
-          >
-            <CheckCircle size={14} />
-            Mark as Delivered
-          </Button>
-        </div>
+        <button
+          style={actionBtnStyle("var(--success)")}
+          disabled={loading === "delivered"}
+          onClick={() =>
+            action(
+              "delivered",
+              () =>
+                call("/status", "PATCH", { status: "DELIVERED" }),
+              "Order marked as delivered"
+            )
+          }
+        >
+          {loading === "delivered" ? (
+            <Loader2 size={13} className="animate-spin" />
+          ) : (
+            <CheckCircle size={13} strokeWidth={1.75} />
+          )}
+          Mark as Delivered
+        </button>
       )}
 
-      {/* Add Admin Note */}
+      {/* Admin Note */}
       <div
-        className="space-y-2 pt-3 border-t"
-        style={{ borderColor: "var(--border)" }}
+        style={{
+          paddingTop: "14px",
+          borderTop: "1px solid var(--border)",
+        }}
       >
-        <p
-          className="text-xs font-semibold uppercase tracking-wide"
-          style={{ color: "var(--text-secondary)" }}
-        >
-          Admin Note
-        </p>
+        <span style={sectionLabelStyle}>Admin Note</span>
         <textarea
           rows={2}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           placeholder="Internal note (not visible to customer)..."
-          className="w-full px-3 py-2 rounded-xl text-sm resize-none outline-none"
           style={{
+            width: "100%",
+            padding: "9px 12px",
+            borderRadius: "6px",
             border: "1px solid var(--border)",
             backgroundColor: "var(--bg-primary)",
             color: "var(--text-primary)",
+            fontSize: "13px",
+            outline: "none",
+            resize: "none",
+            marginBottom: "8px",
+            transition: "border-color 200ms ease",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderColor = "var(--brand)";
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderColor = "var(--border)";
           }}
         />
-        <Button
-          size="sm"
-          variant="secondary"
-          disabled={!note.trim()}
-          loading={loading === "note"}
+        <button
+          style={{
+            ...ghostBtnStyle,
+            opacity: !note.trim() ? 0.5 : 1,
+            cursor: !note.trim() ? "not-allowed" : "pointer",
+          }}
+          disabled={!note.trim() || loading === "note"}
           onClick={() =>
             action(
               "note",
@@ -414,8 +555,11 @@ export default function OrderActions({ order }: { order: Order }) {
             )
           }
         >
+          {loading === "note" && (
+            <Loader2 size={12} className="animate-spin" />
+          )}
           Add Note
-        </Button>
+        </button>
       </div>
 
       {/* Cancel Order */}
@@ -423,23 +567,44 @@ export default function OrderActions({ order }: { order: Order }) {
         order.status
       ) && (
         <div
-          className="pt-3 border-t"
-          style={{ borderColor: "var(--border)" }}
+          style={{
+            paddingTop: "14px",
+            borderTop: "1px solid var(--border)",
+          }}
         >
           {!showCancel ? (
             <button
               onClick={() => setShowCancel(true)}
-              className="flex items-center gap-1.5 text-sm"
-              style={{ color: "#DC2626" }}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "13px",
+                fontWeight: 500,
+                color: "#DC2626",
+                background: "none",
+                border: "none",
+                cursor: "pointer",
+                padding: "0",
+              }}
             >
-              <XCircle size={14} />
+              <XCircle size={14} strokeWidth={1.75} />
               Cancel Order
             </button>
           ) : (
-            <div className="space-y-2">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
               <p
-                className="text-xs font-semibold"
-                style={{ color: "#DC2626" }}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "#DC2626",
+                }}
               >
                 Cancel Order
               </p>
@@ -448,14 +613,19 @@ export default function OrderActions({ order }: { order: Order }) {
                 value={cancelReason}
                 onChange={(e) => setCancelReason(e.target.value)}
                 placeholder="Cancellation reason (required)..."
-                className="w-full px-3 py-2 rounded-xl text-sm resize-none outline-none"
                 style={{
+                  width: "100%",
+                  padding: "9px 12px",
+                  borderRadius: "6px",
                   border: "1px solid #DC2626",
                   backgroundColor: "var(--bg-primary)",
                   color: "var(--text-primary)",
+                  fontSize: "13px",
+                  outline: "none",
+                  resize: "none",
                 }}
               />
-              <div className="flex gap-2">
+              <div style={{ display: "flex", gap: "8px" }}>
                 <button
                   disabled={!cancelReason.trim() || loading === "cancel"}
                   onClick={() =>
@@ -469,21 +639,41 @@ export default function OrderActions({ order }: { order: Order }) {
                       "Order cancelled"
                     )
                   }
-                  className="px-3 py-1.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
-                  style={{ backgroundColor: "#DC2626" }}
+                  style={{
+                    flex: 1,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "7px",
+                    padding: "8px 14px",
+                    borderRadius: "6px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: "#fff",
+                    backgroundColor: "#DC2626",
+                    border: "none",
+                    cursor:
+                      !cancelReason.trim() || loading === "cancel"
+                        ? "not-allowed"
+                        : "pointer",
+                    opacity:
+                      !cancelReason.trim() || loading === "cancel" ? 0.5 : 1,
+                  }}
                 >
-                  {loading === "cancel" ? "Cancelling..." : "Confirm Cancel"}
+                  {loading === "cancel" && (
+                    <Loader2 size={12} className="animate-spin" />
+                  )}
+                  Confirm Cancel
                 </button>
-                <Button
-                  size="sm"
-                  variant="secondary"
+                <button
+                  style={{ ...ghostBtnStyle, flex: 1 }}
                   onClick={() => {
                     setShowCancel(false);
                     setCancelReason("");
                   }}
                 >
                   Back
-                </Button>
+                </button>
               </div>
             </div>
           )}

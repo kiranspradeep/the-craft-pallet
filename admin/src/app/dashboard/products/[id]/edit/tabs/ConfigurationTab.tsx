@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import Toggle from "@/components/ui/Toggle";
 import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
 
 const ALL_SOURCES = [
   "DIRECT_UPLOAD",
@@ -17,6 +17,16 @@ interface Props {
   product: any;
   onUpdate: (p: any) => void;
 }
+
+const sectionLabel = {
+  fontSize: "10px",
+  fontWeight: 600,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase" as const,
+  color: "var(--text-secondary)",
+  marginBottom: "14px",
+  display: "block",
+};
 
 export default function ConfigurationTab({ product, onUpdate }: Props) {
   const config = product.configuration;
@@ -34,7 +44,8 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
     allowedSources: (config?.allowedSources as string[]) || [],
     allowDuplicateImages: config?.allowDuplicateImages ?? false,
     allowImageReordering: config?.allowImageReordering ?? true,
-    estimatedProductionDays: config?.estimatedProductionDays?.toString() || "",
+    estimatedProductionDays:
+      config?.estimatedProductionDays?.toString() || "",
   });
 
   const set = (key: string, val: unknown) =>
@@ -99,46 +110,61 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
 
   return (
     <div
-      className="rounded-2xl border p-6"
       style={{
         backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "20px",
       }}
     >
-      <p
-        className="text-sm font-semibold mb-4"
-        style={{ color: "var(--text-primary)" }}
-      >
+      <span style={{ ...sectionLabel, marginBottom: "20px" }}>
         Upload & Production Configuration
-      </p>
+      </span>
 
       {error && (
         <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
           style={{
+            marginBottom: "16px",
+            padding: "10px 14px",
+            borderRadius: "6px",
             backgroundColor: "#FEF2F2",
-            color: "#DC2626",
             border: "1px solid #FECACA",
+            color: "#DC2626",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <AlertCircle size={13} strokeWidth={1.75} />
           {error}
         </div>
       )}
+
       {success && (
         <div
-          className="mb-4 px-4 py-3 rounded-xl text-sm"
           style={{
-            backgroundColor: "rgba(142,159,130,0.15)",
-            color: "var(--success)",
+            marginBottom: "16px",
+            padding: "10px 14px",
+            borderRadius: "6px",
+            backgroundColor: "rgba(142,159,130,0.12)",
             border: "1px solid rgba(142,159,130,0.3)",
+            color: "var(--success)",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "8px",
           }}
         >
+          <CheckCircle size={13} strokeWidth={1.75} />
           Configuration saved
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+      >
         <Toggle
           label="Upload Required"
           helpText="Customer must upload images to order this product"
@@ -146,7 +172,13 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
           onChange={(v) => set("uploadRequired", v)}
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "14px",
+          }}
+        >
           <Input
             label="Minimum Images"
             type="number"
@@ -196,39 +228,43 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
           />
         </div>
 
+        {/* Allowed sources */}
         <div>
-          <p
-            className="text-sm font-medium mb-3"
-            style={{ color: "var(--text-primary)" }}
-          >
-            Allowed Upload Sources
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {ALL_SOURCES.map((source) => (
-              <button
-                key={source}
-                type="button"
-                onClick={() => toggleSource(source)}
-                className="px-3 py-1.5 rounded-xl text-xs font-medium border transition-all"
-                style={{
-                  backgroundColor: form.allowedSources.includes(source)
-                    ? "var(--brand)"
-                    : "transparent",
-                  color: form.allowedSources.includes(source)
-                    ? "#fff"
-                    : "var(--text-secondary)",
-                  borderColor: form.allowedSources.includes(source)
-                    ? "var(--brand)"
-                    : "var(--border)",
-                }}
-              >
-                {source.replace(/_/g, " ")}
-              </button>
-            ))}
+          <span style={sectionLabel}>Allowed Upload Sources</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+            {ALL_SOURCES.map((source) => {
+              const active = form.allowedSources.includes(source);
+              return (
+                <button
+                  key={source}
+                  type="button"
+                  onClick={() => toggleSource(source)}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: "999px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    letterSpacing: "0.02em",
+                    border: active
+                      ? "1px solid var(--text-primary)"
+                      : "1px solid var(--border)",
+                    backgroundColor: active
+                      ? "var(--text-primary)"
+                      : "transparent",
+                    color: active ? "#fff" : "var(--text-secondary)",
+                    cursor: "pointer",
+                    transition: "all 150ms ease",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {source.replace(/_/g, " ")}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="flex gap-6">
+        <div style={{ display: "flex", gap: "32px", flexWrap: "wrap" }}>
           <Toggle
             label="Allow Duplicate Images"
             checked={form.allowDuplicateImages}
@@ -241,9 +277,29 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
           />
         </div>
 
-        <Button type="submit" loading={loading}>
-          Save Configuration
-        </Button>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "7px",
+            padding: "9px 20px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "#fff",
+            backgroundColor: loading
+              ? "var(--text-secondary)"
+              : "var(--text-primary)",
+            border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
+            alignSelf: "flex-start",
+          }}
+        >
+          {loading && <Loader2 size={13} className="animate-spin" />}
+          {loading ? "Saving..." : "Save Configuration"}
+        </button>
       </form>
     </div>
   );

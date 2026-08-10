@@ -26,58 +26,114 @@ export default function TopBar() {
   }, []);
 
   return (
-    <header
-      className="flex items-center justify-between px-6 py-4 border-b"
-      style={{
-        backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-      }}
-    >
-      <div />
+    <>
+      <style>{`
+        .topbar-bell:hover {
+          background-color: var(--bg-primary);
+        }
 
-      <div className="flex items-center gap-4">
-        {/* Notification bell */}
-        <button
-          className="w-9 h-9 rounded-xl flex items-center justify-center transition-colors"
-          style={{ color: "var(--text-secondary)" }}
-          onMouseEnter={(e) =>
-            ((e.currentTarget as HTMLElement).style.backgroundColor =
-              "var(--bg-primary)")
+        @media (max-width: 768px) {
+          .topbar {
+            padding-left: 64px !important;
           }
-          onMouseLeave={(e) =>
-            ((e.currentTarget as HTMLElement).style.backgroundColor =
-              "transparent")
-          }
-        >
-          <Bell size={18} strokeWidth={1.75} />
-        </button>
+        }
+      `}</style>
 
-        {/* Admin info */}
-        {admin && (
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p
-                className="text-sm font-medium"
-                style={{ color: "var(--text-primary)" }}
-              >
-                {admin.name}
-              </p>
-              <p
-                className="text-xs"
-                style={{ color: "var(--text-secondary)" }}
-              >
-                {admin.role}
-              </p>
-            </div>
+      <header
+        className="topbar"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "0 24px",
+          height: "69px",
+          backgroundColor: "var(--surface)",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div />
+
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Bell */}
+          <button
+            aria-label="Notifications"
+            className="topbar-bell"
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "6px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "var(--text-secondary)",
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              transition: "background-color 150ms ease",
+            }}
+          >
+            <Bell size={17} strokeWidth={1.75} />
+          </button>
+
+          {/* Divider */}
+          <div
+            style={{
+              width: "1px",
+              height: "24px",
+              backgroundColor: "var(--border)",
+            }}
+          />
+
+          {/* Admin */}
+          {admin && (
             <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-sm font-semibold"
-              style={{ backgroundColor: "var(--brand)" }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+              }}
             >
-              {admin.name.charAt(0).toUpperCase()}
+              <div className="hidden sm:block" style={{ textAlign: "right" }}>
+                <p
+                  style={{
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    color: "var(--text-primary)",
+                    lineHeight: 1.2,
+                  }}
+                >
+                  {admin.name}
+                </p>
+                <p
+                  style={{
+                    fontSize: "11px",
+                    color: "var(--text-secondary)",
+                    letterSpacing: "0.02em",
+                  }}
+                >
+                  {admin.role}
+                </p>
+              </div>
+              <div
+                style={{
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "6px",
+                  backgroundColor: "var(--text-primary)",
+                  color: "#fff",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                }}
+              >
+                {admin.name.charAt(0).toUpperCase()}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </header>
+          )}
+        </div>
+      </header>
+    </>
   );
 }

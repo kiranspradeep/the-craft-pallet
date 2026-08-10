@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import Input from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
 import { adminGet, adminPut } from "@/lib/adminApi";
+import {
+  SettingsPageLayout,
+  SettingsSection,
+  SaveButton,
+} from "../SettingsPageLayout";
 
 export default function ShippingSettingsPage() {
   const [loading, setLoading] = useState(false);
@@ -44,7 +46,6 @@ export default function ShippingSettingsPage() {
     setLoading(true);
     setError("");
     setSuccess(false);
-
     const body: Record<string, number> = {};
     if (form.freeShippingThreshold)
       body.freeShippingThreshold = parseFloat(form.freeShippingThreshold);
@@ -52,7 +53,6 @@ export default function ShippingSettingsPage() {
       body.defaultShippingCharge = parseFloat(form.defaultShippingCharge);
     if (form.defaultProcessingDays)
       body.defaultProcessingDays = parseInt(form.defaultProcessingDays);
-
     try {
       await adminPut("/api/admin/settings/shipping", body);
       setSuccess(true);
@@ -66,65 +66,21 @@ export default function ShippingSettingsPage() {
 
   if (fetching) {
     return (
-      <div className="text-center py-20">
-        <p style={{ color: "var(--text-secondary)" }}>Loading...</p>
+      <div style={{ textAlign: "center", padding: "80px 20px" }}>
+        <p style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>
+          Loading...
+        </p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-xl">
-      <div className="flex items-center gap-3 mb-6">
-        <Link href="/dashboard/settings">
-          <button
-            className="p-2 rounded-xl"
-            style={{ color: "var(--text-secondary)" }}
-          >
-            <ArrowLeft size={18} />
-          </button>
-        </Link>
-        <h1
-          className="text-xl font-semibold"
-          style={{ color: "var(--text-primary)" }}
-        >
-          Shipping Settings
-        </h1>
-      </div>
-
-      <div
-        className="rounded-2xl border p-6"
-        style={{
-          backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
-        }}
+    <SettingsPageLayout title="Shipping Settings" error={error} success={success}>
+      <form
+        onSubmit={handleSubmit}
+        style={{ display: "flex", flexDirection: "column", gap: "24px" }}
       >
-        {error && (
-          <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
-            style={{
-              backgroundColor: "#FEF2F2",
-              color: "#DC2626",
-              border: "1px solid #FECACA",
-            }}
-          >
-            {error}
-          </div>
-        )}
-        {success && (
-          <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
-            style={{
-              backgroundColor: "rgba(142,159,130,0.15)",
-              color: "var(--success)",
-              border: "1px solid rgba(142,159,130,0.3)",
-            }}
-          >
-            Settings saved
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <SettingsSection>
           <Input
             label="Free Shipping Threshold (₹)"
             type="number"
@@ -150,11 +106,10 @@ export default function ShippingSettingsPage() {
             onChange={(e) => set("defaultProcessingDays", e.target.value)}
             placeholder="e.g. 3"
           />
-          <Button type="submit" loading={loading}>
-            Save Settings
-          </Button>
-        </form>
-      </div>
-    </div>
+        </SettingsSection>
+
+        <SaveButton loading={loading} />
+      </form>
+    </SettingsPageLayout>
   );
 }

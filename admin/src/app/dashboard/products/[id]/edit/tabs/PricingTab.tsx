@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Star } from "lucide-react";
+import { Plus, Trash2, Star, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Select from "@/components/ui/Select";
-import Button from "@/components/ui/Button";
 import Toggle from "@/components/ui/Toggle";
 
 const STRATEGIES = [
@@ -37,6 +36,15 @@ const emptyTierForm = {
   sortOrder: 0,
 };
 
+const sectionLabel = {
+  fontSize: "10px",
+  fontWeight: 600,
+  letterSpacing: "0.14em",
+  textTransform: "uppercase" as const,
+  color: "var(--text-secondary)",
+  display: "block",
+};
+
 export default function PricingTab({ product, onUpdate }: Props) {
   const pricing = product.pricingConfig;
   const [loading, setLoading] = useState(false);
@@ -60,7 +68,6 @@ export default function PricingTab({ product, onUpdate }: Props) {
 
   const set = (key: string, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
-
   const setTier = (key: string, val: unknown) =>
     setTierForm((f) => ({ ...f, [key]: val }));
 
@@ -77,7 +84,8 @@ export default function PricingTab({ product, onUpdate }: Props) {
     setSuccess(false);
 
     const body: Record<string, unknown> = { strategy: form.strategy };
-    if (form.strategy === "PER_UNIT") body.unitPrice = parseFloat(form.unitPrice);
+    if (form.strategy === "PER_UNIT")
+      body.unitPrice = parseFloat(form.unitPrice);
     if (form.strategy === "INCREMENTAL_QUANTITY") {
       if (form.minimumOrderQuantity)
         body.minimumOrderQuantity = parseInt(form.minimumOrderQuantity);
@@ -158,49 +166,81 @@ export default function PricingTab({ product, onUpdate }: Props) {
 
   const tiers: PricingTier[] = pricing?.tiers || [];
 
+  const infoBox = (text: string) => (
+    <div
+      style={{
+        padding: "12px 14px",
+        borderRadius: "6px",
+        fontSize: "12px",
+        backgroundColor: "rgba(166,138,117,0.08)",
+        color: "var(--brand)",
+        lineHeight: 1.6,
+        border: "1px solid rgba(166,138,117,0.15)",
+      }}
+    >
+      {text}
+    </div>
+  );
+
   return (
-    <div className="space-y-5">
+    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* Strategy form */}
       <div
-        className="rounded-2xl border p-6"
         style={{
           backgroundColor: "var(--surface)",
-          borderColor: "var(--border)",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+          border: "1px solid var(--border)",
+          borderRadius: "8px",
+          padding: "20px",
         }}
       >
-        <p
-          className="text-sm font-semibold mb-4"
-          style={{ color: "var(--text-primary)" }}
-        >
+        <span style={{ ...sectionLabel, marginBottom: "16px" }}>
           Pricing Strategy
-        </p>
+        </span>
 
         {error && (
           <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
             style={{
+              marginBottom: "16px",
+              padding: "10px 14px",
+              borderRadius: "6px",
               backgroundColor: "#FEF2F2",
-              color: "#DC2626",
               border: "1px solid #FECACA",
+              color: "#DC2626",
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
+            <AlertCircle size={13} strokeWidth={1.75} />
             {error}
           </div>
         )}
+
         {success && (
           <div
-            className="mb-4 px-4 py-3 rounded-xl text-sm"
             style={{
-              backgroundColor: "rgba(142,159,130,0.15)",
-              color: "var(--success)",
+              marginBottom: "16px",
+              padding: "10px 14px",
+              borderRadius: "6px",
+              backgroundColor: "rgba(142,159,130,0.12)",
               border: "1px solid rgba(142,159,130,0.3)",
+              color: "var(--success)",
+              fontSize: "13px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
             }}
           >
+            <CheckCircle size={13} strokeWidth={1.75} />
             Pricing saved
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          style={{ display: "flex", flexDirection: "column", gap: "16px" }}
+        >
           <Select
             label="Pricing Strategy"
             value={form.strategy}
@@ -223,13 +263,15 @@ export default function PricingTab({ product, onUpdate }: Props) {
           )}
 
           {form.strategy === "INCREMENTAL_QUANTITY" && (
-            <div className="space-y-4">
+            <>
               <Input
                 label="Minimum Order Quantity"
                 type="number"
                 min={1}
                 value={form.minimumOrderQuantity}
-                onChange={(e) => set("minimumOrderQuantity", e.target.value)}
+                onChange={(e) =>
+                  set("minimumOrderQuantity", e.target.value)
+                }
                 placeholder="e.g. 36"
               />
               <Input
@@ -252,19 +294,10 @@ export default function PricingTab({ product, onUpdate }: Props) {
                 onChange={(e) => set("incrementPrice", e.target.value)}
                 placeholder="e.g. 99"
               />
-              <div
-                className="p-3 rounded-xl text-sm"
-                style={{
-                  backgroundColor: "rgba(166,138,117,0.08)",
-                  color: "var(--brand)",
-                }}
-              >
-                Example: {form.incrementQuantity || "36"} photos = ₹
-                {form.incrementPrice || "99"},{" "}
-                {parseInt(form.incrementQuantity || "36") * 2} photos = ₹
-                {parseInt(form.incrementPrice || "99") * 2}
-              </div>
-            </div>
+              {infoBox(
+                `Example: ${form.incrementQuantity || "36"} photos = ₹${form.incrementPrice || "99"}, ${parseInt(form.incrementQuantity || "36") * 2} photos = ₹${parseInt(form.incrementPrice || "99") * 2}`
+              )}
+            </>
           )}
 
           {form.strategy === "TIERED_PRICING" && (
@@ -280,101 +313,156 @@ export default function PricingTab({ product, onUpdate }: Props) {
             />
           )}
 
-          {form.strategy === "FIXED_VARIANTS" && (
-            <div
-              className="p-4 rounded-xl text-sm"
-              style={{
-                backgroundColor: "rgba(166,138,117,0.08)",
-                color: "var(--brand)",
-              }}
-            >
-              Price is taken from the selected variant. Configure variant prices
-              in the Variants tab.
-            </div>
-          )}
+          {form.strategy === "FIXED_VARIANTS" &&
+            infoBox(
+              "Price is taken from the selected variant. Configure variant prices in the Variants tab."
+            )}
 
-          {form.strategy === "CUSTOM_QUOTE" && (
-            <div
-              className="p-4 rounded-xl text-sm"
-              style={{
-                backgroundColor: "rgba(166,138,117,0.08)",
-                color: "var(--brand)",
-              }}
-            >
-              No price will be shown. Customers will see a &ldquo;Contact
-              Us&rdquo; button.
-            </div>
-          )}
+          {form.strategy === "CUSTOM_QUOTE" &&
+            infoBox(
+              'No price will be shown. Customers will see a "Contact Us" button.'
+            )}
 
-          <Button type="submit" loading={loading}>
-            Save Pricing
-          </Button>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "7px",
+              padding: "9px 20px",
+              borderRadius: "6px",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#fff",
+              backgroundColor: loading
+                ? "var(--text-secondary)"
+                : "var(--text-primary)",
+              border: "none",
+              cursor: loading ? "not-allowed" : "pointer",
+              alignSelf: "flex-start",
+            }}
+          >
+            {loading && <Loader2 size={13} className="animate-spin" />}
+            {loading ? "Saving..." : "Save Pricing"}
+          </button>
         </form>
       </div>
 
+      {/* Tiers */}
       {form.strategy === "TIERED_PRICING" && (
         <div
-          className="rounded-2xl border p-6"
           style={{
             backgroundColor: "var(--surface)",
-            borderColor: "var(--border)",
-            boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+            border: "1px solid var(--border)",
+            borderRadius: "8px",
+            padding: "20px",
           }}
         >
-          <div className="flex items-center justify-between mb-4">
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "4px",
+            }}
+          >
             <div>
               <p
-                className="text-sm font-semibold"
-                style={{ color: "var(--text-primary)" }}
+                style={{
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  marginBottom: "2px",
+                }}
               >
                 Pricing Tiers ({tiers.length})
               </p>
-              <p
-                className="text-xs mt-0.5"
-                style={{ color: "var(--text-secondary)" }}
-              >
+              <p style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
                 Customers choose a tier before ordering
               </p>
             </div>
             {!showTierForm && (
-              <Button
-                size="sm"
-                variant="secondary"
+              <button
                 onClick={() => setShowTierForm(true)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  padding: "7px 14px",
+                  borderRadius: "6px",
+                  fontSize: "12px",
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                  border: "1px solid var(--border)",
+                  backgroundColor: "transparent",
+                  cursor: "pointer",
+                }}
               >
-                <Plus size={14} />
+                <Plus size={13} strokeWidth={2} />
                 Add Tier
-              </Button>
+              </button>
             )}
           </div>
 
+          {/* Tier form */}
           {showTierForm && (
             <div
-              className="p-4 rounded-xl mb-4"
-              style={{ backgroundColor: "var(--bg-primary)" }}
+              style={{
+                padding: "16px",
+                borderRadius: "6px",
+                backgroundColor: "var(--bg-primary)",
+                border: "1px solid var(--border)",
+                marginTop: "16px",
+                marginBottom: "14px",
+              }}
             >
               <p
-                className="text-sm font-medium mb-3"
-                style={{ color: "var(--text-primary)" }}
+                style={{
+                  fontSize: "12px",
+                  fontWeight: 600,
+                  color: "var(--text-primary)",
+                  marginBottom: "14px",
+                }}
               >
                 New Pricing Tier
               </p>
 
               {tierError && (
                 <div
-                  className="mb-3 px-4 py-3 rounded-xl text-sm"
                   style={{
+                    marginBottom: "12px",
+                    padding: "10px 14px",
+                    borderRadius: "6px",
                     backgroundColor: "#FEF2F2",
-                    color: "#DC2626",
                     border: "1px solid #FECACA",
+                    color: "#DC2626",
+                    fontSize: "13px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "7px",
                   }}
                 >
+                  <AlertCircle size={13} strokeWidth={1.75} />
                   {tierError}
                 </div>
               )}
 
-              <form onSubmit={handleCreateTier} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+              <form
+                onSubmit={handleCreateTier}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
+                }}
+              >
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "14px",
+                  }}
+                >
                   <Input
                     label="Quantity (exact)"
                     required
@@ -383,10 +471,10 @@ export default function PricingTab({ product, onUpdate }: Props) {
                     value={tierForm.quantity}
                     onChange={(e) => setTier("quantity", e.target.value)}
                     placeholder="e.g. 30"
-                    helpText="Customer must order exactly this many"
+                    helpText="Customer orders exactly this many"
                   />
                   <Input
-                    label="Total Price for this Tier (₹)"
+                    label="Total Price (₹)"
                     required
                     type="number"
                     min={0}
@@ -396,14 +484,19 @@ export default function PricingTab({ product, onUpdate }: Props) {
                     placeholder="e.g. 99"
                   />
                 </div>
-                <Input
-                  label="Label"
-                  value={tierForm.label}
-                  onChange={(e) => setTier("label", e.target.value)}
-                  placeholder='e.g. "Best Value 🔥"'
-                  helpText="Optional label shown to customer"
-                />
-                <div className="grid grid-cols-2 gap-4">
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "14px",
+                  }}
+                >
+                  <Input
+                    label="Label (optional)"
+                    value={tierForm.label}
+                    onChange={(e) => setTier("label", e.target.value)}
+                    placeholder="e.g. Best Value"
+                  />
                   <Input
                     label="Sort Order"
                     type="number"
@@ -416,94 +509,182 @@ export default function PricingTab({ product, onUpdate }: Props) {
                 </div>
                 <Toggle
                   label="Special Offer"
-                  helpText="Highlights this tier with a special badge"
+                  helpText="Highlights this tier with a badge"
                   checked={tierForm.isSpecialOffer}
                   onChange={(v) => setTier("isSpecialOffer", v)}
                 />
-                <div className="flex gap-3">
-                  <Button type="submit" loading={tierLoading}>
+                <div style={{ display: "flex", gap: "10px" }}>
+                  <button
+                    type="submit"
+                    disabled={tierLoading}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "7px",
+                      padding: "8px 18px",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "#fff",
+                      backgroundColor: tierLoading
+                        ? "var(--text-secondary)"
+                        : "var(--text-primary)",
+                      border: "none",
+                      cursor: tierLoading ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    {tierLoading && (
+                      <Loader2 size={13} className="animate-spin" />
+                    )}
                     Add Tier
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="button"
-                    variant="secondary"
                     onClick={() => {
                       setShowTierForm(false);
                       setTierForm(emptyTierForm);
                       setTierError("");
                     }}
+                    style={{
+                      padding: "8px 18px",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontWeight: 500,
+                      color: "var(--text-secondary)",
+                      backgroundColor: "transparent",
+                      border: "1px solid var(--border)",
+                      cursor: "pointer",
+                    }}
                   >
                     Cancel
-                  </Button>
+                  </button>
                 </div>
               </form>
             </div>
           )}
 
+          {/* Tiers list */}
           {tiers.length === 0 && !showTierForm ? (
-            <div className="text-center py-10">
-              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+            <div style={{ textAlign: "center", padding: "40px 20px" }}>
+              <p
+                style={{ fontSize: "13px", color: "var(--text-secondary)" }}
+              >
                 No tiers yet. Add your first pricing tier above.
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div
+              style={{
+                marginTop: "14px",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px",
+              }}
+            >
               {tiers.map((tier) => (
                 <div
                   key={tier.id}
-                  className="flex items-center justify-between p-4 rounded-xl"
-                  style={{ backgroundColor: "var(--bg-primary)" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 14px",
+                    borderRadius: "6px",
+                    backgroundColor: "var(--bg-primary)",
+                    border: "1px solid var(--border-soft)",
+                  }}
                 >
-                  <div className="flex items-center gap-3">
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                    }}
+                  >
                     {tier.isSpecialOffer && (
                       <Star
-                        size={14}
+                        size={13}
                         fill="currentColor"
-                        style={{ color: "#F59E0B" }}
+                        style={{ color: "#F59E0B", flexShrink: 0 }}
                       />
                     )}
                     <div>
                       <p
-                        className="text-sm font-medium"
-                        style={{ color: "var(--text-primary)" }}
+                        style={{
+                          fontSize: "13px",
+                          fontWeight: 500,
+                          color: "var(--text-primary)",
+                          marginBottom: "2px",
+                        }}
                       >
-                        {tier.quantity} prints = ₹{Number(tier.price).toFixed(2)}
+                        {tier.quantity} prints = ₹
+                        {Number(tier.price).toFixed(2)}
                         {tier.label && (
                           <span
-                            className="ml-2 text-xs"
-                            style={{ color: "var(--brand)" }}
+                            style={{
+                              marginLeft: "8px",
+                              fontSize: "11px",
+                              color: "var(--brand)",
+                            }}
                           >
                             {tier.label}
                           </span>
                         )}
                       </p>
-                      <p
-                        className="text-xs mt-0.5"
-                        style={{ color: "var(--text-secondary)" }}
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                        }}
                       >
-                        ₹{(Number(tier.price) / tier.quantity).toFixed(2)} per
-                        print
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          ₹
+                          {(Number(tier.price) / tier.quantity).toFixed(2)}{" "}
+                          / print
+                        </p>
                         {tier.isSpecialOffer && (
                           <span
-                            className="ml-2 px-1.5 py-0.5 rounded-full text-xs"
                             style={{
+                              fontSize: "10px",
+                              fontWeight: 600,
+                              padding: "2px 7px",
+                              borderRadius: "999px",
                               backgroundColor: "rgba(245,158,11,0.1)",
                               color: "#F59E0B",
+                              letterSpacing: "0.04em",
                             }}
                           >
                             Special Offer
                           </span>
                         )}
-                      </p>
+                      </div>
                     </div>
                   </div>
                   <button
                     onClick={() => handleDeleteTier(tier.id)}
                     disabled={deletingTier === tier.id}
-                    className="p-1.5 rounded-lg"
-                    style={{ color: "#DC2626" }}
+                    aria-label="Delete tier"
+                    style={{
+                      width: "28px",
+                      height: "28px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      borderRadius: "6px",
+                      color: "#DC2626",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      opacity: deletingTier === tier.id ? 0.5 : 1,
+                    }}
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} strokeWidth={1.75} />
                   </button>
                 </div>
               ))}

@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2, Plus, Pencil } from "lucide-react";
-import Button from "@/components/ui/Button";
+import { Trash2, Plus, Pencil, AlertCircle, Loader2 } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Toggle from "@/components/ui/Toggle";
 
@@ -30,6 +29,12 @@ const emptyForm = {
   sortOrder: 0,
 };
 
+const formGrid = {
+  display: "grid",
+  gridTemplateColumns: "1fr 1fr",
+  gap: "14px",
+};
+
 export default function VariantsTab({ product, onUpdate }: Props) {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -47,6 +52,17 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     if (res.ok) onUpdate(data.data);
   };
 
+  const buildBody = () => ({
+    name: form.name,
+    sku: form.sku || undefined,
+    price: parseFloat(form.price),
+    processingDays: form.processingDays
+      ? parseInt(form.processingDays)
+      : undefined,
+    isActive: form.isActive,
+    sortOrder: form.sortOrder,
+  });
+
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -55,16 +71,7 @@ export default function VariantsTab({ product, onUpdate }: Props) {
       const res = await fetch(`/api/admin/products/${product.id}/variants`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: form.name,
-          sku: form.sku || undefined,
-          price: parseFloat(form.price),
-          processingDays: form.processingDays
-            ? parseInt(form.processingDays)
-            : undefined,
-          isActive: form.isActive,
-          sortOrder: form.sortOrder,
-        }),
+        body: JSON.stringify(buildBody()),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -90,16 +97,7 @@ export default function VariantsTab({ product, onUpdate }: Props) {
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: form.name,
-            sku: form.sku || undefined,
-            price: parseFloat(form.price),
-            processingDays: form.processingDays
-              ? parseInt(form.processingDays)
-              : undefined,
-            isActive: form.isActive,
-            sortOrder: form.sortOrder,
-          }),
+          body: JSON.stringify(buildBody()),
         }
       );
       const data = await res.json();
@@ -121,9 +119,10 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     if (!confirm("Delete this variant?")) return;
     setDeleting(variantId);
     try {
-      await fetch(`/api/admin/products/${product.id}/variants/${variantId}`, {
-        method: "DELETE",
-      });
+      await fetch(
+        `/api/admin/products/${product.id}/variants/${variantId}`,
+        { method: "DELETE" }
+      );
       await refreshProduct();
     } finally {
       setDeleting(null);
@@ -143,12 +142,6 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     setShowForm(false);
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setForm(emptyForm);
-    setError("");
-  };
-
   const VariantForm = ({
     onSubmit,
     submitLabel,
@@ -158,26 +151,35 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     submitLabel: string;
     onCancel: () => void;
   }) => (
-    <form onSubmit={onSubmit} className="space-y-4 mt-4">
+    <form
+      onSubmit={onSubmit}
+      style={{ marginTop: "14px", display: "flex", flexDirection: "column", gap: "14px" }}
+    >
       {error && (
         <div
-          className="px-4 py-3 rounded-xl text-sm"
           style={{
+            padding: "10px 14px",
+            borderRadius: "6px",
             backgroundColor: "#FEF2F2",
-            color: "#DC2626",
             border: "1px solid #FECACA",
+            color: "#DC2626",
+            fontSize: "13px",
+            display: "flex",
+            alignItems: "center",
+            gap: "7px",
           }}
         >
+          <AlertCircle size={13} strokeWidth={1.75} />
           {error}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-4">
+      <div style={formGrid}>
         <Input
           label="Variant Name"
           required
           value={form.name}
           onChange={(e) => set("name", e.target.value)}
-          placeholder="e.g. 4x4, A4, Large"
+          placeholder="e.g. 4×4, A4, Large"
         />
         <Input
           label="SKU"
@@ -216,53 +218,115 @@ export default function VariantsTab({ product, onUpdate }: Props) {
         checked={form.isActive}
         onChange={(v) => set("isActive", v)}
       />
-      <div className="flex gap-3">
-        <Button type="submit" loading={loading}>
+      <div style={{ display: "flex", gap: "10px" }}>
+        <button
+          type="submit"
+          disabled={loading}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "7px",
+            padding: "8px 18px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "#fff",
+            backgroundColor: loading ? "var(--text-secondary)" : "var(--text-primary)",
+            border: "none",
+            cursor: loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {loading && <Loader2 size={13} className="animate-spin" />}
           {submitLabel}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            padding: "8px 18px",
+            borderRadius: "6px",
+            fontSize: "13px",
+            fontWeight: 500,
+            color: "var(--text-secondary)",
+            backgroundColor: "transparent",
+            border: "1px solid var(--border)",
+            cursor: "pointer",
+          }}
+        >
           Cancel
-        </Button>
+        </button>
       </div>
     </form>
   );
 
   return (
     <div
-      className="rounded-2xl border p-6"
       style={{
         backgroundColor: "var(--surface)",
-        borderColor: "var(--border)",
-        boxShadow: "0 10px 30px rgba(0,0,0,0.06)",
+        border: "1px solid var(--border)",
+        borderRadius: "8px",
+        padding: "20px",
       }}
     >
-      <div className="flex items-center justify-between mb-4">
+      {/* Header */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          marginBottom: "16px",
+        }}
+      >
         <p
-          className="text-sm font-semibold"
-          style={{ color: "var(--text-primary)" }}
+          style={{
+            fontSize: "13px",
+            fontWeight: 600,
+            color: "var(--text-primary)",
+          }}
         >
           Variants ({product.variants?.length ?? 0})
         </p>
         {!showForm && !editingId && (
-          <Button
-            size="sm"
-            variant="secondary"
+          <button
             onClick={() => setShowForm(true)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "7px 14px",
+              borderRadius: "6px",
+              fontSize: "12px",
+              fontWeight: 500,
+              color: "var(--text-secondary)",
+              border: "1px solid var(--border)",
+              backgroundColor: "transparent",
+              cursor: "pointer",
+              transition: "all 150ms ease",
+            }}
           >
-            <Plus size={14} />
+            <Plus size={13} strokeWidth={2} />
             Add Variant
-          </Button>
+          </button>
         )}
       </div>
 
+      {/* Create form */}
       {showForm && (
         <div
-          className="p-4 rounded-xl mb-4"
-          style={{ backgroundColor: "var(--bg-primary)" }}
+          style={{
+            padding: "16px",
+            borderRadius: "6px",
+            backgroundColor: "var(--bg-primary)",
+            border: "1px solid var(--border)",
+            marginBottom: "14px",
+          }}
         >
           <p
-            className="text-sm font-medium mb-1"
-            style={{ color: "var(--text-primary)" }}
+            style={{
+              fontSize: "12px",
+              fontWeight: 600,
+              color: "var(--text-primary)",
+            }}
           >
             New Variant
           </p>
@@ -278,27 +342,32 @@ export default function VariantsTab({ product, onUpdate }: Props) {
         </div>
       )}
 
+      {/* Empty */}
       {product.variants?.length === 0 && !showForm ? (
-        <div className="text-center py-10">
-          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
+        <div style={{ textAlign: "center", padding: "40px 20px" }}>
+          <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
             No variants yet. Add one above.
           </p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           {product.variants?.map((v: Variant) => (
             <div key={v.id}>
               {editingId === v.id ? (
                 <div
-                  className="p-4 rounded-xl border"
                   style={{
-                    borderColor: "var(--brand)",
+                    padding: "16px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--brand)",
                     backgroundColor: "var(--bg-primary)",
                   }}
                 >
                   <p
-                    className="text-sm font-medium mb-1"
-                    style={{ color: "var(--brand)" }}
+                    style={{
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      color: "var(--brand)",
+                    }}
                   >
                     Editing: {v.name}
                   </p>
@@ -308,58 +377,113 @@ export default function VariantsTab({ product, onUpdate }: Props) {
                       handleUpdate(v.id);
                     }}
                     submitLabel="Save Changes"
-                    onCancel={cancelEdit}
+                    onCancel={() => {
+                      setEditingId(null);
+                      setForm(emptyForm);
+                      setError("");
+                    }}
                   />
                 </div>
               ) : (
                 <div
-                  className="flex items-center justify-between p-4 rounded-xl"
-                  style={{ backgroundColor: "var(--bg-primary)" }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 14px",
+                    borderRadius: "6px",
+                    backgroundColor: "var(--bg-primary)",
+                    border: "1px solid var(--border-soft)",
+                  }}
                 >
                   <div>
                     <p
-                      className="text-sm font-medium"
-                      style={{ color: "var(--text-primary)" }}
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: 500,
+                        color: "var(--text-primary)",
+                        marginBottom: "2px",
+                      }}
                     >
                       {v.name}
                     </p>
                     <p
-                      className="text-xs mt-0.5"
-                      style={{ color: "var(--text-secondary)" }}
+                      style={{
+                        fontSize: "11px",
+                        color: "var(--text-secondary)",
+                      }}
                     >
                       ₹{Number(v.price).toFixed(2)}
-                      {v.sku && ` · SKU: ${v.sku}`}
-                      {v.processingDays && ` · ${v.processingDays} days`}
+                      {v.sku && ` · ${v.sku}`}
+                      {v.processingDays && ` · ${v.processingDays}d`}
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
+
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
                     <span
-                      className="text-xs px-2 py-0.5 rounded-full"
                       style={{
+                        fontSize: "10px",
+                        fontWeight: 600,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        padding: "3px 8px",
+                        borderRadius: "999px",
                         backgroundColor: v.isActive
-                          ? "rgba(142,159,130,0.15)"
-                          : "rgba(166,138,117,0.1)",
+                          ? "rgba(142,159,130,0.12)"
+                          : "var(--bg-primary)",
                         color: v.isActive
                           ? "var(--success)"
                           : "var(--text-secondary)",
+                        border: v.isActive
+                          ? "1px solid rgba(142,159,130,0.25)"
+                          : "1px solid var(--border)",
                       }}
                     >
                       {v.isActive ? "Active" : "Inactive"}
                     </span>
                     <button
                       onClick={() => startEdit(v)}
-                      className="p-1.5 rounded-lg"
-                      style={{ color: "var(--brand)" }}
+                      aria-label="Edit variant"
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "6px",
+                        color: "var(--brand)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                      }}
                     >
-                      <Pencil size={14} />
+                      <Pencil size={13} strokeWidth={1.75} />
                     </button>
                     <button
                       onClick={() => handleDelete(v.id)}
                       disabled={deleting === v.id}
-                      className="p-1.5 rounded-lg"
-                      style={{ color: "#DC2626" }}
+                      aria-label="Delete variant"
+                      style={{
+                        width: "28px",
+                        height: "28px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        borderRadius: "6px",
+                        color: "#DC2626",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        opacity: deleting === v.id ? 0.5 : 1,
+                      }}
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={13} strokeWidth={1.75} />
                     </button>
                   </div>
                 </div>

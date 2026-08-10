@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, X, Loader2 } from "lucide-react";
+import { Search, X, Loader2, ChevronDown, Check } from "lucide-react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -35,17 +35,18 @@ export default function ProductFilters({
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [activeSuggestion, setActiveSuggestion] = useState(-1);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const liveSearchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync with URL param changes
   useEffect(() => {
     setSearch(currentSearch);
   }, [currentSearch]);
 
-  // Close suggestions on outside click
+  // Close search suggestions on outside click
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (
@@ -55,10 +56,28 @@ export default function ProductFilters({
         setShowSuggestions(false);
         setActiveSuggestion(-1);
       }
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+      }
     };
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  // Lock body scroll when mobile dropdown is open
+  useEffect(() => {
+    if (dropdownOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [dropdownOpen]);
 
   const updateParam = (key: string, value: string | null) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -67,14 +86,12 @@ export default function ProductFilters({
     router.push(`/products?${params.toString()}`);
   };
 
-  // Fetch suggestions from API
   const fetchSuggestions = useCallback(async (query: string) => {
     if (query.trim().length < 2) {
       setSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-
     setSuggestionsLoading(true);
     try {
       const res = await fetch(
@@ -98,18 +115,15 @@ export default function ProductFilters({
     }
   }, []);
 
-  // Live filter + suggestions as user types
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setActiveSuggestion(-1);
 
-    // Fetch suggestions with short debounce (250ms)
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       fetchSuggestions(value);
     }, 250);
 
-    // Apply live filter to product grid with longer debounce (500ms)
     if (liveSearchRef.current) clearTimeout(liveSearchRef.current);
     liveSearchRef.current = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString());
@@ -134,16 +148,18 @@ export default function ProductFilters({
     setShowSuggestions(false);
     setSuggestions([]);
     setActiveSuggestion(-1);
-
     const params = new URLSearchParams(searchParams.toString());
     params.set("search", suggestion.name);
     router.push(`/products?${params.toString()}`);
   };
 
-  // Keyboard navigation through suggestions
+  const handleCategorySelect = (slug: string | null) => {
+    updateParam("category", slug);
+    setDropdownOpen(false);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions || suggestions.length === 0) return;
-
     if (e.key === "ArrowDown") {
       e.preventDefault();
       setActiveSuggestion((prev) =>
@@ -161,7 +177,6 @@ export default function ProductFilters({
     }
   };
 
-  // Highlight matched portion of suggestion
   const highlightMatch = (text: string, query: string) => {
     if (!query.trim()) return text;
     const idx = text.toLowerCase().indexOf(query.toLowerCase().trim());
@@ -169,9 +184,7 @@ export default function ProductFilters({
     return (
       <>
         {text.slice(0, idx)}
-        <strong
-          style={{ color: "var(--text-primary)", fontWeight: 600 }}
-        >
+        <strong style={{ color: "var(--text-primary)", fontWeight: 600 }}>
           {text.slice(idx, idx + query.trim().length)}
         </strong>
         {text.slice(idx + query.trim().length)}
@@ -179,27 +192,73 @@ export default function ProductFilters({
     );
   };
 
+  const currentCategoryName =
+    categories.find((c) => c.slug === currentCategory)?.name || "All Products";
+
   return (
     <div>
-      {/* Search */}
-      <div ref={searchRef} style={{ position: "relative", marginBottom: "20px" }}>
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+
+        @keyframes slideUp {
+          from {
+            opacity: 0;
+            transform: translateY(100%);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+
+        .filter-chips-desktop {
+          display: flex;
+        }
+
+        .filter-dropdown-mobile {
+          display: none;
+        }
+
+        @media (max-width: 768px) {
+          .filter-chips-desktop {
+            display: none !important;
+          }
+          .filter-dropdown-mobile {
+            display: block !important;
+          }
+        }
+      `}</style>
+
+      {/* ── Search ── */}
+      <div
+        ref={searchRef}
+        style={{ position: "relative", marginBottom: "16px" }}
+      >
         <div
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: "10px",
-    padding: "12px 16px",
-    backgroundColor: "var(--surface)",
-    border: `1px solid ${showSuggestions ? "var(--brand)" : "var(--border)"}`,
-    borderRadius: showSuggestions
-      ? `var(--radius-input) var(--radius-input) 0 0`
-      : "var(--radius-input)",
-    transition: "border-color 200ms ease",
-  }}
-  onFocusCapture={() => {
-    if (suggestions.length > 0) setShowSuggestions(true);
-  }}
->
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            padding: "12px 16px",
+            backgroundColor: "var(--surface)",
+            border: `1px solid ${showSuggestions ? "var(--brand)" : "var(--border)"}`,
+            borderRadius: showSuggestions
+              ? "var(--radius-input) var(--radius-input) 0 0"
+              : "var(--radius-input)",
+            transition: "border-color 200ms ease",
+          }}
+          onFocusCapture={() => {
+            if (suggestions.length > 0) setShowSuggestions(true);
+          }}
+        >
           {suggestionsLoading ? (
             <Loader2
               size={15}
@@ -255,7 +314,7 @@ export default function ProductFilters({
           )}
         </div>
 
-        {/* Suggestions dropdown */}
+        {/* Search suggestions */}
         {showSuggestions && suggestions.length > 0 && (
           <div
             style={{
@@ -267,7 +326,7 @@ export default function ProductFilters({
               backgroundColor: "var(--surface)",
               border: "1px solid var(--brand)",
               borderTop: "1px solid var(--border-soft)",
-              borderRadius: `0 0 var(--radius-input) var(--radius-input)`,
+              borderRadius: "0 0 var(--radius-input) var(--radius-input)",
               overflow: "hidden",
               boxShadow: "var(--shadow-md)",
             }}
@@ -276,7 +335,6 @@ export default function ProductFilters({
               <button
                 key={s.id}
                 onMouseDown={(e) => {
-                  // Use mousedown to fire before blur
                   e.preventDefault();
                   handleSuggestionClick(s);
                 }}
@@ -300,7 +358,6 @@ export default function ProductFilters({
                   transition: "background-color 150ms ease",
                 }}
               >
-                {/* Thumbnail */}
                 <div
                   style={{
                     width: "36px",
@@ -332,8 +389,6 @@ export default function ProductFilters({
                     />
                   )}
                 </div>
-
-                {/* Name */}
                 <span
                   style={{
                     fontSize: "13px",
@@ -349,7 +404,6 @@ export default function ProductFilters({
               </button>
             ))}
 
-            {/* View all results */}
             <button
               onMouseDown={(e) => {
                 e.preventDefault();
@@ -380,17 +434,13 @@ export default function ProductFilters({
             </button>
           </div>
         )}
-
-        <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
       </div>
 
-      {/* Category chips */}
-      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      {/* ── Desktop: Category pills ── */}
+      <div
+        className="filter-chips-desktop"
+        style={{ gap: "8px", flexWrap: "wrap" }}
+      >
         <FilterChip
           label="All"
           active={!currentCategory}
@@ -405,9 +455,237 @@ export default function ProductFilters({
           />
         ))}
       </div>
+
+      {/* ── Mobile: Custom category dropdown ── */}
+      <div className="filter-dropdown-mobile" ref={dropdownRef}>
+        {/* Trigger button */}
+        <button
+          onClick={() => setDropdownOpen(true)}
+          style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "12px 16px",
+            borderRadius: "var(--radius-input)",
+            border: "1px solid var(--border)",
+            backgroundColor: "var(--surface)",
+            color: currentCategory
+              ? "var(--text-primary)"
+              : "var(--text-secondary)",
+            fontSize: "13px",
+            fontWeight: 500,
+            cursor: "pointer",
+            transition: "border-color 200ms ease",
+          }}
+        >
+          <span>{currentCategoryName}</span>
+          <ChevronDown
+            size={15}
+            strokeWidth={1.75}
+            style={{ color: "var(--text-tertiary)", flexShrink: 0 }}
+          />
+        </button>
+
+        {/* Active tag */}
+        {currentCategory && (
+          <div
+            style={{
+              marginTop: "10px",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+            }}
+          >
+            <span
+              style={{ fontSize: "12px", color: "var(--text-tertiary)" }}
+            >
+              Filtered by:
+            </span>
+            <button
+              onClick={() => updateParam("category", null)}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "5px",
+                padding: "5px 12px",
+                borderRadius: "var(--radius-badge)",
+                backgroundColor: "var(--text-primary)",
+                color: "#fff",
+                fontSize: "11px",
+                fontWeight: 500,
+                letterSpacing: "0.03em",
+                cursor: "pointer",
+              }}
+            >
+              {currentCategoryName}
+              <X size={11} strokeWidth={2} />
+            </button>
+          </div>
+        )}
+
+        {/* Bottom sheet overlay + panel */}
+        {dropdownOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              onClick={() => setDropdownOpen(false)}
+              style={{
+                position: "fixed",
+                inset: 0,
+                zIndex: 100,
+                backgroundColor: "rgba(43, 43, 43, 0.4)",
+                animation: "fadeIn 200ms ease",
+              }}
+            />
+
+            {/* Sheet */}
+            <div
+              style={{
+                position: "fixed",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 101,
+                backgroundColor: "var(--surface)",
+                borderRadius: "16px 16px 0 0",
+                maxHeight: "70vh",
+                display: "flex",
+                flexDirection: "column",
+                animation: "slideUp 300ms cubic-bezier(0.22, 1, 0.36, 1)",
+              }}
+            >
+              {/* Handle bar */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  padding: "12px 0 4px",
+                }}
+              >
+                <div
+                  style={{
+                    width: "36px",
+                    height: "4px",
+                    borderRadius: "999px",
+                    backgroundColor: "var(--border)",
+                  }}
+                />
+              </div>
+
+              {/* Header */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "12px 20px 16px",
+                  borderBottom: "1px solid var(--border-soft)",
+                }}
+              >
+                <h3
+                  style={{
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "var(--text-primary)",
+                    letterSpacing: "0.01em",
+                  }}
+                >
+                  Select Category
+                </h3>
+                <button
+                  onClick={() => setDropdownOpen(false)}
+                  aria-label="Close"
+                  style={{
+                    width: "32px",
+                    height: "32px",
+                    borderRadius: "var(--radius-input)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "var(--text-tertiary)",
+                    transition: "background-color 150ms ease",
+                  }}
+                >
+                  <X size={18} strokeWidth={1.75} />
+                </button>
+              </div>
+
+              {/* Options */}
+              <div
+                style={{
+                  overflowY: "auto",
+                  padding: "8px 0",
+                  flex: 1,
+                }}
+              >
+                {/* All Products option */}
+                <CategoryOption
+                  label="All Products"
+                  active={!currentCategory}
+                  onClick={() => handleCategorySelect(null)}
+                />
+
+                {categories.map((cat) => (
+                  <CategoryOption
+                    key={cat.id}
+                    label={cat.name}
+                    active={currentCategory === cat.slug}
+                    onClick={() => handleCategorySelect(cat.slug)}
+                  />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }
+
+/* ── Category option for bottom sheet ── */
+
+function CategoryOption({
+  label,
+  active,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "14px 20px",
+        textAlign: "left",
+        backgroundColor: active ? "var(--brand-soft)" : "transparent",
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
+        fontSize: "14px",
+        fontWeight: active ? 600 : 400,
+        cursor: "pointer",
+        transition: "background-color 150ms ease",
+        borderBottom: "1px solid var(--border-soft)",
+      }}
+    >
+      <span>{label}</span>
+      {active && (
+        <Check
+          size={16}
+          strokeWidth={2}
+          style={{ color: "var(--text-primary)", flexShrink: 0 }}
+        />
+      )}
+    </button>
+  );
+}
+
+/* ── Desktop filter chip ── */
 
 function FilterChip({
   label,

@@ -1,16 +1,28 @@
+// settings/page.tsx
+
 import SettingsGrid from "./SettingsGrid";
 
 export default function SettingsPage() {
   return (
     <div>
-      <div className="mb-6">
+      <div style={{ marginBottom: "24px" }}>
         <h1
-          className="text-xl font-semibold"
-          style={{ color: "var(--text-primary)" }}
+          style={{
+            fontSize: "18px",
+            fontWeight: 600,
+            color: "var(--text-primary)",
+            letterSpacing: "-0.01em",
+            marginBottom: "4px",
+          }}
         >
           Settings
         </h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--text-secondary)",
+          }}
+        >
           Manage your store configuration
         </p>
       </div>
