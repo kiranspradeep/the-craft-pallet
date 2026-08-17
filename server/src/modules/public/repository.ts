@@ -1,3 +1,5 @@
+// server/src/modules/public/publicRepository.ts
+
 import { prisma } from "../../prisma/client.js";
 import { Prisma } from "@prisma/client";
 
@@ -101,13 +103,16 @@ export const publicRepository = {
           variants: {
             where: { isActive: true },
             orderBy: { sortOrder: "asc" },
+            // ↓ removed thumbnailUrl (field deleted), added images
             select: {
               id: true,
               name: true,
               price: true,
-              thumbnailUrl: true,
               processingDays: true,
               sortOrder: true,
+              images: {
+                orderBy: { sortOrder: "asc" },
+              },
             },
           },
           pricingConfig: {
@@ -143,6 +148,10 @@ export const publicRepository = {
         variants: {
           where: { isActive: true },
           orderBy: { sortOrder: "asc" },
+          // ↓ added images so ProductDetail gallery swap works
+          include: {
+            images: { orderBy: { sortOrder: "asc" } },
+          },
         },
         pricingConfig: {
           include: {
@@ -161,7 +170,6 @@ export const publicRepository = {
   },
 
   // ── Related Products ──────────────────────────────────────────────────
-  // Same category, exclude current product, limit 4
 
   findRelatedProducts: async (
     categoryId: string,
@@ -189,6 +197,7 @@ export const publicRepository = {
         variants: {
           where: { isActive: true },
           orderBy: { sortOrder: "asc" },
+          // ↓ removed thumbnailUrl (field deleted)
           select: {
             id: true,
             name: true,

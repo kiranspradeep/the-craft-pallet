@@ -1,3 +1,4 @@
+//client\src\components\home\BestSellersSection.tsx
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import ProductCard from "@/components/ui/ProductCard";

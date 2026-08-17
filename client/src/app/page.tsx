@@ -1,3 +1,4 @@
+//client\src\app\page.tsx
 import { apiGet, apiGetList } from "@/lib/api";
 import HeroSection from "@/components/home/HeroSection";
 import BestSellersSection from "@/components/home/BestSellersSection";

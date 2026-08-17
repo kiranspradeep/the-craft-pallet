@@ -1,3 +1,4 @@
+// components/products/ProductDetail.tsx
 "use client";
 
 import { useState, useMemo } from "react";
@@ -16,6 +17,21 @@ import {
 } from "lucide-react";
 import { cartApi, buyNowApi, formatPrice } from "@/lib/cart";
 
+interface VariantImage {
+  id: string;
+  url: string;
+  altText: string | null;
+  sortOrder: number;
+}
+
+interface Variant {
+  id: string;
+  name: string;
+  price: number;
+  isActive: boolean;
+  images: VariantImage[];
+}
+
 interface Props {
   product: any;
 }
@@ -32,23 +48,37 @@ export default function ProductDetail({ product }: Props) {
   const [quantity, setQuantity] = useState<number>(() => {
     const p = product.pricingConfig;
     if (!p) return 1;
-    if (p.strategy === "TIERED_PRICING" && p.tiers[0]) return p.tiers[0].quantity;
+    if (p.strategy === "TIERED_PRICING" && p.tiers[0])
+      return p.tiers[0].quantity;
     if (p.strategy === "INCREMENTAL_QUANTITY")
       return p.minimumOrderQuantity || p.incrementQuantity || 1;
     return 1;
   });
-  const [customFieldValues, setCustomFieldValues] = useState<Record<string, string>>({});
+  const [customFieldValues, setCustomFieldValues] = useState<
+    Record<string, string>
+  >({});
   const [notes, setNotes] = useState("");
   const [adding, setAdding] = useState(false);
   const [buying, setBuying] = useState(false);
   const [added, setAdded] = useState(false);
   const [error, setError] = useState("");
 
+  // ── Selected variant ──────────────────────────────────────────────────
   const selectedVariant = useMemo(
-    () => product.variants.find((v: any) => v.id === selectedVariantId),
+    () => product.variants.find((v: Variant) => v.id === selectedVariantId),
     [selectedVariantId, product.variants]
   );
 
+  // ── Gallery images: use variant images if the selected variant has any,
+  //    otherwise fall back to the product-level images ───────────────────
+  const galleryImages = useMemo(() => {
+    if (selectedVariant?.images?.length > 0) {
+      return selectedVariant.images as VariantImage[];
+    }
+    return (product.images ?? []) as any[];
+  }, [selectedVariant, product.images]);
+
+  // ── Pricing helpers ───────────────────────────────────────────────────
   const quantityStep = useMemo(() => {
     const p = product.pricingConfig;
     if (!p) return 1;
@@ -70,7 +100,9 @@ export default function ProductDetail({ product }: Props) {
 
     switch (p.strategy) {
       case "PER_UNIT":
-        return p.unitPrice ? formatPrice(Number(p.unitPrice) * quantity) : "—";
+        return p.unitPrice
+          ? formatPrice(Number(p.unitPrice) * quantity)
+          : "—";
       case "INCREMENTAL_QUANTITY": {
         if (!p.incrementPrice || !p.incrementQuantity) return "—";
         const inc = Math.ceil(quantity / p.incrementQuantity);
@@ -79,7 +111,8 @@ export default function ProductDetail({ product }: Props) {
       case "TIERED_PRICING": {
         const tier = p.tiers.find((t: any) => t.quantity === selectedTier);
         if (tier) return formatPrice(tier.price);
-        if (p.baseUnitPrice) return formatPrice(Number(p.baseUnitPrice) * quantity);
+        if (p.baseUnitPrice)
+          return formatPrice(Number(p.baseUnitPrice) * quantity);
         return "—";
       }
       case "FIXED_VARIANTS":
@@ -93,6 +126,7 @@ export default function ProductDetail({ product }: Props) {
     }
   }, [product.pricingConfig, quantity, selectedTier, selectedVariant]);
 
+  // ── Validation & cart helpers ─────────────────────────────────────────
   const validate = (): boolean => {
     for (const field of product.customFields || []) {
       if (field.isRequired && field.type !== "PHOTO_UPLOAD") {
@@ -107,12 +141,27 @@ export default function ProductDetail({ product }: Props) {
 
   const buildCustomizations = () =>
     (product.customFields || [])
-      .filter((f: any) => customFieldValues[f.id] && f.type !== "PHOTO_UPLOAD")
+      .filter(
+        (f: any) => customFieldValues[f.id] && f.type !== "PHOTO_UPLOAD"
+      )
       .map((f: any) => {
-        const base = { customFieldId: f.id, fieldLabel: f.label, fieldType: f.type };
-        if (f.type === "NUMBER") return { ...base, numberValue: Number(customFieldValues[f.id]) };
-        if (f.type === "DATE") return { ...base, dateValue: new Date(customFieldValues[f.id]).toISOString() };
-        if (f.type === "CHECKBOX") return { ...base, booleanValue: customFieldValues[f.id] === "true" };
+        const base = {
+          customFieldId: f.id,
+          fieldLabel: f.label,
+          fieldType: f.type,
+        };
+        if (f.type === "NUMBER")
+          return { ...base, numberValue: Number(customFieldValues[f.id]) };
+        if (f.type === "DATE")
+          return {
+            ...base,
+            dateValue: new Date(customFieldValues[f.id]).toISOString(),
+          };
+        if (f.type === "CHECKBOX")
+          return {
+            ...base,
+            booleanValue: customFieldValues[f.id] === "true",
+          };
         return { ...base, textValue: customFieldValues[f.id] };
       });
 
@@ -157,6 +206,7 @@ export default function ProductDetail({ product }: Props) {
     }
   };
 
+  // ── Styles ────────────────────────────────────────────────────────────
   const inputStyle = {
     width: "100%",
     padding: "11px 14px",
@@ -194,9 +244,13 @@ export default function ProductDetail({ product }: Props) {
 
         <div
           className="pdp-grid"
-          style={{ display: "grid", gridTemplateColumns: "1fr", gap: "48px" }}
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr",
+            gap: "48px",
+          }}
         >
-          {/* ── Gallery ── */}
+          {/* ── Gallery ───────────────────────────────────────────────── */}
           <div>
             {/* Main image */}
             <div
@@ -208,11 +262,17 @@ export default function ProductDetail({ product }: Props) {
                 marginBottom: "12px",
               }}
             >
-              {product.images?.[activeImageIdx] ? (
+              {galleryImages[activeImageIdx] ? (
                 <img
-                  src={product.images[activeImageIdx].url}
-                  alt={product.images[activeImageIdx].altText || product.name}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                  src={galleryImages[activeImageIdx].url}
+                  alt={
+                    galleryImages[activeImageIdx].altText || product.name
+                  }
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
                 />
               ) : (
                 <div
@@ -233,16 +293,17 @@ export default function ProductDetail({ product }: Props) {
               )}
             </div>
 
-            {/* Thumbnails */}
-            {product.images && product.images.length > 1 && (
+            {/* Thumbnails — only show when more than one image */}
+            {galleryImages.length > 1 && (
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(72px, 1fr))",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(72px, 1fr))",
                   gap: "8px",
                 }}
               >
-                {product.images.map((img: any, i: number) => (
+                {galleryImages.map((img: any, i: number) => (
                   <button
                     key={img.id}
                     aria-label={`View image ${i + 1}`}
@@ -262,7 +323,11 @@ export default function ProductDetail({ product }: Props) {
                     <img
                       src={img.url}
                       alt=""
-                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      style={{
+                        width: "100%",
+                        height: "100%",
+                        objectFit: "cover",
+                      }}
                     />
                   </button>
                 ))}
@@ -270,9 +335,9 @@ export default function ProductDetail({ product }: Props) {
             )}
           </div>
 
-          {/* ── Product Info ── */}
+          {/* ── Product Info ──────────────────────────────────────────── */}
           <div>
-            {/* Breadcrumb category */}
+            {/* Category eyebrow */}
             <p
               style={{
                 fontSize: "11px",
@@ -337,15 +402,21 @@ export default function ProductDetail({ product }: Props) {
               </div>
             </div>
 
-            {/* Variants */}
+            {/* ── Variants ─────────────────────────────────────────────── */}
             {product.variants?.length > 0 && (
               <div style={{ marginBottom: "24px" }}>
                 <p style={labelStyle}>Size / Variant</p>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                  {product.variants.map((v: any) => (
+                <div
+                  style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}
+                >
+                  {product.variants.map((v: Variant) => (
                     <button
                       key={v.id}
-                      onClick={() => setSelectedVariantId(v.id)}
+                      onClick={() => {
+                        setSelectedVariantId(v.id);
+                        // Reset gallery to first image whenever variant changes
+                        setActiveImageIdx(0);
+                      }}
                       style={{
                         padding: "10px 18px",
                         borderRadius: "var(--radius-input)",
@@ -357,7 +428,10 @@ export default function ProductDetail({ product }: Props) {
                           selectedVariantId === v.id
                             ? "var(--text-primary)"
                             : "transparent",
-                        color: selectedVariantId === v.id ? "#fff" : "var(--text-primary)",
+                        color:
+                          selectedVariantId === v.id
+                            ? "#fff"
+                            : "var(--text-primary)",
                         fontSize: "13px",
                         fontWeight: 500,
                         cursor: "pointer",
@@ -382,7 +456,7 @@ export default function ProductDetail({ product }: Props) {
               </div>
             )}
 
-            {/* Tiers */}
+            {/* ── Tiers ────────────────────────────────────────────────── */}
             {product.pricingConfig?.strategy === "TIERED_PRICING" &&
               product.pricingConfig.tiers.length > 0 && (
                 <div style={{ marginBottom: "24px" }}>
@@ -390,7 +464,8 @@ export default function ProductDetail({ product }: Props) {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))",
+                      gridTemplateColumns:
+                        "repeat(auto-fill, minmax(130px, 1fr))",
                       gap: "8px",
                     }}
                   >
@@ -461,15 +536,16 @@ export default function ProductDetail({ product }: Props) {
                             {t.label}
                           </div>
                         )}
-                        <div
-                          style={{
-                            fontSize: "16px",
-                            fontWeight: 700,
-                          }}
-                        >
+                        <div style={{ fontSize: "16px", fontWeight: 700 }}>
                           {formatPrice(t.price)}
                         </div>
-                        <div style={{ fontSize: "11px", opacity: 0.6, marginTop: "2px" }}>
+                        <div
+                          style={{
+                            fontSize: "11px",
+                            opacity: 0.6,
+                            marginTop: "2px",
+                          }}
+                        >
                           ₹{(Number(t.price) / t.quantity).toFixed(1)}/print
                         </div>
                       </button>
@@ -478,7 +554,7 @@ export default function ProductDetail({ product }: Props) {
                 </div>
               )}
 
-            {/* Custom Fields */}
+            {/* ── Custom Fields ─────────────────────────────────────────── */}
             {product.customFields
               ?.filter((f: any) => f.type !== "PHOTO_UPLOAD")
               .map((field: any) => (
@@ -486,7 +562,14 @@ export default function ProductDetail({ product }: Props) {
                   <label style={labelStyle}>
                     {field.label}
                     {field.isRequired && (
-                      <span style={{ color: "var(--accent)", marginLeft: "2px" }}>*</span>
+                      <span
+                        style={{
+                          color: "var(--accent)",
+                          marginLeft: "2px",
+                        }}
+                      >
+                        *
+                      </span>
                     )}
                   </label>
 
@@ -494,10 +577,15 @@ export default function ProductDetail({ product }: Props) {
                     <input
                       type={field.type === "URL" ? "url" : "text"}
                       placeholder={field.placeholder || ""}
-                      maxLength={field.validationJson?.maxTextLength || undefined}
+                      maxLength={
+                        field.validationJson?.maxTextLength || undefined
+                      }
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
+                        setCustomFieldValues((v) => ({
+                          ...v,
+                          [field.id]: e.target.value,
+                        }))
                       }
                       style={inputStyle}
                     />
@@ -505,10 +593,15 @@ export default function ProductDetail({ product }: Props) {
                     <textarea
                       rows={3}
                       placeholder={field.placeholder || ""}
-                      maxLength={field.validationJson?.maxTextLength || undefined}
+                      maxLength={
+                        field.validationJson?.maxTextLength || undefined
+                      }
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
+                        setCustomFieldValues((v) => ({
+                          ...v,
+                          [field.id]: e.target.value,
+                        }))
                       }
                       style={{ ...inputStyle, resize: "vertical" }}
                     />
@@ -516,7 +609,10 @@ export default function ProductDetail({ product }: Props) {
                     <select
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
+                        setCustomFieldValues((v) => ({
+                          ...v,
+                          [field.id]: e.target.value,
+                        }))
                       }
                       style={inputStyle}
                     >
@@ -535,7 +631,10 @@ export default function ProductDetail({ product }: Props) {
                       max={field.validationJson?.max ?? undefined}
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
+                        setCustomFieldValues((v) => ({
+                          ...v,
+                          [field.id]: e.target.value,
+                        }))
                       }
                       style={inputStyle}
                     />
@@ -544,7 +643,10 @@ export default function ProductDetail({ product }: Props) {
                       type="date"
                       value={customFieldValues[field.id] || ""}
                       onChange={(e) =>
-                        setCustomFieldValues((v) => ({ ...v, [field.id]: e.target.value }))
+                        setCustomFieldValues((v) => ({
+                          ...v,
+                          [field.id]: e.target.value,
+                        }))
                       }
                       style={inputStyle}
                     />
@@ -585,11 +687,19 @@ export default function ProductDetail({ product }: Props) {
                 >
                   Photo upload required
                 </p>
-                <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "var(--text-secondary)",
+                  }}
+                >
                   You'll upload{" "}
-                  {product.configuration.minImages === product.configuration.maxImages
+                  {product.configuration.minImages ===
+                  product.configuration.maxImages
                     ? `${product.configuration.maxImages}`
-                    : `${product.configuration.minImages || 1}–${product.configuration.maxImages}`}{" "}
+                    : `${product.configuration.minImages || 1}–${
+                        product.configuration.maxImages
+                      }`}{" "}
                   photos in the next step.
                 </p>
               </div>
@@ -601,7 +711,8 @@ export default function ProductDetail({ product }: Props) {
                 <div style={{ marginBottom: "24px" }}>
                   <p style={labelStyle}>
                     Quantity
-                    {product.pricingConfig?.strategy === "INCREMENTAL_QUANTITY" && (
+                    {product.pricingConfig?.strategy ===
+                      "INCREMENTAL_QUANTITY" && (
                       <span
                         style={{
                           marginLeft: "8px",
@@ -628,7 +739,9 @@ export default function ProductDetail({ product }: Props) {
                     <button
                       aria-label="Decrease quantity"
                       onClick={() =>
-                        setQuantity((q) => Math.max(quantityMin, q - quantityStep))
+                        setQuantity((q) =>
+                          Math.max(quantityMin, q - quantityStep)
+                        )
                       }
                       style={{
                         width: "44px",
@@ -641,10 +754,14 @@ export default function ProductDetail({ product }: Props) {
                         transition: "background-color 150ms ease",
                       }}
                       onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg)";
+                        (
+                          e.currentTarget as HTMLElement
+                        ).style.backgroundColor = "var(--bg)";
                       }}
                       onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                        (
+                          e.currentTarget as HTMLElement
+                        ).style.backgroundColor = "transparent";
                       }}
                     >
                       <Minus size={14} strokeWidth={2} />
@@ -676,10 +793,14 @@ export default function ProductDetail({ product }: Props) {
                         transition: "background-color 150ms ease",
                       }}
                       onMouseEnter={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "var(--bg)";
+                        (
+                          e.currentTarget as HTMLElement
+                        ).style.backgroundColor = "var(--bg)";
                       }}
                       onMouseLeave={(e) => {
-                        (e.currentTarget as HTMLElement).style.backgroundColor = "transparent";
+                        (
+                          e.currentTarget as HTMLElement
+                        ).style.backgroundColor = "transparent";
                       }}
                     >
                       <Plus size={14} strokeWidth={2} />
@@ -690,7 +811,9 @@ export default function ProductDetail({ product }: Props) {
 
             {/* Notes */}
             <div style={{ marginBottom: "24px" }}>
-              <label style={labelStyle}>Special Instructions (optional)</label>
+              <label style={labelStyle}>
+                Special Instructions (optional)
+              </label>
               <textarea
                 rows={2}
                 placeholder="Any special requests..."
@@ -829,7 +952,7 @@ export default function ProductDetail({ product }: Props) {
           </div>
         </div>
 
-        {/* Product Description */}
+        {/* ── Product Description ───────────────────────────────────── */}
         {product.description && (
           <div
             style={{

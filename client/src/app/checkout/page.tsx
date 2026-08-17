@@ -30,6 +30,36 @@ declare global {
   }
 }
 
+// ── Shipping helpers ──────────────────────────────────────────────────────
+
+interface ShippingSettings {
+  keralaShippingCharge: string | null;
+  outsideKeralaShippingCharge: string | null;
+}
+
+function isKerala(state: string): boolean {
+  return state.trim().toLowerCase().includes("kerala");
+}
+
+function resolveShippingCharge(
+  settings: ShippingSettings | null,
+  state: string
+): number | null {
+  if (!settings) return null;
+  if (!state.trim()) return null;
+  if (isKerala(state)) {
+    return settings.keralaShippingCharge !== null &&
+      settings.keralaShippingCharge !== undefined
+      ? Number(String(settings.keralaShippingCharge))
+      : 0;
+  } else {
+    return settings.outsideKeralaShippingCharge !== null &&
+      settings.outsideKeralaShippingCharge !== undefined
+      ? Number(String(settings.outsideKeralaShippingCharge))
+      : 0;
+  }
+}
+
 // ── Validation ────────────────────────────────────────────────────────────
 
 interface FormErrors {
@@ -77,17 +107,9 @@ function validateForm(
     }
   }
 
-  if (!form.shipLine1.trim()) {
-    errors.shipLine1 = "Address is required";
-  }
-
-  if (!form.shipCity.trim()) {
-    errors.shipCity = "City is required";
-  }
-
-  if (!form.shipState.trim()) {
-    errors.shipState = "State is required";
-  }
+  if (!form.shipLine1.trim()) errors.shipLine1 = "Address is required";
+  if (!form.shipCity.trim()) errors.shipCity = "City is required";
+  if (!form.shipState.trim()) errors.shipState = "State is required";
 
   if (!form.shipPincode.trim()) {
     errors.shipPincode = "Pincode is required";
@@ -115,6 +137,10 @@ function CheckoutContent() {
   const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  // Shipping settings fetched once on mount
+  const [shippingSettings, setShippingSettings] =
+    useState<ShippingSettings | null>(null);
+
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -131,10 +157,42 @@ function CheckoutContent() {
 
   const [sameShipping, setSameShipping] = useState(true);
 
+  // Derived shipping charge — recalculates whenever state field changes
+  const shippingCharge = resolveShippingCharge(
+    shippingSettings,
+    form.shipState
+  );
+  const totalWithShipping =
+    shippingCharge !== null ? subtotal + shippingCharge : subtotal;
+
   useEffect(() => {
     load();
+    fetchShippingSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buyNowId]);
+
+  const fetchShippingSettings = async () => {
+  try {
+    const res = await fetch(`${API_URL}/api/settings/shipping`);
+    const data = await res.json();
+    if (res.ok && data.data) {
+      setShippingSettings({
+        keralaShippingCharge:
+          data.data.keralaShippingCharge !== null &&
+          data.data.keralaShippingCharge !== undefined
+            ? String(data.data.keralaShippingCharge)
+            : null,
+        outsideKeralaShippingCharge:
+          data.data.outsideKeralaShippingCharge !== null &&
+          data.data.outsideKeralaShippingCharge !== undefined
+            ? String(data.data.outsideKeralaShippingCharge)
+            : null,
+      });
+    }
+  } catch {
+    // silently fail
+  }
+};
 
   const load = async () => {
     try {
@@ -177,7 +235,6 @@ function CheckoutContent() {
 
   const set = (k: string, v: string) => {
     setForm((f) => ({ ...f, [k]: v }));
-    // Clear field error when user starts typing
     if (fieldErrors[k as keyof FormErrors]) {
       setFieldErrors((prev) => ({ ...prev, [k]: undefined }));
     }
@@ -191,17 +248,12 @@ function CheckoutContent() {
     e.preventDefault();
     setError("");
 
-    // Run validation
     const errors = validateForm(form, sameShipping);
-
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      // Mark all fields as touched so errors show
       const allTouched: Record<string, boolean> = {};
       Object.keys(form).forEach((k) => (allTouched[k] = true));
       setTouched(allTouched);
-
-      // Scroll to first error
       const firstErrorKey = Object.keys(errors)[0];
       const el = document.querySelector(`[data-field="${firstErrorKey}"]`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -217,9 +269,7 @@ function CheckoutContent() {
         phone: form.phone.trim(),
         email: form.email.trim() || undefined,
         shipName: sameShipping ? form.name.trim() : form.shipName.trim(),
-        shipPhone: sameShipping
-          ? form.phone.trim()
-          : form.shipPhone.trim(),
+        shipPhone: sameShipping ? form.phone.trim() : form.shipPhone.trim(),
         shipLine1: form.shipLine1.trim(),
         shipLine2: form.shipLine2.trim() || undefined,
         shipCity: form.shipCity.trim(),
@@ -425,7 +475,7 @@ function CheckoutContent() {
                 gap: "32px",
               }}
             >
-              {/* Left — Form */}
+              {/* ── Left — Form ─────────────────────────────────────── */}
               <div>
                 {/* Contact Information */}
                 <FormSection title="Contact Information" step={1}>
@@ -437,7 +487,11 @@ function CheckoutContent() {
                       gap: "16px",
                     }}
                   >
-                    <Field label="Full Name" required error={touched.name ? fieldErrors.name : undefined}>
+                    <Field
+                      label="Full Name"
+                      required
+                      error={touched.name ? fieldErrors.name : undefined}
+                    >
                       <Input
                         data-field="name"
                         placeholder="Priya Sharma"
@@ -448,7 +502,11 @@ function CheckoutContent() {
                         required
                       />
                     </Field>
-                    <Field label="Phone" required error={touched.phone ? fieldErrors.phone : undefined}>
+                    <Field
+                      label="Phone"
+                      required
+                      error={touched.phone ? fieldErrors.phone : undefined}
+                    >
                       <Input
                         data-field="phone"
                         placeholder="9876543210"
@@ -497,7 +555,6 @@ function CheckoutContent() {
                       checked={sameShipping}
                       onChange={(e) => {
                         setSameShipping(e.target.checked);
-                        // Clear ship field errors when toggling
                         setFieldErrors((prev) => ({
                           ...prev,
                           shipName: undefined,
@@ -521,27 +578,36 @@ function CheckoutContent() {
                       <Field
                         label="Recipient Name"
                         required
-                        error={touched.shipName ? fieldErrors.shipName : undefined}
+                        error={
+                          touched.shipName ? fieldErrors.shipName : undefined
+                        }
                       >
                         <Input
                           data-field="shipName"
                           value={form.shipName}
                           onChange={(v) => set("shipName", v)}
                           onBlur={() => touch("shipName")}
-                          hasError={!!(touched.shipName && fieldErrors.shipName)}
+                          hasError={
+                            !!(touched.shipName && fieldErrors.shipName)
+                          }
                           placeholder="Priya Sharma"
                         />
                       </Field>
                       <Field
                         label="Recipient Phone"
                         required
-                        error={touched.shipPhone ? fieldErrors.shipPhone : undefined}
+                        error={
+                          touched.shipPhone ? fieldErrors.shipPhone : undefined
+                        }
                       >
                         <Input
                           data-field="shipPhone"
                           value={form.shipPhone}
                           onChange={(v) =>
-                            set("shipPhone", v.replace(/\D/g, "").slice(0, 10))
+                            set(
+                              "shipPhone",
+                              v.replace(/\D/g, "").slice(0, 10)
+                            )
                           }
                           onBlur={() => touch("shipPhone")}
                           hasError={
@@ -558,7 +624,9 @@ function CheckoutContent() {
                   <Field
                     label="Address Line 1"
                     required
-                    error={touched.shipLine1 ? fieldErrors.shipLine1 : undefined}
+                    error={
+                      touched.shipLine1 ? fieldErrors.shipLine1 : undefined
+                    }
                   >
                     <Input
                       data-field="shipLine1"
@@ -589,7 +657,9 @@ function CheckoutContent() {
                     <Field
                       label="City"
                       required
-                      error={touched.shipCity ? fieldErrors.shipCity : undefined}
+                      error={
+                        touched.shipCity ? fieldErrors.shipCity : undefined
+                      }
                     >
                       <Input
                         data-field="shipCity"
@@ -597,33 +667,44 @@ function CheckoutContent() {
                         onChange={(v) => set("shipCity", v)}
                         onBlur={() => touch("shipCity")}
                         hasError={!!(touched.shipCity && fieldErrors.shipCity)}
-                        placeholder="Mumbai"
+                        placeholder="Kochi"
                       />
                     </Field>
                     <Field
                       label="State"
                       required
-                      error={touched.shipState ? fieldErrors.shipState : undefined}
+                      error={
+                        touched.shipState ? fieldErrors.shipState : undefined
+                      }
                     >
                       <Input
                         data-field="shipState"
                         value={form.shipState}
                         onChange={(v) => set("shipState", v)}
                         onBlur={() => touch("shipState")}
-                        hasError={!!(touched.shipState && fieldErrors.shipState)}
-                        placeholder="Maharashtra"
+                        hasError={
+                          !!(touched.shipState && fieldErrors.shipState)
+                        }
+                        placeholder="Kerala"
                       />
                     </Field>
                     <Field
                       label="Pincode"
                       required
-                      error={touched.shipPincode ? fieldErrors.shipPincode : undefined}
+                      error={
+                        touched.shipPincode
+                          ? fieldErrors.shipPincode
+                          : undefined
+                      }
                     >
                       <Input
                         data-field="shipPincode"
                         value={form.shipPincode}
                         onChange={(v) =>
-                          set("shipPincode", v.replace(/\D/g, "").slice(0, 6))
+                          set(
+                            "shipPincode",
+                            v.replace(/\D/g, "").slice(0, 6)
+                          )
                         }
                         onBlur={() => touch("shipPincode")}
                         hasError={
@@ -631,7 +712,7 @@ function CheckoutContent() {
                         }
                         maxLength={6}
                         inputMode="numeric"
-                        placeholder="400001"
+                        placeholder="682001"
                       />
                     </Field>
                   </div>
@@ -674,7 +755,7 @@ function CheckoutContent() {
                 </FormSection>
               </div>
 
-              {/* Right — Summary */}
+              {/* ── Right — Summary ──────────────────────────────────── */}
               <div>
                 <div
                   style={{
@@ -738,7 +819,10 @@ function CheckoutContent() {
                             <ImageIcon
                               size={18}
                               strokeWidth={1}
-                              style={{ color: "var(--border)", opacity: 0.6 }}
+                              style={{
+                                color: "var(--border)",
+                                opacity: 0.6,
+                              }}
                             />
                           )}
                         </div>
@@ -783,7 +867,9 @@ function CheckoutContent() {
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {formatPrice(Number(item.unitPrice) * item.quantity)}
+                          {formatPrice(
+                            Number(item.unitPrice) * item.quantity
+                          )}
                         </span>
                       </div>
                     ))}
@@ -791,6 +877,7 @@ function CheckoutContent() {
 
                   {/* Totals */}
                   <div style={{ marginBottom: "16px" }}>
+                    {/* Subtotal */}
                     <div
                       style={{
                         display: "flex",
@@ -817,28 +904,54 @@ function CheckoutContent() {
                         {formatPrice(subtotal)}
                       </span>
                     </div>
+
+                    {/* Shipping — live update based on state field */}
                     <div
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
                         alignItems: "center",
+                        marginBottom: "8px",
                       }}
                     >
                       <span
                         style={{
                           fontSize: "12px",
-                          color: "var(--text-tertiary)",
+                          color: "var(--text-secondary)",
                         }}
                       >
                         Shipping
+                        {form.shipState.trim() && shippingCharge !== null && (
+                          <span
+                            style={{
+                              marginLeft: "6px",
+                              fontSize: "10px",
+                              color: "var(--text-tertiary)",
+                            }}
+                          >
+                            ({isKerala(form.shipState)
+                              ? "Kerala"
+                              : "Outside Kerala"})
+                          </span>
+                        )}
                       </span>
                       <span
                         style={{
                           fontSize: "12px",
-                          color: "var(--text-tertiary)",
+                          fontWeight: shippingCharge !== null ? 500 : 400,
+                          color:
+                            shippingCharge === 0
+                              ? "var(--success)"
+                              : shippingCharge !== null
+                              ? "var(--text-primary)"
+                              : "var(--text-tertiary)",
                         }}
                       >
-                        Calculated at checkout
+                        {shippingCharge === null
+                          ? "Enter state above"
+                          : shippingCharge === 0
+                          ? "Free"
+                          : formatPrice(shippingCharge)}
                       </span>
                     </div>
                   </div>
@@ -864,7 +977,7 @@ function CheckoutContent() {
                         color: "var(--text-tertiary)",
                       }}
                     >
-                      Estimated Total
+                      {shippingCharge !== null ? "Total" : "Estimated Total"}
                     </span>
                     <span
                       style={{
@@ -875,7 +988,7 @@ function CheckoutContent() {
                         letterSpacing: "-0.02em",
                       }}
                     >
-                      {formatPrice(subtotal)}
+                      {formatPrice(totalWithShipping)}
                     </span>
                   </div>
 
@@ -903,7 +1016,6 @@ function CheckoutContent() {
                     </div>
                   )}
 
-                  {/* Validation summary — shown when form submitted with errors */}
                   {Object.keys(fieldErrors).length > 0 &&
                     Object.values(touched).some(Boolean) && (
                       <div
@@ -1166,15 +1278,16 @@ function Input({
         outline: "none",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = hasError ? "#DC2626" : "var(--brand)";
+        e.currentTarget.style.borderColor = hasError
+          ? "#DC2626"
+          : "var(--brand)";
         e.currentTarget.style.backgroundColor = "var(--bg)";
       }}
       onBlurCapture={(e) => {
         e.currentTarget.style.borderColor = hasError
           ? "#DC2626"
           : "var(--border)";
-        if (hasError)
-          e.currentTarget.style.backgroundColor = "#FEF2F2";
+        if (hasError) e.currentTarget.style.backgroundColor = "#FEF2F2";
       }}
     />
   );

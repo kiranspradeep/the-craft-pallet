@@ -210,14 +210,15 @@ export const publicService = {
   },
 
   getShippingSettings: async () => {
-    const settings = await publicRepository.getShippingSettings();
-    if (!settings) return null;
-    return {
-      freeShippingThreshold: settings.freeShippingThreshold,
-      defaultShippingCharge: settings.defaultShippingCharge,
-      defaultProcessingDays: settings.defaultProcessingDays,
-    };
-  },
+  const settings = await publicRepository.getShippingSettings();
+  if (!settings) return null;
+  return {
+    keralaShippingCharge: settings.keralaShippingCharge,
+    outsideKeralaShippingCharge: settings.outsideKeralaShippingCharge,
+    keralaProcessingDays: settings.keralaProcessingDays,
+    outsideKeralaProcessingDays: settings.outsideKeralaProcessingDays,
+  };
+},
 
   getWhatsAppSettings: async () => {
     return publicRepository.getWhatsAppSettings();

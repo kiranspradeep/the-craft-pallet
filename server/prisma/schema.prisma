@@ -315,19 +315,33 @@ model ProductVariant {
   name           String
   sku            String?  @unique
   price          Decimal  @db.Decimal(10, 2)
-  thumbnailUrl   String?
   processingDays Int?
   isActive       Boolean  @default(true)
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  product    Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+   product    Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  images     VariantImage[]
   cartItems  CartItem[]
   orderItems OrderItem[]
 
   @@index([productId])
   @@map("product_variants")
+}
+
+model VariantImage {
+  id        String   @id @default(cuid())
+  variantId String
+  url       String
+  altText   String?
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@index([variantId])
+  @@map("variant_images")
 }
 
 model ProductConfiguration {
@@ -834,11 +848,12 @@ model PaymentSetting {
 }
 
 model ShippingSetting {
-  id                    String   @id @default(cuid())
-  freeShippingThreshold Decimal? @db.Decimal(10, 2)
-  defaultShippingCharge Decimal? @db.Decimal(10, 2)
-  defaultProcessingDays Int?
-  updatedAt             DateTime @updatedAt
+  id                       String   @id @default(cuid())
+  keralaShippingCharge     Decimal? @db.Decimal(10, 2)
+  outsideKeralaShippingCharge Decimal? @db.Decimal(10, 2)
+  keralaProcessingDays     Int?
+  outsideKeralaProcessingDays Int?
+  updatedAt                DateTime @updatedAt
 
   @@map("shipping_settings")
 }

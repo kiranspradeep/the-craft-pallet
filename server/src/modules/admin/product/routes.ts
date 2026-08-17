@@ -142,4 +142,14 @@ router.delete(
   productController.deleteCustomFieldOption
 );
 
+// ── Variant Images ────────────────────────────────────────────────────────
+router.post(
+  "/:id/variants/:variantId/images",
+  productController.addVariantImage
+);
+router.delete(
+  "/:id/variants/:variantId/images/:imageId",
+  productController.deleteVariantImage
+);
+
 export default router;

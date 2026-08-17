@@ -44,12 +44,12 @@ export const settingsRepository = {
       });
     }
     const createData = data as Prisma.PaymentSettingCreateInput;
-return prisma.paymentSetting.create({
-  data: {
-    ...createData,
-    gatewayName: createData.gatewayName ?? "manual",
-  },
-});
+    return prisma.paymentSetting.create({
+      data: {
+        ...createData,
+        gatewayName: createData.gatewayName ?? "manual",
+      },
+    });
   },
 
   // ── Shipping ───────────────────────────────────────────────────────────

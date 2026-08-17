@@ -47,7 +47,7 @@ export interface CustomerShippingInput {
 export interface WebsiteCheckoutInput extends CustomerShippingInput {
   sessionId: string;
   couponCode?: string;
-  buyNowCheckoutId?: string; // if Buy Now flow
+  buyNowCheckoutId?: string;
 }
 
 export interface WhatsAppDraftInput extends CustomerShippingInput {
@@ -70,15 +70,9 @@ export interface BuyNowInput {
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 const generateWhatsappToken = (): string => {
-  return crypto.randomBytes(16).toString("hex"); // 32-char hex
+  return crypto.randomBytes(16).toString("hex");
 };
 
-/**
- * Determine PhotoStatus for a new order:
- *  - NOT_REQUIRED if no product has uploadRequired
- *  - RECEIVED if all uploads are already attached (website upload flow)
- *  - NOT_RECEIVED otherwise (WhatsApp flow, or website with no uploads yet)
- */
 const determineInitialPhotoStatus = (
   items: {
     product: { configuration?: { uploadRequired?: boolean } | null };
@@ -99,7 +93,6 @@ const determineInitialPhotoStatus = (
     return PhotoStatus.NOT_RECEIVED;
   }
 
-  // Website — check if all upload fields have assets
   const allUploadsProvided = items.every((item) => {
     if (!item.product.configuration?.uploadRequired) return true;
     const photoField = item.customizations?.find(
@@ -111,6 +104,32 @@ const determineInitialPhotoStatus = (
   return allUploadsProvided
     ? PhotoStatus.RECEIVED
     : PhotoStatus.NOT_RECEIVED;
+};
+
+// ── Shipping helpers ──────────────────────────────────────────────────────
+
+const isKeralaAddress = (shipState: string): boolean => {
+  return shipState.trim().toLowerCase().includes("kerala");
+};
+
+const calculateShippingCharge = (
+  settings: {
+    keralaShippingCharge: any;
+    outsideKeralaShippingCharge: any;
+  } | null,
+  shipState: string
+): Decimal => {
+  if (!settings) return new Decimal(0);
+
+  if (isKeralaAddress(shipState)) {
+    return settings.keralaShippingCharge
+      ? new Decimal(settings.keralaShippingCharge)
+      : new Decimal(0);
+  } else {
+    return settings.outsideKeralaShippingCharge
+      ? new Decimal(settings.outsideKeralaShippingCharge)
+      : new Decimal(0);
+  }
 };
 
 // ── Service ───────────────────────────────────────────────────────────────
@@ -184,30 +203,33 @@ export const checkoutService = {
     return session;
   },
 
-  // service.ts
-getBuyNowSession: async (id: string) => {
-  const session = await checkoutRepository.findCheckoutSession(id);
-  if (!session) throw new NotFoundError("Checkout session not found");
-  if (session.expiresAt < new Date()) {
-    await checkoutRepository.deleteCheckoutSession(id);
-    throw new BadRequestError("Checkout session has expired. Please start over.");
-  }
-
-  // Attach product configuration to the response
-  const product = await prisma.product.findUnique({
-    where: { id: session.productId },
-    select: {
-      configuration: {
-        select: { uploadRequired: true }
-      }
+  // ────────────────────────────────────────────────────────────────────────
+  // GET BUY NOW SESSION
+  // ────────────────────────────────────────────────────────────────────────
+  getBuyNowSession: async (id: string) => {
+    const session = await checkoutRepository.findCheckoutSession(id);
+    if (!session) throw new NotFoundError("Checkout session not found");
+    if (session.expiresAt < new Date()) {
+      await checkoutRepository.deleteCheckoutSession(id);
+      throw new BadRequestError(
+        "Checkout session has expired. Please start over."
+      );
     }
-  });
 
-  return {
-    ...session,
-    uploadRequired: product?.configuration?.uploadRequired ?? false,
-  };
-},
+    const product = await prisma.product.findUnique({
+      where: { id: session.productId },
+      select: {
+        configuration: {
+          select: { uploadRequired: true },
+        },
+      },
+    });
+
+    return {
+      ...session,
+      uploadRequired: product?.configuration?.uploadRequired ?? false,
+    };
+  },
 
   updateBuyNowSession: async (
     id: string,
@@ -220,7 +242,6 @@ getBuyNowSession: async (id: string) => {
   // WEBSITE CHECKOUT — creates AWAITING_PAYMENT order
   // ────────────────────────────────────────────────────────────────────────
   placeWebsiteOrder: async (input: WebsiteCheckoutInput) => {
-    // Load either cart items OR buy-now session
     let itemsSource: "cart" | "buyNow";
     let cart: any = null;
     let buyNowSession: any = null;
@@ -231,7 +252,8 @@ getBuyNowSession: async (id: string) => {
       buyNowSession = await checkoutRepository.findCheckoutSession(
         input.buyNowCheckoutId
       );
-      if (!buyNowSession) throw new BadRequestError("Checkout session not found");
+      if (!buyNowSession)
+        throw new BadRequestError("Checkout session not found");
       if (buyNowSession.expiresAt < new Date()) {
         throw new BadRequestError(
           "Checkout session has expired. Please start over."
@@ -273,10 +295,7 @@ getBuyNowSession: async (id: string) => {
 
       // ── 2. Coupon ────────────────────────────────────────────────────
       let discountAmount = new Decimal(0);
-      let validatedCoupon: {
-        id: string;
-        code: string;
-      } | null = null;
+      let validatedCoupon: { id: string; code: string } | null = null;
 
       if (input.couponCode) {
         const coupon = await tx.coupon.findUnique({
@@ -308,20 +327,12 @@ getBuyNowSession: async (id: string) => {
         validatedCoupon = { id: coupon.id, code: coupon.code };
       }
 
-      // ── 3. Shipping ──────────────────────────────────────────────────
+      // ── 3. Shipping — Kerala vs outside Kerala ────────────────────────
       const shippingSettings = await tx.shippingSetting.findFirst();
-      let shippingCharge = new Decimal(0);
-      if (shippingSettings) {
-        const threshold = shippingSettings.freeShippingThreshold
-          ? new Decimal(shippingSettings.freeShippingThreshold)
-          : null;
-        const defaultCharge = shippingSettings.defaultShippingCharge
-          ? new Decimal(shippingSettings.defaultShippingCharge)
-          : new Decimal(0);
-        if (!threshold || subtotal.lt(threshold)) {
-          shippingCharge = defaultCharge;
-        }
-      }
+      const shippingCharge = calculateShippingCharge(
+        shippingSettings,
+        input.shipState
+      );
 
       const totalAmount = subtotal
         .sub(discountAmount)
@@ -343,7 +354,7 @@ getBuyNowSession: async (id: string) => {
         },
       });
 
-      // ── 5. Determine PhotoStatus ────────────────────────────────────
+      // ── 5. Determine PhotoStatus ─────────────────────────────────────
       let photoStatus: PhotoStatus;
       if (itemsSource === "cart") {
         photoStatus = determineInitialPhotoStatus(
@@ -354,7 +365,6 @@ getBuyNowSession: async (id: string) => {
           OrderSource.WEBSITE
         );
       } else {
-        // Buy Now — check if asset present
         const uploadRequired =
           buyNowProduct.configuration?.uploadRequired ?? false;
         if (!uploadRequired) photoStatus = PhotoStatus.NOT_REQUIRED;
@@ -384,7 +394,9 @@ getBuyNowSession: async (id: string) => {
           photoStatus,
           orderSource: OrderSource.WEBSITE,
           checkoutMethod:
-            itemsSource === "buyNow" ? CheckoutMethod.BUY_NOW : CheckoutMethod.CART,
+            itemsSource === "buyNow"
+              ? CheckoutMethod.BUY_NOW
+              : CheckoutMethod.CART,
           subtotal,
           discountAmount,
           shippingCharge,
@@ -396,7 +408,7 @@ getBuyNowSession: async (id: string) => {
         },
       });
 
-      // ── 8. Create OrderItems + transfer customizations ──────────────
+      // ── 8. Create OrderItems + transfer customizations ───────────────
       if (itemsSource === "cart") {
         for (const cartItem of cart.items) {
           const orderItem = await tx.orderItem.create({
@@ -442,7 +454,8 @@ getBuyNowSession: async (id: string) => {
             totalPrice: new Decimal(buyNowSession.unitPrice).mul(
               buyNowSession.quantity
             ),
-            selectedTierQuantity: buyNowSession.selectedTierQuantity ?? null,
+            selectedTierQuantity:
+              buyNowSession.selectedTierQuantity ?? null,
             productName: buyNowProduct.name,
             variantName:
               buyNowProduct.variants.find(
@@ -456,43 +469,42 @@ getBuyNowSession: async (id: string) => {
           },
         });
 
-        // Create customizations from Buy Now session
         const customizations = (buyNowSession.customizations as any[]) ?? [];
-let sessionAssetAssigned = false;
+        let sessionAssetAssigned = false;
 
-for (const c of customizations) {
-  let assetId: string | null = c.assetId ?? null;
+        for (const c of customizations) {
+          let assetId: string | null = c.assetId ?? null;
 
-  if (
-    !assetId &&
-    !sessionAssetAssigned &&
-    c.fieldType === "PHOTO_UPLOAD" &&
-    buyNowSession.assetId
-  ) {
-    assetId = buyNowSession.assetId;
-    sessionAssetAssigned = true;
-  }
+          if (
+            !assetId &&
+            !sessionAssetAssigned &&
+            c.fieldType === "PHOTO_UPLOAD" &&
+            buyNowSession.assetId
+          ) {
+            assetId = buyNowSession.assetId;
+            sessionAssetAssigned = true;
+          }
 
-  await tx.customization.create({
-    data: {
-      customFieldId: c.customFieldId,
-      orderItemId: orderItem.id,
-      fieldLabel: c.fieldLabel,
-      fieldType: c.fieldType,
-      textValue: c.textValue ?? null,
-      numberValue:
-        c.numberValue !== undefined
-          ? new Decimal(c.numberValue)
-          : null,
-      dateValue: c.dateValue ? new Date(c.dateValue) : null,
-      booleanValue: c.booleanValue ?? null,
-      assetId,
-    },
-  });
-}
+          await tx.customization.create({
+            data: {
+              customFieldId: c.customFieldId,
+              orderItemId: orderItem.id,
+              fieldLabel: c.fieldLabel,
+              fieldType: c.fieldType,
+              textValue: c.textValue ?? null,
+              numberValue:
+                c.numberValue !== undefined
+                  ? new Decimal(c.numberValue)
+                  : null,
+              dateValue: c.dateValue ? new Date(c.dateValue) : null,
+              booleanValue: c.booleanValue ?? null,
+              assetId,
+            },
+          });
+        }
       }
 
-      // ── 9. Coupon usage ─────────────────────────────────────────────
+      // ── 9. Coupon usage ──────────────────────────────────────────────
       if (validatedCoupon) {
         await tx.coupon.update({
           where: { id: validatedCoupon.id },
@@ -507,7 +519,7 @@ for (const c of customizations) {
         });
       }
 
-      // ── 10. Payment record ──────────────────────────────────────────
+      // ── 10. Payment record ───────────────────────────────────────────
       await tx.payment.create({
         data: {
           orderId: newOrder.id,
@@ -517,7 +529,7 @@ for (const c of customizations) {
         },
       });
 
-      // ── 11. Timeline ────────────────────────────────────────────────
+      // ── 11. Timeline ─────────────────────────────────────────────────
       await tx.orderTimeline.create({
         data: {
           orderId: newOrder.id,
@@ -529,7 +541,7 @@ for (const c of customizations) {
         },
       });
 
-      // ── 12. Cleanup source ──────────────────────────────────────────
+      // ── 12. Cleanup source ───────────────────────────────────────────
       if (itemsSource === "cart") {
         await tx.cart.delete({ where: { id: cart.id } });
       } else {
@@ -562,7 +574,8 @@ for (const c of customizations) {
       buyNowSession = await checkoutRepository.findCheckoutSession(
         input.buyNowCheckoutId
       );
-      if (!buyNowSession) throw new BadRequestError("Checkout session not found");
+      if (!buyNowSession)
+        throw new BadRequestError("Checkout session not found");
       if (buyNowSession.expiresAt < new Date()) {
         throw new BadRequestError(
           "Checkout session has expired. Please start over."
@@ -624,20 +637,12 @@ for (const c of customizations) {
         }
       }
 
-      // Shipping
+      // Shipping — Kerala vs outside Kerala
       const shippingSettings = await tx.shippingSetting.findFirst();
-      let shippingCharge = new Decimal(0);
-      if (shippingSettings) {
-        const threshold = shippingSettings.freeShippingThreshold
-          ? new Decimal(shippingSettings.freeShippingThreshold)
-          : null;
-        const defaultCharge = shippingSettings.defaultShippingCharge
-          ? new Decimal(shippingSettings.defaultShippingCharge)
-          : new Decimal(0);
-        if (!threshold || subtotal.lt(threshold)) {
-          shippingCharge = defaultCharge;
-        }
-      }
+      const shippingCharge = calculateShippingCharge(
+        shippingSettings,
+        input.shipState
+      );
 
       const totalAmount = subtotal
         .sub(discountAmount)
@@ -659,7 +664,7 @@ for (const c of customizations) {
         },
       });
 
-      // PhotoStatus — for WhatsApp always NOT_RECEIVED (unless not required)
+      // PhotoStatus
       let photoStatus: PhotoStatus;
       if (itemsSource === "cart") {
         photoStatus = determineInitialPhotoStatus(
@@ -697,7 +702,9 @@ for (const c of customizations) {
           photoStatus,
           orderSource: OrderSource.WHATSAPP,
           checkoutMethod:
-            itemsSource === "buyNow" ? CheckoutMethod.BUY_NOW : CheckoutMethod.CART,
+            itemsSource === "buyNow"
+              ? CheckoutMethod.BUY_NOW
+              : CheckoutMethod.CART,
           subtotal,
           discountAmount,
           shippingCharge,
@@ -754,7 +761,8 @@ for (const c of customizations) {
             totalPrice: new Decimal(buyNowSession.unitPrice).mul(
               buyNowSession.quantity
             ),
-            selectedTierQuantity: buyNowSession.selectedTierQuantity ?? null,
+            selectedTierQuantity:
+              buyNowSession.selectedTierQuantity ?? null,
             productName: buyNowProduct.name,
             variantName:
               buyNowProduct.variants.find(
@@ -769,38 +777,38 @@ for (const c of customizations) {
         });
 
         const customizations = (buyNowSession.customizations as any[]) ?? [];
-let sessionAssetAssigned = false;
+        let sessionAssetAssigned = false;
 
-for (const c of customizations) {
-  let assetId: string | null = c.assetId ?? null;
+        for (const c of customizations) {
+          let assetId: string | null = c.assetId ?? null;
 
-  if (
-    !assetId &&
-    !sessionAssetAssigned &&
-    c.fieldType === "PHOTO_UPLOAD" &&
-    buyNowSession.assetId
-  ) {
-    assetId = buyNowSession.assetId;
-    sessionAssetAssigned = true;
-  }
+          if (
+            !assetId &&
+            !sessionAssetAssigned &&
+            c.fieldType === "PHOTO_UPLOAD" &&
+            buyNowSession.assetId
+          ) {
+            assetId = buyNowSession.assetId;
+            sessionAssetAssigned = true;
+          }
 
-  await tx.customization.create({
-    data: {
-      customFieldId: c.customFieldId,
-      orderItemId: orderItem.id,
-      fieldLabel: c.fieldLabel,
-      fieldType: c.fieldType,
-      textValue: c.textValue ?? null,
-      numberValue:
-        c.numberValue !== undefined
-          ? new Decimal(c.numberValue)
-          : null,
-      dateValue: c.dateValue ? new Date(c.dateValue) : null,
-      booleanValue: c.booleanValue ?? null,
-      assetId,
-    },
-  });
-}
+          await tx.customization.create({
+            data: {
+              customFieldId: c.customFieldId,
+              orderItemId: orderItem.id,
+              fieldLabel: c.fieldLabel,
+              fieldType: c.fieldType,
+              textValue: c.textValue ?? null,
+              numberValue:
+                c.numberValue !== undefined
+                  ? new Decimal(c.numberValue)
+                  : null,
+              dateValue: c.dateValue ? new Date(c.dateValue) : null,
+              booleanValue: c.booleanValue ?? null,
+              assetId,
+            },
+          });
+        }
       }
 
       // Coupon usage
@@ -818,7 +826,7 @@ for (const c of customizations) {
         });
       }
 
-      // Payment record — PENDING
+      // Payment record
       await tx.payment.create({
         data: {
           orderId: newOrder.id,
@@ -828,7 +836,7 @@ for (const c of customizations) {
         },
       });
 
-      // Timeline — DRAFT_CREATED
+      // Timeline
       await tx.orderTimeline.create({
         data: {
           orderId: newOrder.id,
@@ -873,69 +881,67 @@ for (const c of customizations) {
   },
 
   // ────────────────────────────────────────────────────────────────────────
-// Create Razorpay Order for a placed order (client-side checkout flow)
-// ────────────────────────────────────────────────────────────────────────
-createRazorpayOrder: async (orderNumber: string) => {
-  const Razorpay = (await import("razorpay")).default;
+  // Create Razorpay Order
+  // ────────────────────────────────────────────────────────────────────────
+  createRazorpayOrder: async (orderNumber: string) => {
+    const Razorpay = (await import("razorpay")).default;
 
-  const settings = await prisma.paymentSetting.findFirst();
-  const keyId = settings?.apiKey || process.env.RAZORPAY_KEY_ID;
-  const keySecret = settings?.apiSecret || process.env.RAZORPAY_KEY_SECRET;
+    const settings = await prisma.paymentSetting.findFirst();
+    const keyId = settings?.apiKey || process.env.RAZORPAY_KEY_ID;
+    const keySecret =
+      settings?.apiSecret || process.env.RAZORPAY_KEY_SECRET;
 
-  if (!keyId || !keySecret) {
-    throw new BadRequestError(
-      "Payment gateway is not configured"
-    );
-  }
+    if (!keyId || !keySecret) {
+      throw new BadRequestError("Payment gateway is not configured");
+    }
 
-  const order = await prisma.order.findUnique({
-    where: { orderNumber },
-    include: { payment: true, customer: true },
-  });
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: { payment: true, customer: true },
+    });
 
-  if (!order) throw new NotFoundError("Order not found");
-  if (order.status !== OrderStatus.AWAITING_PAYMENT) {
-    throw new BadRequestError(
-      `Cannot create payment. Order is currently "${order.status}"`
-    );
-  }
+    if (!order) throw new NotFoundError("Order not found");
+    if (order.status !== OrderStatus.AWAITING_PAYMENT) {
+      throw new BadRequestError(
+        `Cannot create payment. Order is currently "${order.status}"`
+      );
+    }
 
-  const razorpay = new Razorpay({
-    key_id: keyId,
-    key_secret: keySecret,
-  });
+    const razorpay = new Razorpay({
+      key_id: keyId,
+      key_secret: keySecret,
+    });
 
-  const rzpOrder = await razorpay.orders.create({
-    amount: Math.round(Number(order.totalAmount) * 100),
-    currency: order.currency || "INR",
-    receipt: order.orderNumber,
-    payment_capture: true, // ← auto-capture on success (instant)
-    notes: {
+    const rzpOrder = await razorpay.orders.create({
+      amount: Math.round(Number(order.totalAmount) * 100),
+      currency: order.currency || "INR",
+      receipt: order.orderNumber,
+      payment_capture: true,
+      notes: {
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+      },
+    });
+
+    await prisma.payment.update({
+      where: { orderId: order.id },
+      data: {
+        gatewayName: "razorpay",
+        gatewayOrderId: rzpOrder.id,
+        status: PaymentStatus.INITIATED,
+      },
+    });
+
+    return {
+      razorpayOrderId: rzpOrder.id,
+      amount: rzpOrder.amount,
+      currency: rzpOrder.currency,
       orderNumber: order.orderNumber,
-      orderId: order.id,
-    },
-  });
-
-  // Save razorpay order id to payment record
-  await prisma.payment.update({
-    where: { orderId: order.id },
-    data: {
-      gatewayName: "razorpay",
-      gatewayOrderId: rzpOrder.id,
-      status: PaymentStatus.INITIATED,
-    },
-  });
-
-  return {
-    razorpayOrderId: rzpOrder.id,
-    amount: rzpOrder.amount,
-    currency: rzpOrder.currency,
-    orderNumber: order.orderNumber,
-    customer: {
-      name: order.customer.name,
-      email: order.customer.email,
-      phone: order.customer.phone,
-    },
-  };
-},
+      customer: {
+        name: order.customer.name,
+        email: order.customer.email,
+        phone: order.customer.phone,
+      },
+    };
+  },
 };

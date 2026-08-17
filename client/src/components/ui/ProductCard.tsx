@@ -1,3 +1,4 @@
+//client\src\components\ui\ProductCard.tsx
 import Link from "next/link";
 import { formatPrice } from "@/lib/cart";
 import { ImageIcon } from "lucide-react";

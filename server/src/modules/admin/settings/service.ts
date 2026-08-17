@@ -1,12 +1,11 @@
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "@prisma/client/runtime/library.js";
 import { settingsRepository } from "./repository.js";
 
 export const settingsService = {
   // ── Business ───────────────────────────────────────────────────────────
 
   getBusinessSettings: async () => {
-    const settings = await settingsRepository.getBusinessSettings();
-    return settings;
+    return settingsRepository.getBusinessSettings();
   },
 
   updateBusinessSettings: async (input: {
@@ -45,7 +44,6 @@ export const settingsService = {
 
   getPaymentSettings: async () => {
     const settings = await settingsRepository.getPaymentSettings();
-    // Never expose raw secrets — mask them
     if (!settings) return null;
     return {
       ...settings,
@@ -89,19 +87,25 @@ export const settingsService = {
   },
 
   updateShippingSettings: async (input: {
-    freeShippingThreshold?: number;
-    defaultShippingCharge?: number;
-    defaultProcessingDays?: number;
+    keralaShippingCharge?: number;
+    outsideKeralaShippingCharge?: number;
+    keralaProcessingDays?: number;
+    outsideKeralaProcessingDays?: number;
   }) => {
     return settingsRepository.upsertShippingSettings({
-      ...(input.freeShippingThreshold !== undefined && {
-        freeShippingThreshold: new Decimal(input.freeShippingThreshold),
+      ...(input.keralaShippingCharge !== undefined && {
+        keralaShippingCharge: new Decimal(input.keralaShippingCharge),
       }),
-      ...(input.defaultShippingCharge !== undefined && {
-        defaultShippingCharge: new Decimal(input.defaultShippingCharge),
+      ...(input.outsideKeralaShippingCharge !== undefined && {
+        outsideKeralaShippingCharge: new Decimal(
+          input.outsideKeralaShippingCharge
+        ),
       }),
-      ...(input.defaultProcessingDays !== undefined && {
-        defaultProcessingDays: input.defaultProcessingDays,
+      ...(input.keralaProcessingDays !== undefined && {
+        keralaProcessingDays: input.keralaProcessingDays,
+      }),
+      ...(input.outsideKeralaProcessingDays !== undefined && {
+        outsideKeralaProcessingDays: input.outsideKeralaProcessingDays,
       }),
     });
   },

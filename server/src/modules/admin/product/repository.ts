@@ -24,7 +24,9 @@ export type ProductWithRelations = Prisma.ProductGetPayload<{
   include: {
     category: true;
     images: true;
-    variants: true;
+    variants: {
+      include: { images: true };
+    };
     pricingConfig: {
       include: { tiers: true };
     };
@@ -76,11 +78,12 @@ export const productRepository = {
         include: {
           category: true,
           images: { orderBy: { sortOrder: "asc" } },
-          variants: { orderBy: { sortOrder: "asc" } },
+          variants: {
+            orderBy: { sortOrder: "asc" },
+            include: { images: { orderBy: { sortOrder: "asc" } } },
+          },
           pricingConfig: {
-            include: {
-              tiers: { orderBy: { sortOrder: "asc" } },
-            },
+            include: { tiers: { orderBy: { sortOrder: "asc" } } },
           },
           configuration: true,
           customFields: {
@@ -109,11 +112,12 @@ export const productRepository = {
       include: {
         category: true,
         images: { orderBy: { sortOrder: "asc" } },
-        variants: { orderBy: { sortOrder: "asc" } },
+        variants: {
+          orderBy: { sortOrder: "asc" },
+          include: { images: { orderBy: { sortOrder: "asc" } } },
+        },
         pricingConfig: {
-          include: {
-            tiers: { orderBy: { sortOrder: "asc" } },
-          },
+          include: { tiers: { orderBy: { sortOrder: "asc" } } },
         },
         configuration: true,
         customFields: {
@@ -157,7 +161,7 @@ export const productRepository = {
     });
   },
 
-  // ── Images ────────────────────────────────────────────────────────────
+  // ── Product Images ────────────────────────────────────────────────────
   addImage: async (data: Prisma.ProductImageCreateInput) => {
     return prisma.productImage.create({ data });
   },
@@ -198,6 +202,26 @@ export const productRepository = {
 
   findVariantById: async (variantId: string) => {
     return prisma.productVariant.findUnique({ where: { id: variantId } });
+  },
+
+  // ── Variant Images ────────────────────────────────────────────────────
+  addVariantImage: async (data: Prisma.VariantImageCreateInput) => {
+    return prisma.variantImage.create({ data });
+  },
+
+  findVariantImageById: async (imageId: string) => {
+    return prisma.variantImage.findUnique({ where: { id: imageId } });
+  },
+
+  deleteVariantImage: async (imageId: string) => {
+    return prisma.variantImage.delete({ where: { id: imageId } });
+  },
+
+  findVariantImages: async (variantId: string) => {
+    return prisma.variantImage.findMany({
+      where: { variantId },
+      orderBy: { sortOrder: "asc" },
+    });
   },
 
   // ── Configuration ─────────────────────────────────────────────────────

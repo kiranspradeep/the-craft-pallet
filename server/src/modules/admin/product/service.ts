@@ -53,8 +53,9 @@ export const productService = {
     let slug: string;
     if (input.slug) {
       const existing = await productRepository.findBySlug(input.slug);
-      if (existing)
+      if (existing) {
         throw new ConflictError(`Slug "${input.slug}" is already in use`);
+      }
       slug = input.slug;
     } else {
       slug = await generateUniqueSlug(input.name, async (candidate) => {
@@ -125,8 +126,9 @@ export const productService = {
 
     if (slug) {
       const conflict = await productRepository.findBySlugExcludingId(slug, id);
-      if (conflict)
+      if (conflict) {
         throw new ConflictError(`Slug "${slug}" is already in use`);
+      }
     } else if (input.name && input.name !== existing.name) {
       slug = await generateUniqueSlug(input.name, async (candidate) => {
         const found = await productRepository.findBySlugExcludingId(
@@ -137,7 +139,7 @@ export const productService = {
       });
     }
 
-    return productRepository.update(id, {
+    await productRepository.update(id, {
       ...(input.categoryId && {
         category: { connect: { id: input.categoryId } },
       }),
@@ -163,6 +165,8 @@ export const productService = {
         ogImageUrl: input.ogImageUrl || null,
       }),
     });
+
+    return await productRepository.findById(id);
   },
 
   softDelete: async (id: string) => {
@@ -170,7 +174,7 @@ export const productService = {
     return productRepository.softDelete(id);
   },
 
-  // ── Images ────────────────────────────────────────────────────────────
+  // ── Product Images ────────────────────────────────────────────────────
 
   addImage: async (
     productId: string,
@@ -184,6 +188,7 @@ export const productService = {
     }
   ) => {
     await assertProductExists(productId);
+
     return productRepository.addImage({
       product: { connect: { id: productId } },
       url: input.url,
@@ -197,10 +202,12 @@ export const productService = {
 
   deleteImage: async (productId: string, imageId: string) => {
     await assertProductExists(productId);
+
     const image = await productRepository.findImageById(imageId);
     if (!image || image.productId !== productId) {
       throw new NotFoundError("Image not found on this product");
     }
+
     await productRepository.deleteImage(imageId);
   },
 
@@ -220,7 +227,6 @@ export const productService = {
       name: string;
       sku?: string;
       price: number;
-      thumbnailUrl?: string;
       processingDays?: number;
       isActive?: boolean;
       sortOrder?: number;
@@ -237,7 +243,6 @@ export const productService = {
       name: input.name,
       sku: input.sku,
       price: new Decimal(input.price),
-      thumbnailUrl: input.thumbnailUrl || null,
       processingDays: input.processingDays,
       isActive: input.isActive ?? true,
       sortOrder: input.sortOrder ?? 0,
@@ -251,7 +256,6 @@ export const productService = {
       name?: string;
       sku?: string;
       price?: number;
-      thumbnailUrl?: string;
       processingDays?: number;
       isActive?: boolean;
       sortOrder?: number;
@@ -272,9 +276,6 @@ export const productService = {
       ...(input.name && { name: input.name }),
       ...(input.sku !== undefined && { sku: input.sku }),
       ...(input.price !== undefined && { price: new Decimal(input.price) }),
-      ...(input.thumbnailUrl !== undefined && {
-        thumbnailUrl: input.thumbnailUrl || null,
-      }),
       ...(input.processingDays !== undefined && {
         processingDays: input.processingDays,
       }),
@@ -285,14 +286,62 @@ export const productService = {
 
   deleteVariant: async (productId: string, variantId: string) => {
     await assertProductExists(productId);
+
     const variant = await productRepository.findVariantById(variantId);
     if (!variant || variant.productId !== productId) {
       throw new NotFoundError("Variant not found on this product");
     }
+
     await productRepository.deleteVariant(variantId);
   },
 
-  // ── Configuration ──────────────────────────────────────────────────────
+  // ── Variant Images ────────────────────────────────────────────────────
+
+  addVariantImage: async (
+    productId: string,
+    variantId: string,
+    input: {
+      url: string;
+      altText?: string;
+      sortOrder?: number;
+    }
+  ) => {
+    await assertProductExists(productId);
+
+    const variant = await productRepository.findVariantById(variantId);
+    if (!variant || variant.productId !== productId) {
+      throw new NotFoundError("Variant not found on this product");
+    }
+
+    return productRepository.addVariantImage({
+      variant: { connect: { id: variantId } },
+      url: input.url,
+      altText: input.altText,
+      sortOrder: input.sortOrder ?? 0,
+    });
+  },
+
+  deleteVariantImage: async (
+    productId: string,
+    variantId: string,
+    imageId: string
+  ) => {
+    await assertProductExists(productId);
+
+    const variant = await productRepository.findVariantById(variantId);
+    if (!variant || variant.productId !== productId) {
+      throw new NotFoundError("Variant not found on this product");
+    }
+
+    const image = await productRepository.findVariantImageById(imageId);
+    if (!image || image.variantId !== variantId) {
+      throw new NotFoundError("Image not found on this variant");
+    }
+
+    await productRepository.deleteVariantImage(imageId);
+  },
+
+  // ── Configuration ─────────────────────────────────────────────────────
 
   upsertConfiguration: async (
     productId: string,
@@ -338,7 +387,7 @@ export const productService = {
     });
   },
 
-  // ── Pricing ────────────────────────────────────────────────────────────
+  // ── Pricing ───────────────────────────────────────────────────────────
 
   upsertPricing: async (
     productId: string,
@@ -352,6 +401,7 @@ export const productService = {
     }
   ) => {
     await assertProductExists(productId);
+
     return productRepository.upsertPricing(productId, {
       strategy: input.strategy,
       minimumOrderQuantity: input.minimumOrderQuantity ?? null,
@@ -369,7 +419,7 @@ export const productService = {
     });
   },
 
-  // ── Pricing Tiers ──────────────────────────────────────────────────────
+  // ── Pricing Tiers ─────────────────────────────────────────────────────
 
   createPricingTier: async (
     productId: string,
@@ -489,7 +539,7 @@ export const productService = {
     await productRepository.deletePricingTier(tierId);
   },
 
-  // ── Custom Fields ──────────────────────────────────────────────────────
+  // ── Custom Fields ─────────────────────────────────────────────────────
 
   createCustomField: async (
     productId: string,
@@ -505,6 +555,7 @@ export const productService = {
     }
   ) => {
     await assertProductExists(productId);
+
     return productRepository.createCustomField({
       product: { connect: { id: productId } },
       name: input.name,
@@ -536,10 +587,12 @@ export const productService = {
     }
   ) => {
     await assertProductExists(productId);
+
     const field = await productRepository.findCustomFieldById(fieldId);
     if (!field || field.productId !== productId) {
       throw new NotFoundError("Custom field not found on this product");
     }
+
     return productRepository.updateCustomField(fieldId, {
       ...(input.name && { name: input.name }),
       ...(input.label && { label: input.label }),
@@ -558,10 +611,12 @@ export const productService = {
 
   deleteCustomField: async (productId: string, fieldId: string) => {
     await assertProductExists(productId);
+
     const field = await productRepository.findCustomFieldById(fieldId);
     if (!field || field.productId !== productId) {
       throw new NotFoundError("Custom field not found on this product");
     }
+
     await productRepository.deleteCustomField(fieldId);
   },
 
@@ -573,7 +628,7 @@ export const productService = {
     return productRepository.updateCustomFieldSortOrders(updates);
   },
 
-  // ── Custom Field Options ────────────────────────────────────────────────
+  // ── Custom Field Options ─────────────────────────────────────────────
 
   createCustomFieldOption: async (
     productId: string,
@@ -581,16 +636,19 @@ export const productService = {
     input: { label: string; value: string; sortOrder?: number }
   ) => {
     await assertProductExists(productId);
+
     const field = await productRepository.findCustomFieldById(fieldId);
     if (!field || field.productId !== productId) {
       throw new NotFoundError("Custom field not found on this product");
     }
+
     const allowedTypes = ["SELECT", "RADIO"];
     if (!allowedTypes.includes(field.type)) {
       throw new BadRequestError(
         "Options can only be added to SELECT or RADIO fields"
       );
     }
+
     return productRepository.createCustomFieldOption({
       customField: { connect: { id: fieldId } },
       label: input.label,
@@ -606,14 +664,17 @@ export const productService = {
     input: { label?: string; value?: string; sortOrder?: number }
   ) => {
     await assertProductExists(productId);
+
     const field = await productRepository.findCustomFieldById(fieldId);
     if (!field || field.productId !== productId) {
       throw new NotFoundError("Custom field not found on this product");
     }
+
     const option = await productRepository.findCustomFieldOptionById(optionId);
     if (!option || option.customFieldId !== fieldId) {
       throw new NotFoundError("Option not found on this field");
     }
+
     return productRepository.updateCustomFieldOption(optionId, {
       ...(input.label && { label: input.label }),
       ...(input.value && { value: input.value }),
@@ -627,14 +688,17 @@ export const productService = {
     optionId: string
   ) => {
     await assertProductExists(productId);
+
     const field = await productRepository.findCustomFieldById(fieldId);
     if (!field || field.productId !== productId) {
       throw new NotFoundError("Custom field not found on this product");
     }
+
     const option = await productRepository.findCustomFieldOptionById(optionId);
     if (!option || option.customFieldId !== fieldId) {
       throw new NotFoundError("Option not found on this field");
     }
+
     await productRepository.deleteCustomFieldOption(optionId);
   },
 };

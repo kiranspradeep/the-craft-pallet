@@ -1,5 +1,4 @@
 // app/products/[slug]/page.tsx
-
 import { apiGet } from "@/lib/api";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -126,7 +125,8 @@ export default async function ProductPage({ params }: Props) {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
+                gridTemplateColumns:
+                  "repeat(auto-fill, minmax(240px, 1fr))",
                 gap: "40px 28px",
               }}
             >

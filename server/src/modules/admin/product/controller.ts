@@ -147,6 +147,36 @@ export const productController = {
     }
   ),
 
+
+  // ── Variant Images ────────────────────────────────────────────────────
+
+addVariantImage: asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const image = await productService.addVariantImage(
+      param(req, "id"),
+      param(req, "variantId"),
+      req.body
+    );
+    sendSuccess({
+      res,
+      message: "Variant image added successfully",
+      data: image,
+      statusCode: 201,
+    });
+  }
+),
+
+deleteVariantImage: asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    await productService.deleteVariantImage(
+      param(req, "id"),
+      param(req, "variantId"),
+      param(req, "imageId")
+    );
+    sendSuccess({ res, message: "Variant image deleted successfully" });
+  }
+),
+
   // ── Configuration ──────────────────────────────────────────────────────
 
   upsertConfiguration: asyncHandler(

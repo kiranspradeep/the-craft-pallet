@@ -19,24 +19,24 @@ const sections = [
     title: "Business",
     description: "Name, logo, contact details, social links",
   },
-  {
-    href: "/dashboard/settings/payment",
-    icon: CreditCard,
-    title: "Payment",
-    description: "UPI ID, Razorpay keys, COD configuration",
-  },
+  // {
+  //   href: "/dashboard/settings/payment",
+  //   icon: CreditCard,
+  //   title: "Payment",
+  //   description: "UPI ID, Razorpay keys, COD configuration",
+  // },
   {
     href: "/dashboard/settings/shipping",
     icon: Truck,
     title: "Shipping",
-    description: "Shipping charges, free shipping threshold",
+    description: "Kerala and outside Kerala shipping charges and processing days",
   },
-  {
-    href: "/dashboard/settings/whatsapp",
-    icon: MessageCircle,
-    title: "WhatsApp",
-    description: "WhatsApp number and message templates",
-  },
+  // {
+  //   href: "/dashboard/settings/whatsapp",
+  //   icon: MessageCircle,
+  //   title: "WhatsApp",
+  //   description: "WhatsApp number and message templates",
+  // },
   {
     href: "/dashboard/settings/image-retention",
     icon: Image,

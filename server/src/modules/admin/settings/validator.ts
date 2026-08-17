@@ -36,9 +36,10 @@ export const updatePaymentSettingsSchema = z.object({
 
 export const updateShippingSettingsSchema = z.object({
   body: z.object({
-    freeShippingThreshold: z.number().min(0).optional(),
-    defaultShippingCharge: z.number().min(0).optional(),
-    defaultProcessingDays: z.number().int().positive().optional(),
+    keralaShippingCharge: z.number().min(0).optional(),
+    outsideKeralaShippingCharge: z.number().min(0).optional(),
+    keralaProcessingDays: z.number().int().positive().optional(),
+    outsideKeralaProcessingDays: z.number().int().positive().optional(),
   }),
 });
 

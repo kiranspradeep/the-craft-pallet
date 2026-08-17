@@ -15,9 +15,10 @@ export default function ShippingSettingsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [form, setForm] = useState({
-    freeShippingThreshold: "",
-    defaultShippingCharge: "",
-    defaultProcessingDays: "",
+    keralaShippingCharge: "",
+    outsideKeralaShippingCharge: "",
+    keralaProcessingDays: "",
+    outsideKeralaProcessingDays: "",
   });
 
   const set = (key: string, val: string) =>
@@ -28,12 +29,14 @@ export default function ShippingSettingsPage() {
       .then((d: any) => {
         if (d.data) {
           setForm({
-            freeShippingThreshold:
-              d.data.freeShippingThreshold?.toString() || "",
-            defaultShippingCharge:
-              d.data.defaultShippingCharge?.toString() || "",
-            defaultProcessingDays:
-              d.data.defaultProcessingDays?.toString() || "",
+            keralaShippingCharge:
+              d.data.keralaShippingCharge?.toString() || "",
+            outsideKeralaShippingCharge:
+              d.data.outsideKeralaShippingCharge?.toString() || "",
+            keralaProcessingDays:
+              d.data.keralaProcessingDays?.toString() || "",
+            outsideKeralaProcessingDays:
+              d.data.outsideKeralaProcessingDays?.toString() || "",
           });
         }
       })
@@ -46,13 +49,21 @@ export default function ShippingSettingsPage() {
     setLoading(true);
     setError("");
     setSuccess(false);
+
     const body: Record<string, number> = {};
-    if (form.freeShippingThreshold)
-      body.freeShippingThreshold = parseFloat(form.freeShippingThreshold);
-    if (form.defaultShippingCharge)
-      body.defaultShippingCharge = parseFloat(form.defaultShippingCharge);
-    if (form.defaultProcessingDays)
-      body.defaultProcessingDays = parseInt(form.defaultProcessingDays);
+    if (form.keralaShippingCharge)
+      body.keralaShippingCharge = parseFloat(form.keralaShippingCharge);
+    if (form.outsideKeralaShippingCharge)
+      body.outsideKeralaShippingCharge = parseFloat(
+        form.outsideKeralaShippingCharge
+      );
+    if (form.keralaProcessingDays)
+      body.keralaProcessingDays = parseInt(form.keralaProcessingDays);
+    if (form.outsideKeralaProcessingDays)
+      body.outsideKeralaProcessingDays = parseInt(
+        form.outsideKeralaProcessingDays
+      );
+
     try {
       await adminPut("/api/admin/settings/shipping", body);
       setSuccess(true);
@@ -75,37 +86,75 @@ export default function ShippingSettingsPage() {
   }
 
   return (
-    <SettingsPageLayout title="Shipping Settings" error={error} success={success}>
+    <SettingsPageLayout
+      title="Shipping Settings"
+      error={error}
+      success={success}
+    >
       <form
         onSubmit={handleSubmit}
         style={{ display: "flex", flexDirection: "column", gap: "24px" }}
       >
-        <SettingsSection>
-          <Input
-            label="Free Shipping Threshold (₹)"
-            type="number"
-            min={0}
-            value={form.freeShippingThreshold}
-            onChange={(e) => set("freeShippingThreshold", e.target.value)}
-            helpText="Orders above this amount get free shipping"
-            placeholder="e.g. 500"
-          />
-          <Input
-            label="Default Shipping Charge (₹)"
-            type="number"
-            min={0}
-            value={form.defaultShippingCharge}
-            onChange={(e) => set("defaultShippingCharge", e.target.value)}
-            placeholder="e.g. 55"
-          />
-          <Input
-            label="Default Processing Days"
-            type="number"
-            min={1}
-            value={form.defaultProcessingDays}
-            onChange={(e) => set("defaultProcessingDays", e.target.value)}
-            placeholder="e.g. 3"
-          />
+        {/* Kerala */}
+        <SettingsSection label="Inside Kerala">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "14px",
+            }}
+          >
+            <Input
+              label="Shipping Charge (₹)"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.keralaShippingCharge}
+              onChange={(e) => set("keralaShippingCharge", e.target.value)}
+              placeholder="e.g. 40"
+            />
+            <Input
+              label="Processing Days"
+              type="number"
+              min={1}
+              value={form.keralaProcessingDays}
+              onChange={(e) => set("keralaProcessingDays", e.target.value)}
+              placeholder="e.g. 3"
+            />
+          </div>
+        </SettingsSection>
+
+        {/* Outside Kerala */}
+        <SettingsSection label="Outside Kerala">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "14px",
+            }}
+          >
+            <Input
+              label="Shipping Charge (₹)"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.outsideKeralaShippingCharge}
+              onChange={(e) =>
+                set("outsideKeralaShippingCharge", e.target.value)
+              }
+              placeholder="e.g. 80"
+            />
+            <Input
+              label="Processing Days"
+              type="number"
+              min={1}
+              value={form.outsideKeralaProcessingDays}
+              onChange={(e) =>
+                set("outsideKeralaProcessingDays", e.target.value)
+              }
+              placeholder="e.g. 7"
+            />
+          </div>
         </SettingsSection>
 
         <SaveButton loading={loading} />
