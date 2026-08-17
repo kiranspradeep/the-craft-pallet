@@ -10,8 +10,6 @@ import {
 
 const router = Router();
 
-// No authentication — guest cart via session ID header
-
 router.get("/", cartController.getCart);
 
 router.post(
@@ -30,6 +28,12 @@ router.delete(
   "/items/:itemId",
   validate(itemIdSchema),
   cartController.removeItem
+);
+
+// Link an uploaded asset to a specific PHOTO_UPLOAD field on a cart item
+router.patch(
+  "/items/:itemId/upload-fields/:customizationId/asset",
+  cartController.linkAssetToUploadField
 );
 
 router.post(

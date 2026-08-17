@@ -3,6 +3,7 @@ import { ArrowLeft, Download, CheckCircle } from "lucide-react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import OrderActions from "./OrderActions";
+import OrderPhotoThumb from "./OrderPhotoThumb";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -111,6 +112,44 @@ const STAGE_STEPS = [
   "READY",
 ];
 
+// ── Types ─────────────────────────────────────────────────────────────────
+
+interface AssetFile {
+  id: string;
+  originalName: string;
+  storagePath: string;
+  previewPath: string | null;
+  fileSize: number | null;
+}
+
+interface Customization {
+  id: string;
+  fieldLabel: string;
+  fieldType: string;
+  unitIndex?: number;
+  textValue: string | null;
+  numberValue: string | null;
+  dateValue: string | null;
+  booleanValue: boolean | null;
+  asset: {
+    id: string;
+    status: string;
+    files: AssetFile[];
+  } | null;
+}
+
+interface OrderItem {
+  id: string;
+  productName: string;
+  variantName: string | null;
+  quantity: number;
+  unitPrice: string;
+  totalPrice: string;
+  customizations: Customization[];
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────
+
 export default async function OrderDetailPage({
   params,
 }: {
@@ -149,7 +188,6 @@ export default async function OrderDetailPage({
             gap: 20px;
           }
         }
-
         .stage-bar {
           display: flex;
           align-items: flex-start;
@@ -157,7 +195,6 @@ export default async function OrderDetailPage({
           overflow-x: auto;
           padding-bottom: 4px;
         }
-
         .stage-bar::-webkit-scrollbar { height: 4px; }
         .stage-bar::-webkit-scrollbar-track { background: transparent; }
         .stage-bar::-webkit-scrollbar-thumb {
@@ -178,9 +215,7 @@ export default async function OrderDetailPage({
             flexWrap: "wrap",
           }}
         >
-          <div
-            style={{ display: "flex", alignItems: "center", gap: "12px" }}
-          >
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <Link href="/dashboard/orders">
               <button
                 aria-label="Back to orders"
@@ -258,13 +293,11 @@ export default async function OrderDetailPage({
             >
               Production Progress
             </p>
-
             <div className="stage-bar">
               {STAGE_STEPS.map((stage, i) => {
                 const isCompleted = i < currentStageIndex;
                 const isCurrent = i === currentStageIndex;
                 const isLast = i === STAGE_STEPS.length - 1;
-
                 return (
                   <div
                     key={stage}
@@ -327,7 +360,6 @@ export default async function OrderDetailPage({
                         {formatLabel(stage)}
                       </p>
                     </div>
-
                     {!isLast && (
                       <div
                         style={{
@@ -350,350 +382,375 @@ export default async function OrderDetailPage({
         {/* Main grid */}
         <div className="order-detail-grid">
           {/* Left column */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "16px",
-            }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Order Items */}
             <Section title={`Items · ${order.items?.length ?? 0}`}>
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-              >
-                {order.items?.map(
-                  (item: {
-                    id: string;
-                    productName: string;
-                    variantName: string | null;
-                    quantity: number;
-                    unitPrice: string;
-                    totalPrice: string;
-                    customizations: {
-                      id: string;
-                      fieldLabel: string;
-                      fieldType: string;
-                      textValue: string | null;
-                      numberValue: string | null;
-                      dateValue: string | null;
-                      booleanValue: boolean | null;
-                      asset: {
-                        id: string;
-                        status: string;
-                        files: {
-                          id: string;
-                          originalName: string;
-                          storagePath: string;
-                          previewPath: string | null;
-                          fileSize: number | null;
-                        }[];
-                      } | null;
-                    }[];
-                  }) => (
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                {order.items?.map((item: OrderItem) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      border: "1px solid var(--border)",
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {/* Item header */}
                     <div
-                      key={item.id}
                       style={{
-                        border: "1px solid var(--border)",
-                        borderRadius: "6px",
-                        overflow: "hidden",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        justifyContent: "space-between",
+                        padding: "12px 14px",
+                        backgroundColor: "var(--bg-primary)",
+                        gap: "12px",
                       }}
                     >
-                      {/* Item header */}
+                      <div style={{ minWidth: 0 }}>
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            fontWeight: 500,
+                            color: "var(--text-primary)",
+                            marginBottom: "2px",
+                          }}
+                        >
+                          {item.productName}
+                        </p>
+                        {item.variantName && (
+                          <p style={{ fontSize: "11px", color: "var(--text-secondary)" }}>
+                            {item.variantName}
+                          </p>
+                        )}
+                        <p
+                          style={{
+                            fontSize: "11px",
+                            color: "var(--text-secondary)",
+                            marginTop: "2px",
+                          }}
+                        >
+                          {item.quantity} × ₹{Number(item.unitPrice).toFixed(2)}
+                        </p>
+                      </div>
+                      <span
+                        style={{
+                          fontSize: "14px",
+                          fontWeight: 600,
+                          color: "var(--text-primary)",
+                          letterSpacing: "-0.01em",
+                          flexShrink: 0,
+                        }}
+                      >
+                        ₹{Number(item.totalPrice).toFixed(2)}
+                      </span>
+                    </div>
+
+                    {/* Customizations — grouped by unitIndex */}
+                    {item.customizations?.length > 0 && (
                       <div
                         style={{
-                          display: "flex",
-                          alignItems: "flex-start",
-                          justifyContent: "space-between",
                           padding: "12px 14px",
-                          backgroundColor: "var(--bg-primary)",
+                          borderTop: "1px solid var(--border)",
+                          display: "flex",
+                          flexDirection: "column",
                           gap: "12px",
                         }}
                       >
-                        <div style={{ minWidth: 0 }}>
-                          <p
-                            style={{
-                              fontSize: "13px",
-                              fontWeight: 500,
-                              color: "var(--text-primary)",
-                              marginBottom: "2px",
-                            }}
-                          >
-                            {item.productName}
-                          </p>
-                          {item.variantName && (
-                            <p
+                        <p
+                          style={{
+                            fontSize: "10px",
+                            fontWeight: 600,
+                            letterSpacing: "0.12em",
+                            textTransform: "uppercase",
+                            color: "var(--text-secondary)",
+                          }}
+                        >
+                          Customizations
+                        </p>
+
+                        {(() => {
+                          // Group by unitIndex
+                          const byUnit = new Map<number, Customization[]>();
+                          for (const c of item.customizations) {
+                            const ui = c.unitIndex ?? 0;
+                            if (!byUnit.has(ui)) byUnit.set(ui, []);
+                            byUnit.get(ui)!.push(c);
+                          }
+                          const units = Array.from(byUnit.entries()).sort(
+                            (a, b) => a[0] - b[0]
+                          );
+                          const totalUnits = units.length;
+
+                          return units.map(([unitIndex, customizations]) => (
+                            <div
+                              key={unitIndex}
                               style={{
-                                fontSize: "11px",
-                                color: "var(--text-secondary)",
+                                border: "1px solid var(--border-soft)",
+                                borderRadius: "6px",
+                                overflow: "hidden",
                               }}
                             >
-                              {item.variantName}
-                            </p>
-                          )}
-                          <p
-                            style={{
-                              fontSize: "11px",
-                              color: "var(--text-secondary)",
-                              marginTop: "2px",
-                            }}
-                          >
-                            {item.quantity} × ₹
-                            {Number(item.unitPrice).toFixed(2)}
-                          </p>
-                        </div>
-                        <span
-                          style={{
-                            fontSize: "14px",
-                            fontWeight: 600,
-                            color: "var(--text-primary)",
-                            letterSpacing: "-0.01em",
-                            flexShrink: 0,
-                          }}
-                        >
-                          ₹{Number(item.totalPrice).toFixed(2)}
-                        </span>
-                      </div>
-
-                      {/* Customizations */}
-                      {item.customizations?.length > 0 && (
-                        <div
-                          style={{
-                            padding: "12px 14px",
-                            borderTop: "1px solid var(--border)",
-                            display: "flex",
-                            flexDirection: "column",
-                            gap: "10px",
-                          }}
-                        >
-                          <p
-                            style={{
-                              fontSize: "10px",
-                              fontWeight: 600,
-                              letterSpacing: "0.12em",
-                              textTransform: "uppercase",
-                              color: "var(--text-secondary)",
-                            }}
-                          >
-                            Customizations
-                          </p>
-
-                          {item.customizations.map((c) => (
-                            <div key={c.id}>
-                              {c.fieldType !== "PHOTO_UPLOAD" && (
+                              {/* Unit header — only if multiple units */}
+                              {totalUnits > 1 && (
                                 <div
                                   style={{
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    gap: "12px",
+                                    padding: "6px 12px",
+                                    backgroundColor: "var(--bg-primary)",
+                                    borderBottom: "1px solid var(--border-soft)",
+                                    fontSize: "10px",
+                                    fontWeight: 600,
+                                    letterSpacing: "0.1em",
+                                    textTransform: "uppercase",
+                                    color: "var(--brand)",
                                   }}
                                 >
-                                  <span
-                                    style={{
-                                      fontSize: "12px",
-                                      color: "var(--text-secondary)",
-                                    }}
-                                  >
-                                    {c.fieldLabel}
-                                  </span>
-                                  <span
-                                    style={{
-                                      fontSize: "12px",
-                                      fontWeight: 500,
-                                      color: "var(--text-primary)",
-                                      textAlign: "right",
-                                    }}
-                                  >
-                                    {c.textValue ??
-                                      c.numberValue?.toString() ??
-                                      (c.dateValue
-                                        ? new Date(
-                                            c.dateValue
-                                          ).toLocaleDateString("en-IN")
-                                        : null) ??
-                                      (c.booleanValue !== null
-                                        ? c.booleanValue
-                                          ? "Yes"
-                                          : "No"
-                                        : "—")}
-                                  </span>
+                                  Unit {unitIndex + 1} of {totalUnits}
                                 </div>
                               )}
 
-                              {c.fieldType === "PHOTO_UPLOAD" && c.asset && (
-                                <div>
-                                  <div
-                                    style={{
-                                      display: "flex",
-                                      alignItems: "center",
-                                      justifyContent: "space-between",
-                                      marginBottom: "10px",
-                                    }}
-                                  >
-                                    <span
-                                      style={{
-                                        fontSize: "12px",
-                                        fontWeight: 500,
-                                        color: "var(--text-secondary)",
-                                      }}
-                                    >
-                                      {c.fieldLabel} (
-                                      {c.asset.files.length} files)
-                                    </span>
-                                    <span
-                                      style={{
-                                        fontSize: "10px",
-                                        fontWeight: 600,
-                                        letterSpacing: "0.06em",
-                                        textTransform: "uppercase",
-                                        padding: "3px 8px",
-                                        borderRadius: "999px",
-                                        backgroundColor:
-                                          c.asset.status === "UPLOADED"
-                                            ? "rgba(142,159,130,0.12)"
-                                            : "rgba(166,138,117,0.1)",
-                                        color:
-                                          c.asset.status === "UPLOADED"
-                                            ? "var(--success)"
-                                            : "var(--brand)",
-                                      }}
-                                    >
-                                      {c.asset.status}
-                                    </span>
-                                  </div>
-
-                                  {c.asset.files.length > 0 && (
-                                    <div
-                                      style={{
-                                        display: "grid",
-                                        gridTemplateColumns:
-                                          "repeat(auto-fill, minmax(72px, 1fr))",
-                                        gap: "8px",
-                                      }}
-                                    >
-                                      {c.asset.files
-                                        .slice(0, 8)
-                                        .map(
-                                          (file: {
-                                            id: string;
-                                            originalName: string;
-                                            storagePath: string;
-                                            previewPath: string | null;
-                                          }) => (
-                                            <div
-                                              key={file.id}
-                                              style={{ position: "relative" }}
-                                              className="group"
-                                            >
-                                              <div
-                                                style={{
-                                                  aspectRatio: "1/1",
-                                                  borderRadius: "6px",
-                                                  overflow: "hidden",
-                                                  border:
-                                                    "1px solid var(--border)",
-                                                }}
-                                              >
-                                                {file.previewPath ? (
-                                                  <img
-                                                    src={`${API}/${file.previewPath}`}
-                                                    alt={file.originalName}
-                                                    style={{
-                                                      width: "100%",
-                                                      height: "100%",
-                                                      objectFit: "cover",
-                                                    }}
-                                                  />
-                                                ) : (
-                                                  <div
-                                                    style={{
-                                                      width: "100%",
-                                                      height: "100%",
-                                                      display: "flex",
-                                                      alignItems: "center",
-                                                      justifyContent: "center",
-                                                      fontSize: "10px",
-                                                      backgroundColor:
-                                                        "var(--bg-primary)",
-                                                      color:
-                                                        "var(--text-secondary)",
-                                                    }}
-                                                  >
-                                                    IMG
-                                                  </div>
-                                                )}
-                                              </div>
-                                              <a
-                                                href={`${API}/${file.storagePath}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                style={{
-                                                  position: "absolute",
-                                                  inset: 0,
-                                                  display: "flex",
-                                                  alignItems: "center",
-                                                  justifyContent: "center",
-                                                  backgroundColor:
-                                                    "rgba(0,0,0,0.5)",
-                                                  borderRadius: "6px",
-                                                  opacity: 0,
-                                                  transition:
-                                                    "opacity 150ms ease",
-                                                }}
-                                                className="group-hover:opacity-100"
-                                              >
-                                                <Download
-                                                  size={14}
-                                                  style={{ color: "#fff" }}
-                                                />
-                                              </a>
-                                            </div>
-                                          )
-                                        )}
-
-                                      {c.asset.files.length > 8 && (
-                                        <div
+                              <div
+                                style={{
+                                  padding: "10px 12px",
+                                  display: "flex",
+                                  flexDirection: "column",
+                                  gap: "10px",
+                                }}
+                              >
+                                {customizations.map((c) => (
+                                  <div key={c.id}>
+                                    {/* Non-photo fields */}
+                                    {c.fieldType !== "PHOTO_UPLOAD" && (
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                          gap: "12px",
+                                        }}
+                                      >
+                                        <span
                                           style={{
-                                            aspectRatio: "1/1",
-                                            borderRadius: "6px",
-                                            border: "1px solid var(--border)",
-                                            display: "flex",
-                                            alignItems: "center",
-                                            justifyContent: "center",
-                                            fontSize: "11px",
-                                            fontWeight: 500,
-                                            backgroundColor:
-                                              "var(--bg-primary)",
+                                            fontSize: "12px",
                                             color: "var(--text-secondary)",
                                           }}
                                         >
-                                          +{c.asset.files.length - 8}
+                                          {c.fieldLabel}
+                                        </span>
+                                        <span
+                                          style={{
+                                            fontSize: "12px",
+                                            fontWeight: 500,
+                                            color: "var(--text-primary)",
+                                            textAlign: "right",
+                                          }}
+                                        >
+                                          {c.textValue ??
+                                            c.numberValue?.toString() ??
+                                            (c.dateValue
+                                              ? new Date(c.dateValue).toLocaleDateString("en-IN")
+                                              : null) ??
+                                            (c.booleanValue !== null
+                                              ? c.booleanValue
+                                                ? "Yes"
+                                                : "No"
+                                              : "—")}
+                                        </span>
+                                      </div>
+                                    )}
+
+                                    {/* Photo upload fields */}
+                                    {c.fieldType === "PHOTO_UPLOAD" && c.asset && (
+                                      <div>
+                                        {/* Row: label + status + download ZIP */}
+                                        <div
+                                          style={{
+                                            display: "flex",
+                                            alignItems: "center",
+                                            justifyContent: "space-between",
+                                            marginBottom: "10px",
+                                            gap: "8px",
+                                            flexWrap: "wrap",
+                                          }}
+                                        >
+                                          <div
+                                            style={{
+                                              display: "flex",
+                                              alignItems: "center",
+                                              gap: "8px",
+                                            }}
+                                          >
+                                            <span
+                                              style={{
+                                                fontSize: "12px",
+                                                fontWeight: 500,
+                                                color: "var(--text-secondary)",
+                                              }}
+                                            >
+                                              {c.fieldLabel} ({c.asset.files.length} files)
+                                            </span>
+                                            <span
+                                              style={{
+                                                fontSize: "10px",
+                                                fontWeight: 600,
+                                                letterSpacing: "0.06em",
+                                                textTransform: "uppercase",
+                                                padding: "3px 8px",
+                                                borderRadius: "999px",
+                                                backgroundColor:
+                                                  c.asset.status === "UPLOADED"
+                                                    ? "rgba(142,159,130,0.12)"
+                                                    : "rgba(166,138,117,0.1)",
+                                                color:
+                                                  c.asset.status === "UPLOADED"
+                                                    ? "var(--success)"
+                                                    : "var(--brand)",
+                                              }}
+                                            >
+                                              {c.asset.status}
+                                            </span>
+                                          </div>
+
+                                          {/* Download ZIP button */}
+                                          {c.asset.files.length > 0 && (
+                                            <a
+                                              href={`/api/admin/orders/${order.id}/items/${item.id}/download?unitIndex=${unitIndex}`}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              style={{
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: "5px",
+                                                padding: "5px 10px",
+                                                borderRadius: "6px",
+                                                fontSize: "11px",
+                                                fontWeight: 500,
+                                                color: "var(--text-primary)",
+                                                border: "1px solid var(--border)",
+                                                backgroundColor: "var(--bg-primary)",
+                                                textDecoration: "none",
+                                                whiteSpace: "nowrap",
+                                              }}
+                                            >
+                                              <Download size={11} strokeWidth={2} />
+                                              Download{" "}
+                                              {c.asset.files.length > 1
+                                                ? `All ${c.asset.files.length}`
+                                                : "Photo"}{" "}
+                                              (.zip)
+                                            </a>
+                                          )}
                                         </div>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              )}
+
+                                        {/* Thumbnails */}
+                                        {c.asset.files.length > 0 && (
+                                          <div
+                                            style={{
+                                              display: "grid",
+                                              gridTemplateColumns:
+                                                "repeat(auto-fill, minmax(72px, 1fr))",
+                                              gap: "8px",
+                                            }}
+                                          >
+                                            {c.asset.files
+                                              .slice(0, 12)
+                                              .map((file: AssetFile) => (
+                                                <div key={file.id}>
+                                                  <a
+                                                    href={`${API}/${file.storagePath}`}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    title={file.originalName}
+                                                    style={{
+                                                      display: "block",
+                                                      width: "72px",
+                                                      height: "72px",
+                                                      borderRadius: "6px",
+                                                      overflow: "hidden",
+                                                      border: "1px solid var(--border)",
+                                                      position: "relative",
+                                                    }}
+                                                  >
+                                                    <OrderPhotoThumb
+                                                      storagePath={file.storagePath}
+                                                      previewPath={file.previewPath}
+                                                      originalName={file.originalName}
+                                                    />
+                                                    <span
+                                                      style={{
+                                                        position: "absolute",
+                                                        bottom: "3px",
+                                                        right: "3px",
+                                                        width: "18px",
+                                                        height: "18px",
+                                                        borderRadius: "3px",
+                                                        backgroundColor: "rgba(0,0,0,0.55)",
+                                                        display: "flex",
+                                                        alignItems: "center",
+                                                        justifyContent: "center",
+                                                      }}
+                                                    >
+                                                      <Download
+                                                        size={10}
+                                                        strokeWidth={2}
+                                                        style={{ color: "#fff" }}
+                                                      />
+                                                    </span>
+                                                  </a>
+                                                  <p
+                                                    style={{
+                                                      fontSize: "9px",
+                                                      color: "var(--text-tertiary)",
+                                                      marginTop: "3px",
+                                                      overflow: "hidden",
+                                                      textOverflow: "ellipsis",
+                                                      whiteSpace: "nowrap",
+                                                      maxWidth: "72px",
+                                                    }}
+                                                  >
+                                                    {file.originalName}
+                                                  </p>
+                                                </div>
+                                              ))}
+
+                                            {c.asset.files.length > 12 && (
+                                              <div
+                                                style={{
+                                                  width: "72px",
+                                                  height: "72px",
+                                                  borderRadius: "6px",
+                                                  border: "1px solid var(--border)",
+                                                  display: "flex",
+                                                  alignItems: "center",
+                                                  justifyContent: "center",
+                                                  fontSize: "11px",
+                                                  fontWeight: 500,
+                                                  backgroundColor: "var(--bg-primary)",
+                                                  color: "var(--text-secondary)",
+                                                }}
+                                              >
+                                                +{c.asset.files.length - 12}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )
-                )}
+                          ));
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </Section>
 
             {/* Customer note */}
             {order.customerNote && (
               <Section title="Customer Note">
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--text-primary)",
-                    lineHeight: 1.6,
-                  }}
-                >
+                <p style={{ fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
                   {order.customerNote}
                 </p>
               </Section>
@@ -702,13 +759,7 @@ export default async function OrderDetailPage({
             {/* Admin note */}
             {order.adminNote && (
               <Section title="Admin Note">
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--text-primary)",
-                    lineHeight: 1.6,
-                  }}
-                >
+                <p style={{ fontSize: "13px", color: "var(--text-primary)", lineHeight: 1.6 }}>
                   {order.adminNote}
                 </p>
               </Section>
@@ -733,10 +784,7 @@ export default async function OrderDetailPage({
                         i: number,
                         arr: unknown[]
                       ) => (
-                        <div
-                          key={event.id}
-                          style={{ display: "flex", gap: "12px" }}
-                        >
+                        <div key={event.id} style={{ display: "flex", gap: "12px" }}>
                           <div
                             style={{
                               display: "flex",
@@ -752,9 +800,7 @@ export default async function OrderDetailPage({
                                 borderRadius: "2px",
                                 marginTop: "4px",
                                 backgroundColor:
-                                  i === 0
-                                    ? "var(--text-primary)"
-                                    : "var(--border)",
+                                  i === 0 ? "var(--text-primary)" : "var(--border)",
                                 flexShrink: 0,
                               }}
                             />
@@ -769,14 +815,7 @@ export default async function OrderDetailPage({
                               />
                             )}
                           </div>
-
-                          <div
-                            style={{
-                              paddingBottom: "16px",
-                              minWidth: 0,
-                              flex: 1,
-                            }}
-                          >
+                          <div style={{ paddingBottom: "16px", minWidth: 0, flex: 1 }}>
                             <p
                               style={{
                                 fontSize: "13px",
@@ -807,21 +846,13 @@ export default async function OrderDetailPage({
                                 flexWrap: "wrap",
                               }}
                             >
-                              <span
-                                style={{
-                                  fontSize: "11px",
-                                  color: "var(--text-tertiary)",
-                                }}
-                              >
-                                {new Date(event.createdAt).toLocaleString(
-                                  "en-IN",
-                                  {
-                                    day: "numeric",
-                                    month: "short",
-                                    hour: "2-digit",
-                                    minute: "2-digit",
-                                  }
-                                )}
+                              <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                                {new Date(event.createdAt).toLocaleString("en-IN", {
+                                  day: "numeric",
+                                  month: "short",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
                               </span>
                               <span
                                 style={{
@@ -843,8 +874,7 @@ export default async function OrderDetailPage({
                                     fontWeight: 500,
                                     padding: "2px 7px",
                                     borderRadius: "4px",
-                                    backgroundColor:
-                                      "rgba(142,159,130,0.12)",
+                                    backgroundColor: "rgba(142,159,130,0.12)",
                                     color: "var(--success)",
                                   }}
                                 >
@@ -858,12 +888,7 @@ export default async function OrderDetailPage({
                     )}
                 </div>
               ) : (
-                <p
-                  style={{
-                    fontSize: "13px",
-                    color: "var(--text-secondary)",
-                  }}
-                >
+                <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
                   No timeline events yet
                 </p>
               )}
@@ -871,9 +896,7 @@ export default async function OrderDetailPage({
           </div>
 
           {/* Right column */}
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "16px" }}
-          >
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             <Section title="Customer">
               <Row label="Name" value={order.customer.name} />
               <Row label="Phone" value={order.customer.phone} />
@@ -893,12 +916,7 @@ export default async function OrderDetailPage({
                   gap: "2px",
                 }}
               >
-                <p
-                  style={{
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
-                  }}
-                >
+                <p style={{ fontWeight: 500, color: "var(--text-primary)" }}>
                   {order.shipName}
                 </p>
                 <p>{order.shipPhone}</p>
@@ -929,10 +947,7 @@ export default async function OrderDetailPage({
                   />
                 }
               />
-              <Row
-                label="Subtotal"
-                value={`₹${Number(order.subtotal).toFixed(2)}`}
-              />
+              <Row label="Subtotal" value={`₹${Number(order.subtotal).toFixed(2)}`} />
               {Number(order.discountAmount) > 0 && (
                 <Row
                   label="Discount"
@@ -943,20 +958,11 @@ export default async function OrderDetailPage({
                   }
                 />
               )}
-              <Row
-                label="Shipping"
-                value={`₹${Number(order.shippingCharge).toFixed(2)}`}
-              />
+              <Row label="Shipping" value={`₹${Number(order.shippingCharge).toFixed(2)}`} />
               <Row
                 label="Total"
                 value={
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      fontSize: "15px",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
+                  <span style={{ fontWeight: 700, fontSize: "15px", letterSpacing: "-0.01em" }}>
                     ₹{Number(order.totalAmount).toFixed(2)}
                   </span>
                 }
@@ -984,13 +990,7 @@ export default async function OrderDetailPage({
                 <Row
                   label="Payment ID"
                   value={
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: "11px",
-                        color: "var(--text-secondary)",
-                      }}
-                    >
+                    <span style={{ fontFamily: "monospace", fontSize: "11px", color: "var(--text-secondary)" }}>
                       {order.payment.gatewayPaymentId}
                     </span>
                   }
@@ -999,42 +999,27 @@ export default async function OrderDetailPage({
               {order.payment?.paidAt && (
                 <Row
                   label="Paid At"
-                  value={new Date(
-                    order.payment.paidAt
-                  ).toLocaleDateString("en-IN")}
+                  value={new Date(order.payment.paidAt).toLocaleDateString("en-IN")}
                 />
               )}
             </Section>
 
             {order.shipment && (
               <Section title="Shipment">
-                <Row
-                  label="Partner"
-                  value={order.shipment.shippingPartner?.name ?? "—"}
-                />
+                <Row label="Partner" value={order.shipment.shippingPartner?.name ?? "—"} />
                 <Row
                   label="Tracking"
                   value={
-                    <span
-                      style={{
-                        fontFamily: "monospace",
-                        fontSize: "11px",
-                      }}
-                    >
+                    <span style={{ fontFamily: "monospace", fontSize: "11px" }}>
                       {order.shipment.trackingNumber}
                     </span>
                   }
                 />
-                <Row
-                  label="Status"
-                  value={formatLabel(order.shipment.status)}
-                />
+                <Row label="Status" value={formatLabel(order.shipment.status)} />
                 {order.shipment.estimatedDelivery && (
                   <Row
                     label="Est. Delivery"
-                    value={new Date(
-                      order.shipment.estimatedDelivery
-                    ).toLocaleDateString("en-IN")}
+                    value={new Date(order.shipment.estimatedDelivery).toLocaleDateString("en-IN")}
                   />
                 )}
               </Section>

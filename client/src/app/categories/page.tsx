@@ -104,141 +104,153 @@ export default async function CategoriesPage() {
               </p>
             </div>
           ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                gap: "2px",
-              }}
-            >
-              {categories.map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/categories/${cat.slug}`}
-                  className="group"
-                  style={{
-                    display: "block",
-                    overflow: "hidden",
-                    aspectRatio: "3/4",
-                    position: "relative",
-                    backgroundColor: "var(--brand-soft)",
-                  }}
-                >
-                  {/* Background image */}
-                  {cat.imageUrl ? (
-                    <img
-                      src={cat.imageUrl}
-                      alt={cat.name}
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        width: "100%",
-                        height: "100%",
-                        objectFit: "cover",
-                        transition: "transform 600ms ease",
-                      }}
-                      className="group-hover:scale-[1.02]"
-                    />
-                  ) : (
+            <>
+              <style>{`
+                @media (max-width: 640px) {
+                  .categories-page-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                  }
+                }
+              `}</style>
+
+              <div
+                className="categories-page-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(300px, 1fr))",
+                  gap: "2px",
+                }}
+              >
+                {categories.map((cat) => (
+                  <Link
+                    key={cat.id}
+                    href={`/categories/${cat.slug}`}
+                    className="group"
+                    style={{
+                      display: "block",
+                      overflow: "hidden",
+                      aspectRatio: "3/4",
+                      position: "relative",
+                      backgroundColor: "var(--brand-soft)",
+                    }}
+                  >
+                    {/* Background image */}
+                    {cat.imageUrl ? (
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.name}
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          transition: "transform 600ms ease",
+                        }}
+                        className="group-hover:scale-[1.02]"
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          position: "absolute",
+                          inset: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <ImageIcon
+                          size={40}
+                          strokeWidth={1}
+                          style={{ color: "var(--border)", opacity: 0.4 }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Gradient overlay */}
                     <div
                       style={{
                         position: "absolute",
                         inset: 0,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
+                        background:
+                          "linear-gradient(to top, rgba(43,43,43,0.68) 0%, rgba(43,43,43,0.08) 55%, transparent 100%)",
                       }}
-                    >
-                      <ImageIcon
-                        size={40}
-                        strokeWidth={1}
-                        style={{ color: "var(--border)", opacity: 0.4 }}
-                      />
-                    </div>
-                  )}
+                    />
 
-                  {/* Gradient overlay */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background:
-                        "linear-gradient(to top, rgba(43,43,43,0.68) 0%, rgba(43,43,43,0.08) 55%, transparent 100%)",
-                    }}
-                  />
-
-                  {/* Content */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      padding: "28px",
-                      color: "#fff",
-                    }}
-                  >
-                    <p
+                    {/* Content */}
+                    <div
                       style={{
-                        fontSize: "10px",
-                        letterSpacing: "0.16em",
-                        textTransform: "uppercase",
-                        fontWeight: 500,
-                        opacity: 0.65,
-                        marginBottom: "6px",
+                        position: "absolute",
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        padding: "28px",
+                        color: "#fff",
                       }}
                     >
-                      {cat.productCount} products
-                    </p>
-                    <h3
-                      style={{
-                        fontFamily: "'Playfair Display', serif",
-                        fontSize: "22px",
-                        fontWeight: 500,
-                        marginBottom: "12px",
-                        letterSpacing: "-0.01em",
-                        lineHeight: 1.2,
-                      }}
-                    >
-                      {cat.name}
-                    </h3>
-                    {cat.description && (
                       <p
                         style={{
-                          fontSize: "13px",
-                          opacity: 0.75,
-                          marginBottom: "14px",
-                          lineHeight: 1.5,
-                          overflow: "hidden",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: "vertical",
+                          fontSize: "10px",
+                          letterSpacing: "0.16em",
+                          textTransform: "uppercase",
+                          fontWeight: 500,
+                          opacity: 0.65,
+                          marginBottom: "6px",
                         }}
                       >
-                        {cat.description}
+                        {cat.productCount} products
                       </p>
-                    )}
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "6px",
-                        fontSize: "12px",
-                        fontWeight: 500,
-                        letterSpacing: "0.04em",
-                        textTransform: "uppercase",
-                        opacity: 0.85,
-                        transition: "gap 250ms ease",
-                      }}
-                      className="group-hover:gap-[10px]"
-                    >
-                      Explore
-                      <ArrowRight size={13} strokeWidth={2} />
-                    </span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                      <h3
+                        style={{
+                          fontFamily: "'Playfair Display', serif",
+                          fontSize: "22px",
+                          fontWeight: 500,
+                          marginBottom: "12px",
+                          letterSpacing: "-0.01em",
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {cat.name}
+                      </h3>
+                      {cat.description && (
+                        <p
+                          style={{
+                            fontSize: "13px",
+                            opacity: 0.75,
+                            marginBottom: "14px",
+                            lineHeight: 1.5,
+                            overflow: "hidden",
+                            display: "-webkit-box",
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: "vertical",
+                          }}
+                        >
+                          {cat.description}
+                        </p>
+                      )}
+                      <span
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: "6px",
+                          fontSize: "12px",
+                          fontWeight: 500,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          opacity: 0.85,
+                          transition: "gap 250ms ease",
+                        }}
+                        className="group-hover:gap-[10px]"
+                      >
+                        Explore
+                        <ArrowRight size={13} strokeWidth={2} />
+                      </span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </>
           )}
         </div>
       </section>

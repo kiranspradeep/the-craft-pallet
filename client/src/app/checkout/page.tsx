@@ -10,6 +10,7 @@ import {
   Loader2,
   ImageIcon,
   Lock,
+  AlertCircle,
 } from "lucide-react";
 import {
   cartApi,
@@ -29,6 +30,76 @@ declare global {
   }
 }
 
+// ── Validation ────────────────────────────────────────────────────────────
+
+interface FormErrors {
+  name?: string;
+  phone?: string;
+  email?: string;
+  shipName?: string;
+  shipPhone?: string;
+  shipLine1?: string;
+  shipCity?: string;
+  shipState?: string;
+  shipPincode?: string;
+}
+
+function validateForm(
+  form: Record<string, string>,
+  sameShipping: boolean
+): FormErrors {
+  const errors: FormErrors = {};
+
+  if (!form.name.trim()) {
+    errors.name = "Full name is required";
+  } else if (form.name.trim().length < 2) {
+    errors.name = "Name must be at least 2 characters";
+  }
+
+  if (!form.phone.trim()) {
+    errors.phone = "Phone number is required";
+  } else if (!/^\d{10}$/.test(form.phone.trim())) {
+    errors.phone = "Enter a valid 10-digit phone number";
+  }
+
+  if (form.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+    errors.email = "Enter a valid email address";
+  }
+
+  if (!sameShipping) {
+    if (!form.shipName.trim()) {
+      errors.shipName = "Recipient name is required";
+    }
+    if (!form.shipPhone.trim()) {
+      errors.shipPhone = "Recipient phone is required";
+    } else if (!/^\d{10}$/.test(form.shipPhone.trim())) {
+      errors.shipPhone = "Enter a valid 10-digit phone number";
+    }
+  }
+
+  if (!form.shipLine1.trim()) {
+    errors.shipLine1 = "Address is required";
+  }
+
+  if (!form.shipCity.trim()) {
+    errors.shipCity = "City is required";
+  }
+
+  if (!form.shipState.trim()) {
+    errors.shipState = "State is required";
+  }
+
+  if (!form.shipPincode.trim()) {
+    errors.shipPincode = "Pincode is required";
+  } else if (!/^\d{6}$/.test(form.shipPincode.trim())) {
+    errors.shipPincode = "Enter a valid 6-digit pincode";
+  }
+
+  return errors;
+}
+
+// ── Main Component ────────────────────────────────────────────────────────
+
 function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,6 +112,8 @@ function CheckoutContent() {
   const [loading, setLoading] = useState(true);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const [form, setForm] = useState({
     name: "",
@@ -102,11 +175,39 @@ function CheckoutContent() {
     }
   };
 
-  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: string, v: string) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    // Clear field error when user starts typing
+    if (fieldErrors[k as keyof FormErrors]) {
+      setFieldErrors((prev) => ({ ...prev, [k]: undefined }));
+    }
+  };
+
+  const touch = (k: string) => {
+    setTouched((prev) => ({ ...prev, [k]: true }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Run validation
+    const errors = validateForm(form, sameShipping);
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      // Mark all fields as touched so errors show
+      const allTouched: Record<string, boolean> = {};
+      Object.keys(form).forEach((k) => (allTouched[k] = true));
+      setTouched(allTouched);
+
+      // Scroll to first error
+      const firstErrorKey = Object.keys(errors)[0];
+      const el = document.querySelector(`[data-field="${firstErrorKey}"]`);
+      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
+
     setPlacing(true);
 
     try {
@@ -116,7 +217,9 @@ function CheckoutContent() {
         phone: form.phone.trim(),
         email: form.email.trim() || undefined,
         shipName: sameShipping ? form.name.trim() : form.shipName.trim(),
-        shipPhone: sameShipping ? form.phone.trim() : form.shipPhone.trim(),
+        shipPhone: sameShipping
+          ? form.phone.trim()
+          : form.shipPhone.trim(),
         shipLine1: form.shipLine1.trim(),
         shipLine2: form.shipLine2.trim() || undefined,
         shipCity: form.shipCity.trim(),
@@ -155,7 +258,9 @@ function CheckoutContent() {
     ]
       .filter(Boolean)
       .join("\n");
-    window.location.href = `https://wa.me/918086415357?text=${encodeURIComponent(parts)}`;
+    window.location.href = `https://wa.me/918086415357?text=${encodeURIComponent(
+      parts
+    )}`;
   };
 
   const openRazorpayCheckout = async (order: any) => {
@@ -247,7 +352,9 @@ function CheckoutContent() {
           {/* Header */}
           <div style={{ marginBottom: "48px" }}>
             <Link
-              href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
+              href={`/checkout/upload-method${
+                buyNowId ? `?bn=${buyNowId}` : ""
+              }`}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
@@ -296,7 +403,7 @@ function CheckoutContent() {
             </h1>
           </div>
 
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} noValidate>
             <style>{`
               @media (min-width: 900px) {
                 .checkout-grid {
@@ -305,12 +412,8 @@ function CheckoutContent() {
                 }
               }
               @media (max-width: 640px) {
-                .field-grid-2 {
-                  grid-template-columns: 1fr !important;
-                }
-                .field-grid-3 {
-                  grid-template-columns: 1fr !important;
-                }
+                .field-grid-2 { grid-template-columns: 1fr !important; }
+                .field-grid-3 { grid-template-columns: 1fr !important; }
               }
             `}</style>
 
@@ -322,8 +425,9 @@ function CheckoutContent() {
                 gap: "32px",
               }}
             >
-              {/* ── Left — Form ── */}
+              {/* Left — Form */}
               <div>
+                {/* Contact Information */}
                 <FormSection title="Contact Information" step={1}>
                   <div
                     className="field-grid-2"
@@ -333,37 +437,49 @@ function CheckoutContent() {
                       gap: "16px",
                     }}
                   >
-                    <Field label="Full Name" required>
+                    <Field label="Full Name" required error={touched.name ? fieldErrors.name : undefined}>
                       <Input
+                        data-field="name"
                         placeholder="Priya Sharma"
                         value={form.name}
                         onChange={(v) => set("name", v)}
+                        onBlur={() => touch("name")}
+                        hasError={!!(touched.name && fieldErrors.name)}
                         required
                       />
                     </Field>
-                    <Field label="Phone" required>
+                    <Field label="Phone" required error={touched.phone ? fieldErrors.phone : undefined}>
                       <Input
+                        data-field="phone"
                         placeholder="9876543210"
                         value={form.phone}
                         onChange={(v) =>
                           set("phone", v.replace(/\D/g, "").slice(0, 10))
                         }
+                        onBlur={() => touch("phone")}
+                        hasError={!!(touched.phone && fieldErrors.phone)}
                         maxLength={10}
-                        pattern="\d{10}"
-                        required
+                        inputMode="numeric"
                       />
                     </Field>
                   </div>
-                  <Field label="Email (optional)">
+                  <Field
+                    label="Email (optional)"
+                    error={touched.email ? fieldErrors.email : undefined}
+                  >
                     <Input
+                      data-field="email"
                       type="email"
                       placeholder="priya@example.com"
                       value={form.email}
                       onChange={(v) => set("email", v)}
+                      onBlur={() => touch("email")}
+                      hasError={!!(touched.email && fieldErrors.email)}
                     />
                   </Field>
                 </FormSection>
 
+                {/* Shipping Address */}
                 <FormSection title="Shipping Address" step={2}>
                   <label
                     style={{
@@ -379,7 +495,15 @@ function CheckoutContent() {
                     <input
                       type="checkbox"
                       checked={sameShipping}
-                      onChange={(e) => setSameShipping(e.target.checked)}
+                      onChange={(e) => {
+                        setSameShipping(e.target.checked);
+                        // Clear ship field errors when toggling
+                        setFieldErrors((prev) => ({
+                          ...prev,
+                          shipName: undefined,
+                          shipPhone: undefined,
+                        }));
+                      }}
                       style={{ accentColor: "var(--text-primary)" }}
                     />
                     Same as contact info
@@ -394,34 +518,58 @@ function CheckoutContent() {
                         gap: "16px",
                       }}
                     >
-                      <Field label="Recipient Name" required>
+                      <Field
+                        label="Recipient Name"
+                        required
+                        error={touched.shipName ? fieldErrors.shipName : undefined}
+                      >
                         <Input
+                          data-field="shipName"
                           value={form.shipName}
                           onChange={(v) => set("shipName", v)}
-                          required
+                          onBlur={() => touch("shipName")}
+                          hasError={!!(touched.shipName && fieldErrors.shipName)}
+                          placeholder="Priya Sharma"
                         />
                       </Field>
-                      <Field label="Recipient Phone" required>
+                      <Field
+                        label="Recipient Phone"
+                        required
+                        error={touched.shipPhone ? fieldErrors.shipPhone : undefined}
+                      >
                         <Input
+                          data-field="shipPhone"
                           value={form.shipPhone}
                           onChange={(v) =>
                             set("shipPhone", v.replace(/\D/g, "").slice(0, 10))
                           }
+                          onBlur={() => touch("shipPhone")}
+                          hasError={
+                            !!(touched.shipPhone && fieldErrors.shipPhone)
+                          }
                           maxLength={10}
-                          required
+                          inputMode="numeric"
+                          placeholder="9876543210"
                         />
                       </Field>
                     </div>
                   )}
 
-                  <Field label="Address Line 1" required>
+                  <Field
+                    label="Address Line 1"
+                    required
+                    error={touched.shipLine1 ? fieldErrors.shipLine1 : undefined}
+                  >
                     <Input
+                      data-field="shipLine1"
                       placeholder="House / Flat, Street"
                       value={form.shipLine1}
                       onChange={(v) => set("shipLine1", v)}
-                      required
+                      onBlur={() => touch("shipLine1")}
+                      hasError={!!(touched.shipLine1 && fieldErrors.shipLine1)}
                     />
                   </Field>
+
                   <Field label="Address Line 2 (optional)">
                     <Input
                       placeholder="Landmark, Area"
@@ -429,6 +577,7 @@ function CheckoutContent() {
                       onChange={(v) => set("shipLine2", v)}
                     />
                   </Field>
+
                   <div
                     className="field-grid-3"
                     style={{
@@ -437,34 +586,58 @@ function CheckoutContent() {
                       gap: "16px",
                     }}
                   >
-                    <Field label="City" required>
+                    <Field
+                      label="City"
+                      required
+                      error={touched.shipCity ? fieldErrors.shipCity : undefined}
+                    >
                       <Input
+                        data-field="shipCity"
                         value={form.shipCity}
                         onChange={(v) => set("shipCity", v)}
-                        required
+                        onBlur={() => touch("shipCity")}
+                        hasError={!!(touched.shipCity && fieldErrors.shipCity)}
+                        placeholder="Mumbai"
                       />
                     </Field>
-                    <Field label="State" required>
+                    <Field
+                      label="State"
+                      required
+                      error={touched.shipState ? fieldErrors.shipState : undefined}
+                    >
                       <Input
+                        data-field="shipState"
                         value={form.shipState}
                         onChange={(v) => set("shipState", v)}
-                        required
+                        onBlur={() => touch("shipState")}
+                        hasError={!!(touched.shipState && fieldErrors.shipState)}
+                        placeholder="Maharashtra"
                       />
                     </Field>
-                    <Field label="Pincode" required>
+                    <Field
+                      label="Pincode"
+                      required
+                      error={touched.shipPincode ? fieldErrors.shipPincode : undefined}
+                    >
                       <Input
+                        data-field="shipPincode"
                         value={form.shipPincode}
                         onChange={(v) =>
                           set("shipPincode", v.replace(/\D/g, "").slice(0, 6))
                         }
+                        onBlur={() => touch("shipPincode")}
+                        hasError={
+                          !!(touched.shipPincode && fieldErrors.shipPincode)
+                        }
                         maxLength={6}
-                        pattern="\d{6}"
-                        required
+                        inputMode="numeric"
+                        placeholder="400001"
                       />
                     </Field>
                   </div>
                 </FormSection>
 
+                {/* Order Notes */}
                 <FormSection title="Order Notes" step={3}>
                   <textarea
                     rows={3}
@@ -501,7 +674,7 @@ function CheckoutContent() {
                 </FormSection>
               </div>
 
-              {/* ── Right — Summary ── */}
+              {/* Right — Summary */}
               <div>
                 <div
                   style={{
@@ -716,11 +889,45 @@ function CheckoutContent() {
                         color: "#DC2626",
                         fontSize: "12px",
                         marginBottom: "16px",
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: "8px",
                       }}
                     >
+                      <AlertCircle
+                        size={14}
+                        strokeWidth={1.75}
+                        style={{ flexShrink: 0, marginTop: "1px" }}
+                      />
                       {error}
                     </div>
                   )}
+
+                  {/* Validation summary — shown when form submitted with errors */}
+                  {Object.keys(fieldErrors).length > 0 &&
+                    Object.values(touched).some(Boolean) && (
+                      <div
+                        style={{
+                          padding: "12px 14px",
+                          borderRadius: "var(--radius-input)",
+                          backgroundColor: "#FEF2F2",
+                          border: "1px solid #FECACA",
+                          color: "#DC2626",
+                          fontSize: "12px",
+                          marginBottom: "16px",
+                          display: "flex",
+                          alignItems: "flex-start",
+                          gap: "8px",
+                        }}
+                      >
+                        <AlertCircle
+                          size={14}
+                          strokeWidth={1.75}
+                          style={{ flexShrink: 0, marginTop: "1px" }}
+                        />
+                        Please fix the errors in the form above
+                      </div>
+                    )}
 
                   <button
                     type="submit"
@@ -730,12 +937,18 @@ function CheckoutContent() {
                       width: "100%",
                       justifyContent: "center",
                       backgroundColor:
-                        method === "whatsapp" ? "var(--text-primary)" : "var(--accent)",
+                        method === "whatsapp"
+                          ? "var(--text-primary)"
+                          : "var(--accent)",
                     }}
                   >
                     {placing ? (
                       <>
-                        <Loader2 size={15} className="animate-spin" strokeWidth={2} />
+                        <Loader2
+                          size={15}
+                          className="animate-spin"
+                          strokeWidth={2}
+                        />
                         Processing...
                       </>
                     ) : method === "whatsapp" ? (
@@ -807,7 +1020,7 @@ export default function CheckoutPage() {
   );
 }
 
-/* ── Sub-components ─────────────────────────────────────────────────────── */
+/* ── Sub-components ──────────────────────────────────────────────────────── */
 
 function FormSection({
   title,
@@ -872,10 +1085,12 @@ function FormSection({
 function Field({
   label,
   required,
+  error,
   children,
 }: {
   label: string;
   required?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -887,8 +1102,9 @@ function Field({
           fontWeight: 500,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: "var(--text-tertiary)",
+          color: error ? "#DC2626" : "var(--text-tertiary)",
           marginBottom: "7px",
+          transition: "color 200ms ease",
         }}
       >
         {label}
@@ -897,6 +1113,21 @@ function Field({
         )}
       </label>
       {children}
+      {error && (
+        <p
+          style={{
+            fontSize: "11px",
+            color: "#DC2626",
+            marginTop: "5px",
+            display: "flex",
+            alignItems: "center",
+            gap: "4px",
+          }}
+        >
+          <AlertCircle size={11} strokeWidth={2} />
+          {error}
+        </p>
+      )}
     </div>
   );
 }
@@ -904,32 +1135,46 @@ function Field({
 function Input({
   value,
   onChange,
+  onBlur,
+  hasError,
+  "data-field": dataField,
   ...props
 }: {
   value: string;
   onChange: (v: string) => void;
+  onBlur?: () => void;
+  hasError?: boolean;
+  "data-field"?: string;
   [k: string]: any;
 }) {
   return (
     <input
       {...props}
+      data-field={dataField}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       style={{
         width: "100%",
         padding: "11px 14px",
         borderRadius: "var(--radius-input)",
-        border: "1px solid var(--border)",
+        border: `1px solid ${hasError ? "#DC2626" : "var(--border)"}`,
         fontSize: "14px",
-        backgroundColor: "var(--bg)",
+        backgroundColor: hasError ? "#FEF2F2" : "var(--bg)",
         color: "var(--text-primary)",
-        transition: "border-color 200ms ease",
+        transition: "border-color 200ms ease, background-color 200ms ease",
+        outline: "none",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = "var(--brand)";
+        e.currentTarget.style.borderColor = hasError ? "#DC2626" : "var(--brand)";
+        e.currentTarget.style.backgroundColor = "var(--bg)";
       }}
-      onBlur={(e) => {
-        e.currentTarget.style.borderColor = "var(--border)";
+      onBlurCapture={(e) => {
+        e.currentTarget.style.borderColor = hasError
+          ? "#DC2626"
+          : "var(--border)";
+        if (hasError)
+          e.currentTarget.style.backgroundColor = "#FEF2F2";
       }}
     />
   );

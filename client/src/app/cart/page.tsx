@@ -9,7 +9,6 @@ import {
   Minus,
   ArrowRight,
   ShoppingBag,
-  Tag,
   ImageIcon,
   Paperclip,
   Check,
@@ -31,34 +30,29 @@ export default function CartPage() {
   }, []);
 
   const loadCart = async () => {
-  setLoading(true);
-  try {
-    const res = await cartApi.getCart();
-
-    // Handle case where session ID wasn't ready
-    if (!res) {
-      setCart(null);
-      setTotals(null);
-      return;
+    setLoading(true);
+    try {
+      const res = await cartApi.getCart();
+      if (!res) {
+        setCart(null);
+        setTotals(null);
+        return;
+      }
+      setCart(res.cart);
+      setTotals(res.totals);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-
-    setCart(res.cart);
-    setTotals(res.totals);
-  } catch (err) {
-    console.error(err);
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   const handleQuantity = async (itemId: string, newQty: number) => {
     if (newQty < 1) return;
     setUpdating(itemId);
     try {
-      const updated = await cartApi.updateItem(itemId, { quantity: newQty });
-      setCart(updated.cart ?? updated);
-      const res = await cartApi.getCart();
-      setTotals(res.totals);
+      await cartApi.updateItem(itemId, { quantity: newQty });
+      await loadCart();
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -83,7 +77,9 @@ export default function CartPage() {
     if (!couponCode.trim()) return;
     setCouponError("");
     try {
-      const result = await cartApi.applyCoupon(couponCode.trim().toUpperCase());
+      const result = await cartApi.applyCoupon(
+        couponCode.trim().toUpperCase()
+      );
       setAppliedCoupon(result);
     } catch (err: any) {
       setCouponError(err.message);
@@ -127,12 +123,7 @@ export default function CartPage() {
   const total = subtotal - discount;
 
   return (
-    <div
-      style={{
-        backgroundColor: "var(--bg)",
-        padding: "56px 0 120px",
-      }}
-    >
+    <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
       <div className="tcp-container">
         {/* Header */}
         <div style={{ marginBottom: "56px" }}>
@@ -151,7 +142,6 @@ export default function CartPage() {
         </div>
 
         {isEmpty ? (
-          /* ── Empty state ── */
           <div
             style={{
               textAlign: "center",
@@ -194,7 +184,6 @@ export default function CartPage() {
                 fontSize: "14px",
                 color: "var(--text-secondary)",
                 lineHeight: 1.7,
-                marginBottom: "32px",
                 maxWidth: "320px",
                 margin: "0 auto 32px",
               }}
@@ -207,7 +196,6 @@ export default function CartPage() {
             </Link>
           </div>
         ) : (
-          /* ── Cart with items ── */
           <>
             <style>{`
               @media (min-width: 900px) {
@@ -226,9 +214,14 @@ export default function CartPage() {
                 gap: "32px",
               }}
             >
-              {/* ── Left — Items ── */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
-                {/* Column headers — desktop only */}
+              {/* Left — Items */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "2px",
+                }}
+              >
                 <div
                   style={{
                     display: "grid",
@@ -274,7 +267,7 @@ export default function CartPage() {
                 ))}
               </div>
 
-              {/* ── Right — Summary ── */}
+              {/* Right — Summary */}
               <div>
                 <div
                   style={{
@@ -480,7 +473,7 @@ export default function CartPage() {
   );
 }
 
-/* ── Cart Item ─────────────────────────────────────────────────────────────── */
+/* ── Cart Item ────────────────────────────────────────────────────────────── */
 
 function CartItem({
   item,
@@ -495,12 +488,40 @@ function CartItem({
 }) {
   const thumb = item.product?.images?.[0];
 
+  const strategy = item.product?.pricingConfig?.strategy;
+  const isPerUnit =
+    strategy === "FIXED_VARIANTS" || strategy === "PER_UNIT";
+
+  // Step size for quantity buttons
+  const incrementQty =
+    strategy === "INCREMENTAL_QUANTITY"
+      ? (item.product?.pricingConfig?.incrementQuantity ?? 1)
+      : 1;
+
+  // Minimum quantity
+  const minQty =
+    strategy === "INCREMENTAL_QUANTITY"
+      ? (item.product?.pricingConfig?.minimumOrderQuantity ?? incrementQty)
+      : 1;
+
+  // Upload status
   const uploadedFiles = item.customizations
     ?.filter((c: any) => c.fieldType === "PHOTO_UPLOAD" && c.asset)
     .flatMap((c: any) => c.asset.files ?? []);
 
+  const totalUploadSlots =
+    item.customizations?.filter(
+      (c: any) => c.fieldType === "PHOTO_UPLOAD"
+    ).length ?? 0;
+
+  const filledUploadSlots =
+    item.customizations?.filter(
+      (c: any) => c.fieldType === "PHOTO_UPLOAD" && c.assetId
+    ).length ?? 0;
+
+  // Only show unit 0 text customizations in cart
   const textCustomizations = item.customizations?.filter(
-    (c: any) => c.fieldType !== "PHOTO_UPLOAD"
+    (c: any) => c.fieldType !== "PHOTO_UPLOAD" && (c.unitIndex ?? 0) === 0
   );
 
   return (
@@ -612,7 +633,7 @@ function CartItem({
           </button>
         </div>
 
-        {/* Text customizations */}
+        {/* Text customizations — unit 0 only */}
         {textCustomizations?.length > 0 && (
           <div
             style={{
@@ -641,12 +662,15 @@ function CartItem({
           </div>
         )}
 
-        {/* Photo upload count */}
-        {uploadedFiles?.length > 0 && (
+        {/* Upload status */}
+        {totalUploadSlots > 0 && (
           <p
             style={{
               fontSize: "11px",
-              color: "var(--text-tertiary)",
+              color:
+                filledUploadSlots === totalUploadSlots
+                  ? "var(--success)"
+                  : "var(--text-tertiary)",
               marginBottom: "8px",
               display: "flex",
               alignItems: "center",
@@ -654,7 +678,11 @@ function CartItem({
             }}
           >
             <Paperclip size={11} strokeWidth={1.75} />
-            {uploadedFiles.length} photos uploaded
+            {isPerUnit
+              ? `${filledUploadSlots} of ${totalUploadSlots} units have photos`
+              : uploadedFiles?.length > 0
+              ? `${uploadedFiles.length} photos uploaded`
+              : "Photos not yet uploaded"}
           </p>
         )}
 
@@ -682,7 +710,7 @@ function CartItem({
             marginTop: "14px",
           }}
         >
-          {/* Qty control */}
+          {/* Quantity control */}
           <div
             style={{
               display: "inline-flex",
@@ -692,9 +720,14 @@ function CartItem({
               overflow: "hidden",
             }}
           >
+            {/* MINUS — steps by incrementQty, never below minQty */}
             <button
-              onClick={() => onQuantityChange(item.quantity - 1)}
-              disabled={updating || item.quantity <= 1}
+              onClick={() =>
+                onQuantityChange(
+                  Math.max(minQty, item.quantity - incrementQty)
+                )
+              }
+              disabled={updating || item.quantity <= minQty}
               aria-label="Decrease quantity"
               style={{
                 width: "34px",
@@ -702,17 +735,25 @@ function CartItem({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "var(--text-secondary)",
+                color:
+                  item.quantity <= minQty
+                    ? "var(--border)"
+                    : "var(--text-secondary)",
                 borderRight: "1px solid var(--border)",
                 transition: "background-color 150ms ease",
+                cursor:
+                  item.quantity <= minQty ? "not-allowed" : "pointer",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.backgroundColor =
-                  "var(--bg)";
+                if (item.quantity > minQty)
+                  (
+                    e.currentTarget as HTMLElement
+                  ).style.backgroundColor = "var(--bg)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.backgroundColor =
-                  "transparent";
+                (
+                  e.currentTarget as HTMLElement
+                ).style.backgroundColor = "transparent";
               }}
             >
               <Minus size={12} strokeWidth={2} />
@@ -730,8 +771,11 @@ function CartItem({
               {item.quantity}
             </span>
 
+            {/* PLUS — steps by incrementQty */}
             <button
-              onClick={() => onQuantityChange(item.quantity + 1)}
+              onClick={() =>
+                onQuantityChange(item.quantity + incrementQty)
+              }
               disabled={updating}
               aria-label="Increase quantity"
               style={{
@@ -743,14 +787,17 @@ function CartItem({
                 color: "var(--text-secondary)",
                 borderLeft: "1px solid var(--border)",
                 transition: "background-color 150ms ease",
+                cursor: "pointer",
               }}
               onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.backgroundColor =
-                  "var(--bg)";
+                (
+                  e.currentTarget as HTMLElement
+                ).style.backgroundColor = "var(--bg)";
               }}
               onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.backgroundColor =
-                  "transparent";
+                (
+                  e.currentTarget as HTMLElement
+                ).style.backgroundColor = "transparent";
               }}
             >
               <Plus size={12} strokeWidth={2} />
@@ -781,12 +828,26 @@ function CartItem({
             </p>
           </div>
         </div>
+
+        {/* Step hint for incremental products */}
+        {strategy === "INCREMENTAL_QUANTITY" && incrementQty > 1 && (
+          <p
+            style={{
+              fontSize: "10px",
+              color: "var(--text-tertiary)",
+              marginTop: "6px",
+              letterSpacing: "0.02em",
+            }}
+          >
+            Quantity in steps of {incrementQty}
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-/* ── Summary Row ───────────────────────────────────────────────────────────── */
+/* ── Summary Row ─────────────────────────────────────────────────────────── */
 
 function SummaryRow({
   label,

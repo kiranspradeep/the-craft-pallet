@@ -42,7 +42,8 @@ async function getData(params: Record<string, string>) {
     ]);
 
     const categories =
-      categoriesRes.status === "fulfilled" && Array.isArray(categoriesRes.value)
+      categoriesRes.status === "fulfilled" &&
+      Array.isArray(categoriesRes.value)
         ? categoriesRes.value
         : [];
 
@@ -217,18 +218,30 @@ export default async function ProductsPage({
               </p>
             </div>
           ) : (
-            /* Product grid */
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                gap: "40px 28px",
-              }}
-            >
-              {products.map((p) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
+            <>
+              <style>{`
+                @media (max-width: 640px) {
+                  .products-grid {
+                    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                    gap: 24px 12px !important;
+                  }
+                }
+              `}</style>
+
+              <div
+                className="products-grid"
+                style={{
+                  display: "grid",
+                  gridTemplateColumns:
+                    "repeat(auto-fill, minmax(260px, 1fr))",
+                  gap: "40px 28px",
+                }}
+              >
+                {products.map((p) => (
+                  <ProductCard key={p.id} product={p} />
+                ))}
+              </div>
+            </>
           )}
         </div>
       </section>

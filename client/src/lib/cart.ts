@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from "uuid";
 
 const SESSION_KEY = "tcp_session_id";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export const getSessionId = (): string => {
   if (typeof window === "undefined") return "";
@@ -16,6 +17,8 @@ const cartHeaders = () => ({
   "Content-Type": "application/json",
   "X-Session-Id": getSessionId(),
 });
+
+// ── Cart API ───────────────────────────────────────────────────────────────
 
 export const cartApi = {
   getCart: async () => {
@@ -38,58 +41,85 @@ export const cartApi = {
   },
 
   addItem: async (body: {
-    productId: string;
-    variantId?: string;
-    quantity: number;
-    selectedTierQuantity?: number;
-    customizations?: unknown[];
-    notes?: string;
-  }) => {
-    const res = await fetch(`/api/cart/items`, {
-      method: "POST",
-      headers: cartHeaders(),
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Failed to add to cart");
-    return data.data;
-  },
+  productId: string;
+  variantId?: string;
+  quantity: number;
+  selectedTierQuantity?: number;
+  customizations?: unknown[];
+  notes?: string;
+}) => {
+  const res = await fetch(`/api/cart/items`, {
+    method: "POST",
+    headers: cartHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to add to cart");
+  dispatchCartUpdate();
+  return data.data;
+},
 
   updateItem: async (
-    itemId: string,
-    body: { quantity?: number; notes?: string }
-  ) => {
-    const res = await fetch(`/api/cart/items/${itemId}`, {
-      method: "PUT",
-      headers: cartHeaders(),
-      body: JSON.stringify(body),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Failed to update cart");
-    return data.data;
-  },
+  itemId: string,
+  body: { quantity?: number; notes?: string }
+) => {
+  const res = await fetch(`/api/cart/items/${itemId}`, {
+    method: "PUT",
+    headers: cartHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to update cart");
+  dispatchCartUpdate();
+  return data.data;
+},
 
   removeItem: async (itemId: string) => {
-    const res = await fetch(`/api/cart/items/${itemId}`, {
-      method: "DELETE",
-      headers: cartHeaders(),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Failed to remove item");
-    return data.data;
-  },
+  const res = await fetch(`/api/cart/items/${itemId}`, {
+    method: "DELETE",
+    headers: cartHeaders(),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Failed to remove item");
+  dispatchCartUpdate();
+  return data.data;
+},
 
   applyCoupon: async (code: string) => {
-    const res = await fetch(`/api/cart/apply-coupon`, {
-      method: "POST",
-      headers: cartHeaders(),
-      body: JSON.stringify({ code }),
-    });
+  const res = await fetch(`/api/cart/apply-coupon`, {
+    method: "POST",
+    headers: cartHeaders(),
+    body: JSON.stringify({ code }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.message || "Invalid coupon");
+  dispatchCartUpdate();
+  return data.data;
+},
+
+  // Links an uploaded asset to a specific PHOTO_UPLOAD customization field
+  // on a cart item. Called after assetApi.uploadDirect/uploadZip/uploadDriveLink.
+  linkAssetToUploadField: async (
+    itemId: string,
+    customizationId: string,
+    assetId: string
+  ) => {
+    const res = await fetch(
+      `/api/cart/items/${itemId}/upload-fields/${customizationId}/asset`,
+      {
+        method: "PATCH",
+        headers: cartHeaders(),
+        body: JSON.stringify({ assetId }),
+      }
+    );
     const data = await res.json();
-    if (!res.ok) throw new Error(data.message || "Invalid coupon");
+    if (!res.ok)
+      throw new Error(data.message || "Failed to link asset to upload field");
     return data.data;
   },
 };
+
+// ── Buy Now API ────────────────────────────────────────────────────────────
 
 export const buyNowApi = {
   create: async (body: {
@@ -135,6 +165,8 @@ export const buyNowApi = {
   },
 };
 
+// ── Checkout API ───────────────────────────────────────────────────────────
+
 export const checkoutApi = {
   placeWebsiteOrder: async (body: any) => {
     const res = await fetch(`/api/checkout`, {
@@ -159,13 +191,17 @@ export const checkoutApi = {
   },
 };
 
+// ── Asset API ──────────────────────────────────────────────────────────────
+
 export const assetApi = {
+  // Direct image upload — goes to local server storage
+  // Used for customer order photos
   uploadDirect: async (files: File[], productId?: string) => {
     const formData = new FormData();
     if (productId) formData.append("productId", productId);
     files.forEach((f) => formData.append("files", f));
 
-    const res = await fetch(`/api/assets/upload`, {
+    const res = await fetch(`${API_URL}/api/assets/upload`, {
       method: "POST",
       headers: { "X-Session-Id": getSessionId() },
       body: formData,
@@ -175,12 +211,13 @@ export const assetApi = {
     return data.data;
   },
 
+  // ZIP upload — goes to local server storage
   uploadZip: async (file: File, productId?: string) => {
     const formData = new FormData();
     if (productId) formData.append("productId", productId);
     formData.append("file", file);
 
-    const res = await fetch(`/api/assets/upload-zip`, {
+    const res = await fetch(`${API_URL}/api/assets/upload-zip`, {
       method: "POST",
       headers: { "X-Session-Id": getSessionId() },
       body: formData,
@@ -190,8 +227,9 @@ export const assetApi = {
     return data.data;
   },
 
+  // Google Drive link — stored as external reference
   uploadDriveLink: async (driveUrl: string) => {
-    const res = await fetch(`/api/assets/upload-drive-link`, {
+    const res = await fetch(`${API_URL}/api/assets/upload-drive-link`, {
       method: "POST",
       headers: cartHeaders(),
       body: JSON.stringify({ driveUrl }),
@@ -202,9 +240,17 @@ export const assetApi = {
   },
 };
 
+// ── Price Formatting ───────────────────────────────────────────────────────
+
 export const formatPrice = (amount: number | string): string => {
   return `₹${Number(amount).toLocaleString("en-IN", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   })}`;
+};
+
+export const dispatchCartUpdate = () => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("cart-updated"));
+  }
 };

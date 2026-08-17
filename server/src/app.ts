@@ -15,16 +15,30 @@ import cartRoutes from "./modules/cart/routes.js";
 import checkoutRoutes from "./modules/checkout/routes.js";
 import adminUploadRoutes from "./modules/admin/upload/routes.js";
 import publicRoutes from "./modules/public/routes.js";
-import webhookRoutes, { captureRawBody } from "./modules/webhooks/razorpay/routes.js";
+import webhookRoutes from "./modules/webhooks/razorpay/routes.js";
 
 ensureUploadDirs();
 
 const app = express();
 
-app.use(helmet());
+// Allow both client (3000) and admin (3001) by default in development.
+// You can still override with CORS_ORIGIN="http://localhost:3000,http://localhost:3001"
+const allowedOrigins = (
+  process.env.CORS_ORIGIN ||
+  "http://localhost:3000,http://localhost:3001"
+).split(",");
+
+app.use(
+  helmet({
+    // Important: admin (3001) loads images from server (4000)
+    // This must be cross-origin, otherwise thumbnails are blocked.
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+  })
+);
+
 app.use(
   cors({
-    origin: (process.env.CORS_ORIGIN || "http://localhost:3000").split(","),
+    origin: allowedOrigins,
     credentials: true,
   })
 );
@@ -36,6 +50,12 @@ app.use("/api/webhooks", webhookRoutes);
 // ── Body parsers — after webhooks ─────────────────────────────────────────
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Allow uploads to be loaded cross-origin by admin/client apps
+app.use("/uploads", (_req, res, next) => {
+  res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
+  next();
+});
 
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
@@ -51,13 +71,12 @@ app.use("/api/admin/orders", orderRoutes);
 app.use("/api/admin/settings", settingsRoutes);
 app.use("/api/admin/upload", adminUploadRoutes);
 
-// ── Customer (session-based) ───────────────────────────────────────────────
+// ── Customer (session-based) ──────────────────────────────────────────────
 app.use("/api/assets", assetRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/checkout", checkoutRoutes);
 
-
-// ── Public (no auth) ───────────────────────────────────────────────────────
+// ── Public (no auth) ──────────────────────────────────────────────────────
 app.use("/api", publicRoutes);
 
 app.use((_req, res) => {

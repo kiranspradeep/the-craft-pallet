@@ -62,4 +62,10 @@ router.post(
   orderController.generatePaymentLink
 );
 
+// ── Download unit photos as ZIP ───────────────────────────────────────────
+router.get(
+  "/:id/items/:itemId/download",
+  orderController.downloadUnitPhotos
+);
+
 export default router;

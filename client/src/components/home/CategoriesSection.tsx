@@ -52,13 +52,22 @@ export default function CategoriesSection({
         </div>
 
         {/* Grid — editorial stacked layout */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-            gap: "2px",
-          }}
-        >
+        <style>{`
+  @media (max-width: 640px) {
+    .categories-section-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+  }
+`}</style>
+
+<div
+  className="categories-section-grid"
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
+    gap: "2px",
+  }}
+>
           {categories.map((cat) => (
             <Link
               key={cat.id}

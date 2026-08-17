@@ -171,4 +171,15 @@ export const orderController = {
       });
     }
   ),
+
+  downloadUnitPhotos: asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const orderId   = param(req, "id");
+    const itemId    = param(req, "itemId");
+    const unitIndex = parseInt(req.query["unitIndex"] as string ?? "0", 10);
+
+    await orderService.streamUnitPhotosZip(orderId, itemId, unitIndex, res);
+  }
+),
+
 };

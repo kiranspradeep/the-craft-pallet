@@ -10,177 +10,230 @@ import {
   Folder,
   FileArchive,
   Cloud,
-  X,
   Check,
   Loader2,
-  MessageCircle,
   AlertCircle,
+  MessageCircle,
 } from "lucide-react";
-import { assetApi, cartApi, buyNowApi } from "@/lib/cart";
+import { assetApi, cartApi } from "@/lib/cart";
 
-const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+// ── Types ─────────────────────────────────────────────────────────────────
+
+interface UploadField {
+  customizationId: string;
+  customFieldId: string;
+  fieldLabel: string;
+  cartItemId: string;
+  productName: string;
+  productId: string;
+  minImages: number | null;
+  maxImages: number | null;
+  assetId: string | null;
+  unitIndex: number;
+  unitTotal: number;
+}
+
+interface FieldUploadState {
+  files: File[];
+  uploading: boolean;
+  assetId: string | null;
+  error: string;
+}
+
+// ── Main Component ────────────────────────────────────────────────────────
 
 export default function UploadPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const buyNowId = searchParams.get("bn");
 
-  const [productConfig, setProductConfig] = useState<{
-    minImages?: number | null;
-    maxImages?: number | null;
-    uploadRequired?: boolean;
-  } | null>(null);
-  const [productIdForUpload, setProductIdForUpload] = useState<string | null>(null);
-  const [cartItemInfo, setCartItemInfo] = useState<any>(null);
+  const [uploadFields, setUploadFields] = useState<UploadField[]>([]);
+  const [fieldStates, setFieldStates] = useState<
+    Record<string, FieldUploadState>
+  >({});
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const folderInputRef = useRef<HTMLInputElement>(null);
-  const zipInputRef = useRef<HTMLInputElement>(null);
-
-  const [files, setFiles] = useState<File[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [assetId, setAssetId] = useState<string | null>(null);
-  const [driveLink, setDriveLink] = useState("");
-  const [driveLoading, setDriveLoading] = useState(false);
+  const [pageError, setPageError] = useState("");
 
   useEffect(() => {
     const load = async () => {
       try {
         if (buyNowId) {
-          const session = await buyNowApi.get(buyNowId);
-          setProductIdForUpload(session.productId);
-          const res = await fetch(`${API}/api/products/${session.productId}`);
-          const data = await res.json();
-          if (data.data?.configuration) {
-            setProductConfig(data.data.configuration);
-          }
-          setCartItemInfo({
-            productName: data.data?.name,
-            quantity: session.quantity,
-          });
-        } else {
-          const cartRes = await cartApi.getCart();
-          if (!cartRes?.cart?.items?.length) {
-            router.push("/cart");
-            return;
-          }
-          const uploadItem = cartRes.cart.items.find(
-            (i: any) => i.product?.configuration?.uploadRequired
-          );
-          if (!uploadItem) {
-            router.push("/checkout");
-            return;
-          }
-          setProductIdForUpload(uploadItem.productId);
-          setProductConfig(uploadItem.product.configuration);
-          setCartItemInfo({
-            productName: uploadItem.product.name,
-            quantity: uploadItem.quantity,
-          });
+          // Buy Now — single product handled via CheckoutSession
+          router.push(`/checkout?bn=${buyNowId}`);
+          return;
         }
-      } catch (err: any) {
-        setError(err.message || "Failed to load");
+
+        const res = await cartApi.getCart();
+        if (!res?.cart?.items?.length) {
+          router.push("/cart");
+          return;
+        }
+
+        const fields: UploadField[] = [];
+
+        for (const item of res.cart.items) {
+          if (!item.product?.configuration?.uploadRequired) continue;
+
+          const photoCustomizations =
+            item.customizations?.filter(
+              (c: any) => c.fieldType === "PHOTO_UPLOAD"
+            ) ?? [];
+
+          // Sort by unitIndex — should already be ordered from DB but sort
+          // client-side as a safety net
+          photoCustomizations.sort(
+            (a: any, b: any) => (a.unitIndex ?? 0) - (b.unitIndex ?? 0)
+          );
+
+          // unitTotal = how many upload sections this product needs
+          // For FIXED_VARIANTS/PER_UNIT: equals quantity
+          // For INCREMENTAL_QUANTITY/TIERED_PRICING: always 1
+          const unitTotal = photoCustomizations.length;
+
+          for (const c of photoCustomizations) {
+            fields.push({
+              customizationId: c.id,
+              customFieldId: c.customFieldId,
+              fieldLabel: c.fieldLabel,
+              cartItemId: item.id,
+              productName: item.product.name,
+              productId: item.productId,
+              minImages: item.product.configuration.minImages ?? null,
+              maxImages: item.product.configuration.maxImages ?? null,
+              assetId: c.assetId ?? null,
+              unitIndex: c.unitIndex ?? 0,
+              unitTotal,
+            });
+          }
+        }
+
+        if (fields.length === 0) {
+          router.push("/checkout");
+          return;
+        }
+
+        setUploadFields(fields);
+
+        const states: Record<string, FieldUploadState> = {};
+        for (const f of fields) {
+          states[f.customizationId] = {
+            files: [],
+            uploading: false,
+            assetId: f.assetId,
+            error: "",
+          };
+        }
+        setFieldStates(states);
+      } catch {
+        setPageError("Failed to load your cart");
       } finally {
         setLoading(false);
       }
     };
+
     load();
   }, [buyNowId, router]);
 
-  const handleFiles = (fileList: FileList | null) => {
-    if (!fileList) return;
-    const newFiles = Array.from(fileList).filter((f) =>
-      f.type.startsWith("image/")
-    );
-    const total = files.length + newFiles.length;
-    if (productConfig?.maxImages && total > productConfig.maxImages) {
-      setError(`Maximum ${productConfig.maxImages} photos allowed`);
+  const allComplete = uploadFields.every((f) => {
+    const state = fieldStates[f.customizationId];
+    return state?.assetId !== null && state?.assetId !== undefined;
+  });
+
+  const updateField = (
+    customizationId: string,
+    update: Partial<FieldUploadState>
+  ) => {
+    setFieldStates((prev) => ({
+      ...prev,
+      [customizationId]: { ...prev[customizationId]!, ...update },
+    }));
+  };
+
+  const uploadFilesForField = async (field: UploadField, files: File[]) => {
+    if (field.minImages && files.length < field.minImages) {
+      updateField(field.customizationId, {
+        error: `Please select at least ${field.minImages} photos`,
+      });
       return;
     }
-    setError("");
-    setFiles((prev) => [...prev, ...newFiles]);
-  };
-
-  const removeFile = (idx: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== idx));
-    setAssetId(null);
-    setSuccess("");
-  };
-
-  const uploadFiles = async () => {
-    if (files.length === 0) return;
-    if (productConfig?.minImages && files.length < productConfig.minImages) {
-      setError(`Please add at least ${productConfig.minImages} photos`);
+    if (field.maxImages && files.length > field.maxImages) {
+      updateField(field.customizationId, {
+        error: `Maximum ${field.maxImages} photos allowed`,
+      });
       return;
     }
-    setUploading(true);
-    setError("");
+
+    updateField(field.customizationId, { files, uploading: true, error: "" });
+
     try {
-      const asset = await assetApi.uploadDirect(
-        files,
-        productIdForUpload || undefined
+      const asset = await assetApi.uploadDirect(files, field.productId);
+      await cartApi.linkAssetToUploadField(
+        field.cartItemId,
+        field.customizationId,
+        asset.id
       );
-      setAssetId(asset.id);
-      setSuccess(`${files.length} photos uploaded successfully`);
-      if (buyNowId) {
-        await buyNowApi.update(buyNowId, { assetId: asset.id });
-      }
+      updateField(field.customizationId, {
+        uploading: false,
+        assetId: asset.id,
+        error: "",
+      });
     } catch (err: any) {
-      setError(err.message || "Upload failed");
-    } finally {
-      setUploading(false);
+      updateField(field.customizationId, {
+        uploading: false,
+        error: err.message || "Upload failed",
+      });
     }
   };
 
-  const uploadZip = async (file: File) => {
-    setUploading(true);
-    setError("");
+  const uploadZipForField = async (field: UploadField, file: File) => {
+    updateField(field.customizationId, { uploading: true, error: "" });
     try {
-      const asset = await assetApi.uploadZip(
-        file,
-        productIdForUpload || undefined
+      const asset = await assetApi.uploadZip(file, field.productId);
+      await cartApi.linkAssetToUploadField(
+        field.cartItemId,
+        field.customizationId,
+        asset.id
       );
-      setAssetId(asset.id);
-      setSuccess("ZIP extracted and uploaded");
-      if (buyNowId) {
-        await buyNowApi.update(buyNowId, { assetId: asset.id });
-      }
+      updateField(field.customizationId, {
+        uploading: false,
+        assetId: asset.id,
+        error: "",
+      });
     } catch (err: any) {
-      setError(err.message || "ZIP upload failed");
-    } finally {
-      setUploading(false);
+      updateField(field.customizationId, {
+        uploading: false,
+        error: err.message || "ZIP upload failed",
+      });
     }
   };
 
-  const submitDriveLink = async () => {
-    if (!driveLink.trim()) return;
-    setDriveLoading(true);
-    setError("");
+  const submitDriveLinkForField = async (
+    field: UploadField,
+    driveLink: string
+  ) => {
+    updateField(field.customizationId, { uploading: true, error: "" });
     try {
-      const asset = await assetApi.uploadDriveLink(driveLink.trim());
-      setAssetId(asset.id);
-      setSuccess("Google Drive link saved");
-      if (buyNowId) {
-        await buyNowApi.update(buyNowId, { assetId: asset.id });
-      }
+      const asset = await assetApi.uploadDriveLink(driveLink);
+      await cartApi.linkAssetToUploadField(
+        field.cartItemId,
+        field.customizationId,
+        asset.id
+      );
+      updateField(field.customizationId, {
+        uploading: false,
+        assetId: asset.id,
+        error: "",
+      });
     } catch (err: any) {
-      setError(err.message || "Failed to save link");
-    } finally {
-      setDriveLoading(false);
+      updateField(field.customizationId, {
+        uploading: false,
+        error: err.message || "Failed to save Drive link",
+      });
     }
   };
 
-  const goToCheckout = () => {
-    router.push(`/checkout${buyNowId ? `?bn=${buyNowId}` : ""}`);
-  };
-
-  const switchToWhatsApp = () => {
-    router.push(
-      `/checkout?method=whatsapp${buyNowId ? `&bn=${buyNowId}` : ""}`
-    );
+  const clearField = (customizationId: string) => {
+    updateField(customizationId, { files: [], assetId: null, error: "" });
   };
 
   if (loading) {
@@ -199,11 +252,30 @@ export default function UploadPage() {
     );
   }
 
+  if (pageError) {
+    return (
+      <div
+        style={{
+          padding: "160px 0",
+          textAlign: "center",
+          backgroundColor: "var(--bg)",
+        }}
+      >
+        <p style={{ fontSize: "13px", color: "#DC2626" }}>{pageError}</p>
+      </div>
+    );
+  }
+
+  const completedCount = uploadFields.filter(
+    (f) => fieldStates[f.customizationId]?.assetId
+  ).length;
+
   return (
     <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
       <div className="tcp-container" style={{ maxWidth: "860px" }}>
+        {/* Back */}
         <Link
-          href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
+          href="/checkout/upload-method"
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -212,16 +284,14 @@ export default function UploadPage() {
             color: "var(--text-tertiary)",
             marginBottom: "32px",
             letterSpacing: "0.02em",
-            transition: "color 200ms ease",
           }}
-          className="hover:text-[var(--text-primary)]"
         >
           <ArrowLeft size={13} strokeWidth={1.75} />
           Back
         </Link>
 
         {/* Header */}
-        <div style={{ marginBottom: "40px" }}>
+        <div style={{ marginBottom: "36px" }}>
           <p className="tcp-eyebrow">Step 2 of 3</p>
           <h1
             style={{
@@ -238,328 +308,93 @@ export default function UploadPage() {
               photos
             </em>
           </h1>
-          {cartItemInfo && (
-            <p style={{ fontSize: "14px", color: "var(--text-secondary)" }}>
-              For:{" "}
-              <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>
-                {cartItemInfo.productName}
-              </span>
-              {productConfig?.minImages && productConfig?.maxImages && (
-                <span style={{ color: "var(--text-tertiary)" }}>
-                  {" · "}
-                  {productConfig.minImages === productConfig.maxImages
-                    ? `${productConfig.maxImages} photos required`
-                    : `${productConfig.minImages}–${productConfig.maxImages} photos`}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
 
-        {/* Error / Success */}
-        {error && (
+          {/* Progress dots */}
           <div
             style={{
-              padding: "12px 16px",
-              borderRadius: "var(--radius-input)",
-              backgroundColor: "#FEF2F2",
-              border: "1px solid #FECACA",
-              color: "#DC2626",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
               fontSize: "13px",
-              marginBottom: "20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
+              color: "var(--text-secondary)",
             }}
           >
-            <AlertCircle size={14} strokeWidth={1.75} />
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div
-            style={{
-              padding: "12px 16px",
-              borderRadius: "var(--radius-input)",
-              backgroundColor: "rgba(142,159,130,0.12)",
-              border: "1px solid rgba(142,159,130,0.25)",
-              color: "var(--success)",
-              fontSize: "13px",
-              marginBottom: "20px",
-              display: "flex",
-              alignItems: "center",
-              gap: "8px",
-            }}
-          >
-            <Check size={14} strokeWidth={2} />
-            {success}
-          </div>
-        )}
-
-        {/* Upload method cards */}
-        <p
-          style={{
-            fontSize: "10px",
-            fontWeight: 600,
-            letterSpacing: "0.16em",
-            textTransform: "uppercase",
-            color: "var(--text-tertiary)",
-            marginBottom: "14px",
-          }}
-        >
-          Upload Method
-        </p>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-            gap: "12px",
-            marginBottom: "28px",
-          }}
-        >
-          <UploadCard
-            icon={<Upload size={18} strokeWidth={1.75} />}
-            title="Upload Photos"
-            description="Browse or drag & drop files"
-            onClick={() => fileInputRef.current?.click()}
-          />
-          <UploadCard
-            icon={<Folder size={18} strokeWidth={1.75} />}
-            title="Upload Folder"
-            description="Best for 100+ photos"
-            onClick={() => folderInputRef.current?.click()}
-          />
-          <UploadCard
-            icon={<FileArchive size={18} strokeWidth={1.75} />}
-            title="Upload ZIP"
-            description="Fastest for large collections"
-            onClick={() => zipInputRef.current?.click()}
-          />
-        </div>
-
-        {/* Hidden inputs */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="image/*"
-          hidden
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
-          multiple
-          accept="image/*"
-          hidden
-          // @ts-expect-error non-standard attribute
-          webkitdirectory=""
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <input
-          ref={zipInputRef}
-          type="file"
-          accept=".zip"
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) uploadZip(file);
-          }}
-        />
-
-        {/* Google Drive */}
-        <div
-          style={{
-            padding: "20px",
-            borderRadius: "var(--radius-card)",
-            border: "1px solid var(--border-soft)",
-            backgroundColor: "var(--surface)",
-            marginBottom: "28px",
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "12px",
-              marginBottom: "14px",
-            }}
-          >
-            <div
-              style={{
-                width: "36px",
-                height: "36px",
-                borderRadius: "var(--radius-input)",
-                backgroundColor: "var(--brand-soft)",
-                color: "var(--brand)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Cloud size={16} strokeWidth={1.75} />
-            </div>
-            <div>
-              <h4
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: "var(--text-primary)",
-                }}
-              >
-                Google Drive
-              </h4>
-              <p
-                style={{ fontSize: "12px", color: "var(--text-tertiary)" }}
-              >
-                Paste your sharing link
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "8px" }}>
-            <input
-              type="url"
-              placeholder="https://drive.google.com/..."
-              value={driveLink}
-              onChange={(e) => setDriveLink(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "11px 14px",
-                borderRadius: "var(--radius-input)",
-                border: "1px solid var(--border)",
-                fontSize: "14px",
-                backgroundColor: "var(--bg)",
-                color: "var(--text-primary)",
-                transition: "border-color 200ms ease",
-              }}
-              onFocus={(e) => {
-                e.currentTarget.style.borderColor = "var(--brand)";
-              }}
-              onBlur={(e) => {
-                e.currentTarget.style.borderColor = "var(--border)";
-              }}
-            />
-            <button
-              onClick={submitDriveLink}
-              disabled={driveLoading || !driveLink.trim()}
-              className="btn-secondary"
-              style={{ padding: "11px 18px", fontSize: "12px" }}
-            >
-              {driveLoading ? "Saving..." : "Import"}
-            </button>
-          </div>
-        </div>
-
-        {/* File previews */}
-        {files.length > 0 && (
-          <div style={{ marginBottom: "28px" }}>
-            <p
-              style={{
-                fontSize: "12px",
-                fontWeight: 500,
-                color: "var(--text-secondary)",
-                marginBottom: "12px",
-                letterSpacing: "0.02em",
-              }}
-            >
-              {files.length} photo{files.length !== 1 ? "s" : ""} selected
-            </p>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(80px, 1fr))",
-                gap: "8px",
-                marginBottom: "16px",
-              }}
-            >
-              {files.map((file, i) => (
+            <div style={{ display: "flex", gap: "4px" }}>
+              {uploadFields.map((f) => (
                 <div
-                  key={i}
+                  key={f.customizationId}
                   style={{
-                    position: "relative",
-                    aspectRatio: "1/1",
-                    borderRadius: "var(--radius-card)",
-                    overflow: "hidden",
-                    border: "1px solid var(--border-soft)",
+                    width: "8px",
+                    height: "8px",
+                    borderRadius: "999px",
+                    backgroundColor: fieldStates[f.customizationId]?.assetId
+                      ? "var(--success)"
+                      : "var(--border)",
+                    transition: "background-color 300ms ease",
                   }}
-                >
-                  <img
-                    src={URL.createObjectURL(file)}
-                    alt=""
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      objectFit: "cover",
-                    }}
-                  />
-                  <button
-                    onClick={() => removeFile(i)}
-                    aria-label="Remove photo"
-                    style={{
-                      position: "absolute",
-                      top: "4px",
-                      right: "4px",
-                      width: "20px",
-                      height: "20px",
-                      borderRadius: "4px",
-                      backgroundColor: "rgba(0,0,0,0.55)",
-                      color: "#fff",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <X size={11} strokeWidth={2} />
-                  </button>
-                </div>
+                />
               ))}
             </div>
-
-            {!assetId && (
-              <button
-                onClick={uploadFiles}
-                disabled={uploading}
-                className="btn-primary"
-                style={{ width: "100%", justifyContent: "center" }}
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 size={15} className="animate-spin" strokeWidth={2} />
-                    Uploading {files.length} photos...
-                  </>
-                ) : (
-                  `Upload ${files.length} Photo${files.length !== 1 ? "s" : ""}`
-                )}
-              </button>
-            )}
+            <span>
+              {completedCount} of {uploadFields.length} uploads complete
+            </span>
           </div>
-        )}
+        </div>
+
+        {/* One section per upload field */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {uploadFields.map((field, index) => (
+            <UploadSection
+              key={field.customizationId}
+              field={field}
+              state={fieldStates[field.customizationId]!}
+              index={index}
+              onUploadFiles={(files) => uploadFilesForField(field, files)}
+              onUploadZip={(file) => uploadZipForField(field, file)}
+              onSubmitDrive={(link) => submitDriveLinkForField(field, link)}
+              onClear={() => clearField(field.customizationId)}
+            />
+          ))}
+        </div>
 
         {/* Continue */}
         <div
           style={{
+            marginTop: "28px",
             padding: "20px",
             borderRadius: "var(--radius-card)",
             backgroundColor: "var(--surface)",
             border: "1px solid var(--border-soft)",
           }}
         >
+          {!allComplete && (
+            <p
+              style={{
+                fontSize: "12px",
+                color: "var(--text-tertiary)",
+                marginBottom: "12px",
+                textAlign: "center",
+              }}
+            >
+              Upload photos for all products above to continue
+            </p>
+          )}
           <button
-            onClick={goToCheckout}
-            disabled={!assetId && productConfig?.uploadRequired !== false}
+            onClick={() => router.push("/checkout")}
+            disabled={!allComplete}
             className="btn-primary"
-            style={{ width: "100%", justifyContent: "center" }}
+            style={{
+              width: "100%",
+              justifyContent: "center",
+              opacity: allComplete ? 1 : 0.4,
+            }}
           >
             Continue to Checkout
             <ArrowRight size={15} strokeWidth={2} />
           </button>
 
           <button
-            onClick={switchToWhatsApp}
+            onClick={() => router.push("/checkout?method=whatsapp")}
             style={{
               width: "100%",
               marginTop: "12px",
@@ -570,10 +405,7 @@ export default function UploadPage() {
               alignItems: "center",
               justifyContent: "center",
               gap: "6px",
-              transition: "color 200ms ease",
-              letterSpacing: "0.02em",
             }}
-            className="hover:text-[var(--text-primary)]"
           >
             <MessageCircle size={13} strokeWidth={1.75} />
             Or continue on WhatsApp instead
@@ -584,68 +416,380 @@ export default function UploadPage() {
   );
 }
 
-function UploadCard({
+// ── Upload Section ────────────────────────────────────────────────────────
+
+function UploadSection({
+  field,
+  state,
+  index,
+  onUploadFiles,
+  onUploadZip,
+  onSubmitDrive,
+  onClear,
+}: {
+  field: UploadField;
+  state: FieldUploadState;
+  index: number;
+  onUploadFiles: (files: File[]) => void;
+  onUploadZip: (file: File) => void;
+  onSubmitDrive: (link: string) => void;
+  onClear: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
+  const zipInputRef = useRef<HTMLInputElement>(null);
+  const [driveLink, setDriveLink] = useState("");
+  const [driveLoading, setDriveLoading] = useState(false);
+
+  const isComplete = !!state.assetId;
+
+  const handleDrive = async () => {
+    if (!driveLink.trim()) return;
+    setDriveLoading(true);
+    await onSubmitDrive(driveLink.trim());
+    setDriveLoading(false);
+  };
+
+  const photoRequirement =
+    field.minImages && field.maxImages
+      ? field.minImages === field.maxImages
+        ? `${field.maxImages} photos required`
+        : `${field.minImages}–${field.maxImages} photos`
+      : field.minImages
+      ? `At least ${field.minImages} photos`
+      : field.maxImages
+      ? `Up to ${field.maxImages} photos`
+      : "Upload photos";
+
+  return (
+    <div
+      style={{
+        borderRadius: "var(--radius-card)",
+        border: `1.5px solid ${
+          isComplete ? "rgba(142,159,130,0.4)" : "var(--border)"
+        }`,
+        backgroundColor: "var(--surface)",
+        overflow: "hidden",
+        transition: "border-color 300ms ease",
+      }}
+    >
+      {/* Section header */}
+      <div
+        style={{
+          padding: "16px 20px",
+          borderBottom: "1px solid var(--border-soft)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          backgroundColor: isComplete
+            ? "rgba(142,159,130,0.06)"
+            : "var(--bg-primary)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Circle number / check */}
+          <div
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "999px",
+              backgroundColor: isComplete ? "var(--success)" : "var(--border)",
+              color: isComplete ? "#fff" : "var(--text-secondary)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "11px",
+              fontWeight: 600,
+              flexShrink: 0,
+              transition: "all 300ms ease",
+            }}
+          >
+            {isComplete ? <Check size={13} strokeWidth={2.5} /> : index + 1}
+          </div>
+
+          <div>
+            {/* Product name + unit badge */}
+            <p
+              style={{
+                fontSize: "14px",
+                fontWeight: 600,
+                color: "var(--text-primary)",
+                marginBottom: "2px",
+              }}
+            >
+              {field.productName}
+              {field.unitTotal > 1 && (
+                <span
+                  style={{
+                    marginLeft: "8px",
+                    fontSize: "11px",
+                    fontWeight: 500,
+                    color: "var(--text-tertiary)",
+                  }}
+                >
+                  Unit {field.unitIndex + 1} of {field.unitTotal}
+                </span>
+              )}
+            </p>
+
+            {/* Field label + photo requirement */}
+            <p style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
+              {field.fieldLabel} · {photoRequirement}
+            </p>
+          </div>
+        </div>
+
+        {isComplete && (
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span
+              style={{
+                fontSize: "11px",
+                fontWeight: 500,
+                color: "var(--success)",
+              }}
+            >
+              Uploaded ✓
+            </span>
+            <button
+              onClick={onClear}
+              style={{
+                fontSize: "11px",
+                color: "var(--text-tertiary)",
+                textDecoration: "underline",
+              }}
+            >
+              Change
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Upload controls */}
+      {!isComplete && (
+        <div style={{ padding: "20px" }}>
+          {state.error && (
+            <div
+              style={{
+                padding: "10px 14px",
+                borderRadius: "var(--radius-input)",
+                backgroundColor: "#FEF2F2",
+                border: "1px solid #FECACA",
+                color: "#DC2626",
+                fontSize: "12px",
+                marginBottom: "16px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
+              <AlertCircle size={13} strokeWidth={1.75} />
+              {state.error}
+            </div>
+          )}
+
+          {/* Upload method buttons */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(3, 1fr)",
+              gap: "8px",
+              marginBottom: "16px",
+            }}
+          >
+            <UploadButton
+              icon={<Upload size={15} strokeWidth={1.75} />}
+              label="Photos"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={state.uploading}
+            />
+            <UploadButton
+              icon={<Folder size={15} strokeWidth={1.75} />}
+              label="Folder"
+              onClick={() => folderInputRef.current?.click()}
+              disabled={state.uploading}
+            />
+            <UploadButton
+              icon={<FileArchive size={15} strokeWidth={1.75} />}
+              label="ZIP"
+              onClick={() => zipInputRef.current?.click()}
+              disabled={state.uploading}
+            />
+          </div>
+
+          {/* Hidden file inputs */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              if (e.target.files) {
+                onUploadFiles(Array.from(e.target.files));
+                e.target.value = "";
+              }
+            }}
+          />
+          <input
+            ref={folderInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            hidden
+            // @ts-expect-error non-standard
+            webkitdirectory=""
+            onChange={(e) => {
+              if (e.target.files) {
+                onUploadFiles(Array.from(e.target.files));
+                e.target.value = "";
+              }
+            }}
+          />
+          <input
+            ref={zipInputRef}
+            type="file"
+            accept=".zip"
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) {
+                onUploadZip(file);
+                e.target.value = "";
+              }
+            }}
+          />
+
+          {/* Google Drive */}
+          <div style={{ display: "flex", gap: "8px" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: "var(--radius-input)",
+                border: "1px solid var(--border)",
+                backgroundColor: "var(--bg)",
+              }}
+            >
+              <Cloud
+                size={14}
+                strokeWidth={1.75}
+                style={{ color: "var(--brand)", flexShrink: 0 }}
+              />
+              <input
+                type="url"
+                placeholder="Google Drive link..."
+                value={driveLink}
+                onChange={(e) => setDriveLink(e.target.value)}
+                disabled={state.uploading}
+                style={{
+                  flex: 1,
+                  fontSize: "13px",
+                  backgroundColor: "transparent",
+                  color: "var(--text-primary)",
+                  outline: "none",
+                }}
+              />
+            </div>
+            <button
+              onClick={handleDrive}
+              disabled={driveLoading || !driveLink.trim() || state.uploading}
+              className="btn-secondary"
+              style={{ padding: "10px 14px", fontSize: "12px" }}
+            >
+              {driveLoading ? "..." : "Import"}
+            </button>
+          </div>
+
+          {/* Upload progress */}
+          {state.uploading && (
+            <div
+              style={{
+                marginTop: "14px",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                fontSize: "13px",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <Loader2 size={14} className="animate-spin" strokeWidth={2} />
+              Uploading
+              {state.files.length > 0
+                ? ` ${state.files.length} photos`
+                : ""}
+              ...
+            </div>
+          )}
+
+          {state.files.length > 0 && !state.uploading && !state.assetId && (
+            <p
+              style={{
+                marginTop: "12px",
+                fontSize: "12px",
+                color: "var(--text-secondary)",
+              }}
+            >
+              {state.files.length} photo
+              {state.files.length !== 1 ? "s" : ""} selected — uploading...
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Small upload button ───────────────────────────────────────────────────
+
+function UploadButton({
   icon,
-  title,
-  description,
+  label,
   onClick,
+  disabled,
 }: {
   icon: React.ReactNode;
-  title: string;
-  description: string;
+  label: string;
   onClick: () => void;
+  disabled: boolean;
 }) {
   return (
     <button
       onClick={onClick}
+      disabled={disabled}
       style={{
-        padding: "20px",
-        borderRadius: "var(--radius-card)",
+        padding: "10px",
+        borderRadius: "var(--radius-input)",
         border: "1px solid var(--border)",
-        backgroundColor: "var(--surface)",
-        cursor: "pointer",
-        textAlign: "left",
-        transition: "border-color 250ms ease, box-shadow 250ms ease",
+        backgroundColor: "var(--bg-primary)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: "6px",
+        transition: "border-color 200ms ease",
+        opacity: disabled ? 0.5 : 1,
       }}
       onMouseEnter={(e) => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = "var(--brand)";
-        el.style.boxShadow = "var(--shadow-sm)";
+        if (!disabled)
+          (e.currentTarget as HTMLElement).style.borderColor = "var(--brand)";
       }}
       onMouseLeave={(e) => {
-        const el = e.currentTarget as HTMLElement;
-        el.style.borderColor = "var(--border)";
-        el.style.boxShadow = "none";
+        (e.currentTarget as HTMLElement).style.borderColor = "var(--border)";
       }}
     >
-      <div
+      <span style={{ color: "var(--brand)" }}>{icon}</span>
+      <span
         style={{
-          width: "38px",
-          height: "38px",
-          borderRadius: "var(--radius-input)",
-          backgroundColor: "var(--brand-soft)",
-          color: "var(--brand)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginBottom: "12px",
+          fontSize: "11px",
+          color: "var(--text-secondary)",
+          fontWeight: 500,
         }}
       >
-        {icon}
-      </div>
-      <h4
-        style={{
-          fontSize: "14px",
-          fontWeight: 600,
-          color: "var(--text-primary)",
-          marginBottom: "4px",
-        }}
-      >
-        {title}
-      </h4>
-      <p style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.5 }}>
-        {description}
-      </p>
+        {label}
+      </span>
     </button>
   );
 }

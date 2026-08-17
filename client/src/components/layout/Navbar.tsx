@@ -29,11 +29,20 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+  const loadCount = () => {
     cartApi
       .getCart()
       .then((cart) => setCartCount(cart?.cart?.items?.length ?? 0))
       .catch(() => {});
-  }, []);
+  };
+
+  // Load on mount
+  loadCount();
+
+  // Reload when any cart mutation happens
+  window.addEventListener("cart-updated", loadCount);
+  return () => window.removeEventListener("cart-updated", loadCount);
+}, []);
 
   const navLinks = [
     { href: "/products", label: "Shop" },

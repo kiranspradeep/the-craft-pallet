@@ -59,13 +59,23 @@ export default function BestSellersSection({
         </div>
 
         {/* Product Grid */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-            gap: "40px 28px",
-          }}
-        >
+        <style>{`
+  @media (max-width: 640px) {
+    .best-sellers-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 24px 14px !important;
+    }
+  }
+`}</style>
+
+<div
+  className="best-sellers-grid"
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+    gap: "40px 28px",
+  }}
+>
           {products.map((product) => (
             <ProductCard key={product.id} product={product} />
           ))}

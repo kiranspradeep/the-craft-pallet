@@ -1,5 +1,5 @@
 import { prisma } from "../../prisma/client.js";
-import { Cart, CartItem, Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 export type CartWithItems = Prisma.CartGetPayload<{
   include: {
@@ -91,28 +91,28 @@ export const cartRepository = {
     });
   },
 
- createItem: async (data: {
-  cartId: string;
-  productId: string;
-  variantId?: string;
-  quantity: number;
-  unitPrice: Prisma.Decimal | number;
-  selectedTierQuantity?: number;
-  notes?: string;
-}): Promise<CartItemWithRelations> => {
-  return prisma.cartItem.create({
-    data: {
-      cartId: data.cartId,
-      productId: data.productId,
-      variantId: data.variantId ?? null,
-      quantity: data.quantity,
-      unitPrice: data.unitPrice,
-      selectedTierQuantity: data.selectedTierQuantity ?? null,
-      notes: data.notes ?? null,
-    },
-    include: itemInclude,
-  });
-},
+  createItem: async (data: {
+    cartId: string;
+    productId: string;
+    variantId?: string;
+    quantity: number;
+    unitPrice: Prisma.Decimal | number;
+    selectedTierQuantity?: number;
+    notes?: string;
+  }): Promise<CartItemWithRelations> => {
+    return prisma.cartItem.create({
+      data: {
+        cartId: data.cartId,
+        productId: data.productId,
+        variantId: data.variantId ?? null,
+        quantity: data.quantity,
+        unitPrice: data.unitPrice,
+        selectedTierQuantity: data.selectedTierQuantity ?? null,
+        notes: data.notes ?? null,
+      },
+      include: itemInclude,
+    });
+  },
 
   updateItem: async (
     itemId: string,
@@ -144,6 +144,7 @@ export const cartRepository = {
   findCustomizationsByCartItemId: async (cartItemId: string) => {
     return prisma.customization.findMany({
       where: { cartItemId },
+      orderBy: { unitIndex: "asc" }, // always return in unit order
       include: { asset: { include: { files: true } } },
     });
   },
@@ -173,6 +174,7 @@ const itemInclude = {
   },
   variant: true,
   customizations: {
+    orderBy: { unitIndex: "asc" as const }, // ordered by unit so upload page is consistent
     include: {
       asset: { include: { files: true } },
     },

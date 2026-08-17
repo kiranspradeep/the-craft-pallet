@@ -499,6 +499,8 @@ model Customization {
   cartItemId  String?
   orderItemId String?
 
+  unitIndex    Int     @default(0)   // ← ADD THIS LINE
+
   fieldLabel String
   fieldType  CustomFieldType
 

@@ -73,4 +73,31 @@ export const cartController = {
       sendSuccess({ res, data: result });
     }
   ),
+
+linkAssetToUploadField: asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const sessionId = getSessionId(req);
+    const itemId = param(req, "itemId");
+    const customizationId = param(req, "customizationId");
+    const { assetId } = req.body;
+
+    if (!assetId) {
+      throw new BadRequestError("assetId is required");
+    }
+
+    const cart = await cartService.linkAssetToCustomization(
+      sessionId,
+      itemId,
+      customizationId,
+      assetId
+    );
+
+    sendSuccess({
+      res,
+      message: "Asset linked to upload field",
+      data: cart,
+    });
+  }
+),
+
 };
