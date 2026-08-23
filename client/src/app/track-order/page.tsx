@@ -9,21 +9,23 @@ import {
   CheckCircle,
   Clock,
   Truck,
-  MessageCircle,
   Camera,
   ShieldCheck,
+  Copy,
 } from "lucide-react";
 import { formatPrice } from "@/lib/cart";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 const ORDER_STEPS = [
-  { key: "AWAITING_PAYMENT", label: "Order Placed", icon: Clock },
-  { key: "CONFIRMED", label: "Payment Confirmed", icon: CheckCircle },
-  { key: "IN_PRODUCTION", label: "In Production", icon: Package },
-  { key: "SHIPPED", label: "Shipped", icon: Truck },
-  { key: "DELIVERED", label: "Delivered", icon: CheckCircle },
+  { key: "AWAITING_PAYMENT", label: "Order Placed",       icon: Clock        },
+  { key: "CONFIRMED",        label: "Payment Confirmed",  icon: CheckCircle  },
+  { key: "IN_PRODUCTION",    label: "In Production",      icon: Package      },
+  { key: "SHIPPED",          label: "Shipped",            icon: Truck        },
+  { key: "DELIVERED",        label: "Delivered",          icon: CheckCircle  },
 ];
+
+// ── WhatsApp icon ─────────────────────────────────────────────────────────────
 
 function WhatsAppIcon({ size = 16 }: { size?: number }) {
   return (
@@ -33,15 +35,60 @@ function WhatsAppIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+// ── Copy tracking number button ───────────────────────────────────────────────
+
+function CopyTrackingButton({ trackingNumber }: { trackingNumber: string }) {
+  const [copied, setCopied] = useState(false);
+
+  return (
+    <button
+      onClick={() => {
+        navigator.clipboard.writeText(trackingNumber);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }}
+      style={{
+        display:         "inline-flex",
+        alignItems:      "center",
+        gap:             "5px",
+        padding:         "5px 12px",
+        borderRadius:    "var(--radius-input)",
+        border:          "1px solid var(--border)",
+        backgroundColor: copied ? "rgba(142,159,130,0.12)" : "var(--surface)",
+        color:           copied ? "var(--success)" : "var(--text-secondary)",
+        fontSize:        "12px",
+        fontWeight:      500,
+        cursor:          "pointer",
+        transition:      "all 200ms ease",
+        flexShrink:      0,
+      }}
+    >
+      {copied ? (
+        <>
+          <CheckCircle size={12} strokeWidth={2} />
+          Copied!
+        </>
+      ) : (
+        <>
+          <Copy size={12} strokeWidth={2} />
+          Copy
+        </>
+      )}
+    </button>
+  );
+}
+
+// ── Main tracking content ─────────────────────────────────────────────────────
+
 function TrackContent() {
   const searchParams = useSearchParams();
   const [orderNumber, setOrderNumber] = useState(
     searchParams.get("order") || ""
   );
-  const [phone, setPhone] = useState(searchParams.get("phone") || "");
-  const [order, setOrder] = useState<any>(null);
+  const [phone,   setPhone]   = useState(searchParams.get("phone") || "");
+  const [order,   setOrder]   = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error,   setError]   = useState("");
 
   useEffect(() => {
     if (orderNumber && phone) handleTrack();
@@ -79,38 +126,39 @@ function TrackContent() {
     : -1;
 
   const inputStyle = {
-    width: "100%",
-    padding: "11px 14px",
-    borderRadius: "var(--radius-input)",
-    border: "1px solid var(--border)",
-    fontSize: "14px",
+    width:           "100%",
+    padding:         "11px 14px",
+    borderRadius:    "var(--radius-input)",
+    border:          "1px solid var(--border)",
+    fontSize:        "14px",
     backgroundColor: "var(--bg)",
-    color: "var(--text-primary)",
-    transition: "border-color 200ms ease",
+    color:           "var(--text-primary)",
+    transition:      "border-color 200ms ease",
   };
 
   const labelStyle = {
-    display: "block",
-    fontSize: "10px",
-    fontWeight: 600,
+    display:       "block",
+    fontSize:      "10px",
+    fontWeight:    600,
     letterSpacing: "0.14em",
     textTransform: "uppercase" as const,
-    color: "var(--text-tertiary)",
-    marginBottom: "7px",
+    color:         "var(--text-tertiary)",
+    marginBottom:  "7px",
   };
 
   return (
     <div style={{ backgroundColor: "var(--bg)", padding: "72px 0 120px" }}>
       <div className="tcp-container" style={{ maxWidth: "680px" }}>
+
         {/* Header */}
         <div style={{ marginBottom: "48px" }}>
           <p className="tcp-eyebrow">Order Tracking</p>
           <h1
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(28px, 4vw, 42px)",
-              fontWeight: 500,
-              color: "var(--text-primary)",
+              fontFamily:    "'Playfair Display', serif",
+              fontSize:      "clamp(28px, 4vw, 42px)",
+              fontWeight:    500,
+              color:         "var(--text-primary)",
               letterSpacing: "-0.02em",
             }}
           >
@@ -125,10 +173,10 @@ function TrackContent() {
         <div
           style={{
             backgroundColor: "var(--surface)",
-            borderRadius: "var(--radius-card)",
-            border: "1px solid var(--border-soft)",
-            padding: "24px",
-            marginBottom: "24px",
+            borderRadius:    "var(--radius-card)",
+            border:          "1px solid var(--border-soft)",
+            padding:         "24px",
+            marginBottom:    "24px",
           }}
         >
           <form onSubmit={handleTrack}>
@@ -141,10 +189,10 @@ function TrackContent() {
             <div
               className="track-fields"
               style={{
-                display: "grid",
+                display:             "grid",
                 gridTemplateColumns: "1fr",
-                gap: "16px",
-                marginBottom: "16px",
+                gap:                 "16px",
+                marginBottom:        "16px",
               }}
             >
               <div>
@@ -153,16 +201,10 @@ function TrackContent() {
                   type="text"
                   placeholder="TCP-2026-0001"
                   value={orderNumber}
-                  onChange={(e) =>
-                    setOrderNumber(e.target.value.toUpperCase())
-                  }
+                  onChange={(e) => setOrderNumber(e.target.value.toUpperCase())}
                   style={inputStyle}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "var(--brand)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "var(--brand)"; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--border)"; }}
                 />
               </div>
               <div>
@@ -176,24 +218,14 @@ function TrackContent() {
                   }
                   maxLength={10}
                   style={inputStyle}
-                  onFocus={(e) => {
-                    e.currentTarget.style.borderColor = "var(--brand)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.borderColor = "var(--border)";
-                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "var(--brand)"; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--border)"; }}
                 />
               </div>
             </div>
 
             {error && (
-              <p
-                style={{
-                  fontSize: "12px",
-                  color: "#DC2626",
-                  marginBottom: "12px",
-                }}
-              >
+              <p style={{ fontSize: "12px", color: "#DC2626", marginBottom: "12px" }}>
                 {error}
               </p>
             )}
@@ -215,33 +247,33 @@ function TrackContent() {
           <div
             style={{
               backgroundColor: "var(--surface)",
-              borderRadius: "var(--radius-card)",
-              border: "1px solid var(--border-soft)",
-              padding: "28px",
+              borderRadius:    "var(--radius-card)",
+              border:          "1px solid var(--border-soft)",
+              padding:         "28px",
             }}
           >
             {/* Order meta */}
             <div style={{ marginBottom: "28px" }}>
               <p
                 style={{
-                  fontSize: "10px",
-                  fontWeight: 600,
+                  fontSize:      "10px",
+                  fontWeight:    600,
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: "var(--text-tertiary)",
-                  marginBottom: "4px",
+                  color:         "var(--text-tertiary)",
+                  marginBottom:  "4px",
                 }}
               >
                 Order
               </p>
               <p
                 style={{
-                  fontFamily: "'Playfair Display', serif",
-                  fontSize: "20px",
-                  fontWeight: 600,
-                  color: "var(--text-primary)",
+                  fontFamily:    "'Playfair Display', serif",
+                  fontSize:      "20px",
+                  fontWeight:    600,
+                  color:         "var(--text-primary)",
                   letterSpacing: "-0.01em",
-                  marginBottom: "4px",
+                  marginBottom:  "4px",
                 }}
               >
                 {order.orderNumber}
@@ -249,9 +281,9 @@ function TrackContent() {
               <p style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
                 Placed on{" "}
                 {new Date(order.createdAt).toLocaleDateString("en-IN", {
-                  day: "numeric",
+                  day:   "numeric",
                   month: "long",
-                  year: "numeric",
+                  year:  "numeric",
                 })}
               </p>
             </div>
@@ -260,8 +292,8 @@ function TrackContent() {
             {order.photoStatus && order.photoStatus !== "NOT_REQUIRED" && (
               <div
                 style={{
-                  padding: "12px 16px",
-                  borderRadius: "var(--radius-input)",
+                  padding:         "12px 16px",
+                  borderRadius:    "var(--radius-input)",
                   backgroundColor:
                     order.photoStatus === "VERIFIED"
                       ? "rgba(142,159,130,0.12)"
@@ -271,9 +303,9 @@ function TrackContent() {
                       ? "1px solid rgba(142,159,130,0.25)"
                       : "1px solid var(--border-soft)",
                   marginBottom: "24px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
+                  display:      "flex",
+                  alignItems:   "center",
+                  gap:          "10px",
                 }}
               >
                 {order.photoStatus === "VERIFIED" ? (
@@ -291,18 +323,13 @@ function TrackContent() {
                 )}
                 <p
                   style={{
-                    fontSize: "13px",
+                    fontSize:  "13px",
                     fontWeight: 500,
-                    color: "var(--text-primary)",
+                    color:     "var(--text-primary)",
                   }}
                 >
                   Photos:{" "}
-                  <span
-                    style={{
-                      fontWeight: 400,
-                      color: "var(--text-secondary)",
-                    }}
-                  >
+                  <span style={{ fontWeight: 400, color: "var(--text-secondary)" }}>
                     {order.photoStatus === "NOT_RECEIVED"
                       ? "Awaiting your photos"
                       : order.photoStatus === "RECEIVED"
@@ -318,51 +345,45 @@ function TrackContent() {
               <div style={{ marginBottom: "28px" }}>
                 <p
                   style={{
-                    fontSize: "10px",
-                    fontWeight: 600,
+                    fontSize:      "10px",
+                    fontWeight:    600,
                     letterSpacing: "0.14em",
                     textTransform: "uppercase",
-                    color: "var(--text-tertiary)",
-                    marginBottom: "20px",
+                    color:         "var(--text-tertiary)",
+                    marginBottom:  "20px",
                   }}
                 >
                   Progress
                 </p>
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: "0",
-                  }}
-                >
+                <div style={{ display: "flex", flexDirection: "column", gap: "0" }}>
                   {ORDER_STEPS.map((step, i) => {
                     const isCompleted = i < currentStepIndex;
-                    const isCurrent = i === currentStepIndex;
-                    const isLast = i === ORDER_STEPS.length - 1;
+                    const isCurrent   = i === currentStepIndex;
+                    const isLast      = i === ORDER_STEPS.length - 1;
 
                     return (
                       <div
                         key={step.key}
                         style={{
                           display: "flex",
-                          gap: "16px",
+                          gap:     "16px",
                           opacity: isCompleted || isCurrent ? 1 : 0.35,
                         }}
                       >
                         {/* Icon + connector */}
                         <div
                           style={{
-                            display: "flex",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            flexShrink: 0,
+                            display:        "flex",
+                            flexDirection:  "column",
+                            alignItems:     "center",
+                            flexShrink:     0,
                           }}
                         >
                           <div
                             style={{
-                              width: "32px",
-                              height: "32px",
-                              borderRadius: "var(--radius-input)",
+                              width:           "32px",
+                              height:          "32px",
+                              borderRadius:    "var(--radius-input)",
                               backgroundColor: isCompleted
                                 ? "var(--success)"
                                 : isCurrent
@@ -372,8 +393,8 @@ function TrackContent() {
                                 isCompleted || isCurrent
                                   ? "#fff"
                                   : "var(--text-tertiary)",
-                              display: "flex",
-                              alignItems: "center",
+                              display:        "flex",
+                              alignItems:     "center",
                               justifyContent: "center",
                             }}
                           >
@@ -382,9 +403,9 @@ function TrackContent() {
                           {!isLast && (
                             <div
                               style={{
-                                width: "1px",
-                                flex: 1,
-                                minHeight: "20px",
+                                width:           "1px",
+                                flex:            1,
+                                minHeight:       "20px",
                                 backgroundColor: isCompleted
                                   ? "var(--success)"
                                   : "var(--border-soft)",
@@ -398,14 +419,14 @@ function TrackContent() {
                         <div
                           style={{
                             paddingBottom: isLast ? "0" : "20px",
-                            paddingTop: "4px",
+                            paddingTop:    "4px",
                           }}
                         >
                           <p
                             style={{
-                              fontSize: "13px",
-                              fontWeight: isCurrent ? 600 : 500,
-                              color: "var(--text-primary)",
+                              fontSize:     "13px",
+                              fontWeight:   isCurrent ? 600 : 500,
+                              color:        "var(--text-primary)",
                               marginBottom: "1px",
                             }}
                           >
@@ -414,8 +435,8 @@ function TrackContent() {
                           {isCurrent && (
                             <p
                               style={{
-                                fontSize: "11px",
-                                color: "var(--brand)",
+                                fontSize:   "11px",
+                                color:      "var(--brand)",
                                 fontWeight: 500,
                               }}
                             >
@@ -434,28 +455,169 @@ function TrackContent() {
             {order.status === "DRAFT" && (
               <div
                 style={{
-                  padding: "14px 16px",
-                  borderRadius: "var(--radius-input)",
+                  padding:         "14px 16px",
+                  borderRadius:    "var(--radius-input)",
                   backgroundColor: "rgba(37,211,102,0.08)",
-                  border: "1px solid rgba(37,211,102,0.2)",
-                  marginBottom: "24px",
+                  border:          "1px solid rgba(37,211,102,0.2)",
+                  marginBottom:    "24px",
                 }}
               >
                 <p
                   style={{
-                    fontSize: "13px",
-                    fontWeight: 500,
-                    color: "var(--text-primary)",
+                    fontSize:     "13px",
+                    fontWeight:   500,
+                    color:        "var(--text-primary)",
                     marginBottom: "3px",
                   }}
                 >
                   WhatsApp order in progress
                 </p>
-                <p
-                  style={{ fontSize: "12px", color: "var(--text-secondary)" }}
-                >
+                <p style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                   Continue the conversation with our team to complete payment.
                 </p>
+              </div>
+            )}
+
+            {/* ── Tracking number (SHIPPED / DELIVERED) ───────────────────── */}
+            {order.shipment?.trackingNumber &&
+              (order.status === "SHIPPED" || order.status === "DELIVERED") && (
+              <div
+                style={{
+                  marginBottom:    "24px",
+                  padding:         "16px",
+                  borderRadius:    "var(--radius-input)",
+                  backgroundColor: "rgba(142,159,130,0.08)",
+                  border:          "1px solid rgba(142,159,130,0.2)",
+                }}
+              >
+                {/* Header row */}
+                <div
+                  style={{
+                    display:      "flex",
+                    alignItems:   "center",
+                    gap:          "8px",
+                    marginBottom: "12px",
+                  }}
+                >
+                  <Truck
+                    size={15}
+                    strokeWidth={1.75}
+                    style={{ color: "var(--success)", flexShrink: 0 }}
+                  />
+                  <p
+                    style={{
+                      fontSize:      "12px",
+                      fontWeight:    600,
+                      letterSpacing: "0.06em",
+                      textTransform: "uppercase",
+                      color:         "var(--success)",
+                    }}
+                  >
+                    {order.status === "DELIVERED"
+                      ? "Order Delivered"
+                      : "Your order is on the way!"}
+                  </p>
+                </div>
+
+                {/* Label */}
+                <p
+                  style={{
+                    fontSize:      "10px",
+                    fontWeight:    600,
+                    letterSpacing: "0.1em",
+                    textTransform: "uppercase",
+                    color:         "var(--text-tertiary)",
+                    marginBottom:  "6px",
+                  }}
+                >
+                  Tracking Number
+                </p>
+
+                {/* Tracking number + copy button */}
+                <div
+                  style={{
+                    display:      "flex",
+                    alignItems:   "center",
+                    gap:          "10px",
+                    marginBottom: "14px",
+                    flexWrap:     "wrap",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily:    "monospace",
+                      fontSize:      "18px",
+                      fontWeight:    700,
+                      color:         "var(--text-primary)",
+                      letterSpacing: "0.06em",
+                    }}
+                  >
+                    {order.shipment.trackingNumber}
+                  </span>
+                  <CopyTrackingButton
+                    trackingNumber={order.shipment.trackingNumber}
+                  />
+                </div>
+
+                {/* Estimated delivery */}
+                {order.shipment.estimatedDelivery && (
+                  <p
+                    style={{
+                      fontSize:     "12px",
+                      color:        "var(--text-secondary)",
+                      marginBottom: "14px",
+                    }}
+                  >
+                    Estimated delivery:{" "}
+                    <strong style={{ color: "var(--text-primary)" }}>
+                      {new Date(
+                        order.shipment.estimatedDelivery
+                      ).toLocaleDateString("en-IN", {
+                        day:   "numeric",
+                        month: "long",
+                        year:  "numeric",
+                      })}
+                    </strong>
+                  </p>
+                )}
+
+                {/* Track on India Post */}
+                <a
+  href="https://www.indiapost.gov.in/"
+  target="_blank"
+  rel="noopener noreferrer"
+  style={{
+    display:         "inline-flex",
+    alignItems:      "center",
+    gap:             "7px",
+    padding:         "9px 16px",
+    borderRadius:    "var(--radius-input)",
+    backgroundColor: "var(--success)",
+    color:           "#fff",
+    fontSize:        "13px",
+    fontWeight:      500,
+    textDecoration:  "none",
+    transition:      "opacity 200ms ease",
+  }}
+  onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.85"; }}
+  onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+>
+  <svg
+    width="13"
+    height="13"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+    <polyline points="15 3 21 3 21 9" />
+    <line x1="10" y1="14" x2="21" y2="3" />
+  </svg>
+  Track on India Post
+</a>
               </div>
             )}
 
@@ -463,17 +625,17 @@ function TrackContent() {
             <div
               style={{
                 paddingTop: "20px",
-                borderTop: "1px solid var(--border-soft)",
+                borderTop:  "1px solid var(--border-soft)",
               }}
             >
               <p
                 style={{
-                  fontSize: "10px",
-                  fontWeight: 600,
+                  fontSize:      "10px",
+                  fontWeight:    600,
                   letterSpacing: "0.14em",
                   textTransform: "uppercase",
-                  color: "var(--text-tertiary)",
-                  marginBottom: "12px",
+                  color:         "var(--text-tertiary)",
+                  marginBottom:  "12px",
                 }}
               >
                 Items
@@ -483,48 +645,38 @@ function TrackContent() {
                 <div
                   key={item.id}
                   style={{
-                    display: "flex",
+                    display:        "flex",
                     justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    padding: "10px 0",
-                    borderBottom: "1px solid var(--border-soft)",
+                    alignItems:     "flex-start",
+                    padding:        "10px 0",
+                    borderBottom:   "1px solid var(--border-soft)",
                   }}
                 >
                   <div>
                     <p
                       style={{
-                        fontSize: "13px",
-                        fontWeight: 500,
-                        color: "var(--text-primary)",
+                        fontSize:     "13px",
+                        fontWeight:   500,
+                        color:        "var(--text-primary)",
                         marginBottom: "2px",
                       }}
                     >
                       {item.productName}
                     </p>
                     {item.variantName && (
-                      <p
-                        style={{
-                          fontSize: "11px",
-                          color: "var(--text-tertiary)",
-                        }}
-                      >
+                      <p style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
                         {item.variantName}
                       </p>
                     )}
-                    <p
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--text-tertiary)",
-                      }}
-                    >
+                    <p style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
                       Qty: {item.quantity}
                     </p>
                   </div>
                   <span
                     style={{
-                      fontSize: "13px",
+                      fontSize:   "13px",
                       fontWeight: 600,
-                      color: "var(--text-primary)",
+                      color:      "var(--text-primary)",
                     }}
                   >
                     {formatPrice(item.totalPrice)}
@@ -534,29 +686,29 @@ function TrackContent() {
 
               <div
                 style={{
-                  display: "flex",
+                  display:        "flex",
                   justifyContent: "space-between",
-                  alignItems: "baseline",
-                  marginTop: "14px",
-                  paddingTop: "14px",
-                  borderTop: "1px solid var(--border-soft)",
+                  alignItems:     "baseline",
+                  marginTop:      "14px",
+                  paddingTop:     "14px",
+                  borderTop:      "1px solid var(--border-soft)",
                 }}
               >
                 <span
                   style={{
-                    fontSize: "13px",
+                    fontSize:   "13px",
                     fontWeight: 500,
-                    color: "var(--text-primary)",
+                    color:      "var(--text-primary)",
                   }}
                 >
                   Total
                 </span>
                 <span
                   style={{
-                    fontFamily: "'Playfair Display', serif",
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
+                    fontFamily:    "'Playfair Display', serif",
+                    fontSize:      "20px",
+                    fontWeight:    600,
+                    color:         "var(--text-primary)",
                     letterSpacing: "-0.01em",
                   }}
                 >
@@ -572,8 +724,8 @@ function TrackContent() {
               rel="noopener noreferrer"
               className="btn-secondary"
               style={{
-                width: "100%",
-                marginTop: "24px",
+                width:          "100%",
+                marginTop:      "24px",
                 justifyContent: "center",
               }}
             >
@@ -588,10 +740,10 @@ function TrackContent() {
           <Link
             href="/"
             style={{
-              fontSize: "12px",
-              color: "var(--text-tertiary)",
+              fontSize:      "12px",
+              color:         "var(--text-tertiary)",
               letterSpacing: "0.02em",
-              transition: "color 200ms ease",
+              transition:    "color 200ms ease",
             }}
             className="hover:text-[var(--text-primary)]"
           >
@@ -603,14 +755,16 @@ function TrackContent() {
   );
 }
 
+// ── Page wrapper ──────────────────────────────────────────────────────────────
+
 export default function TrackOrderPage() {
   return (
     <Suspense
       fallback={
         <div
           style={{
-            padding: "160px 0",
-            textAlign: "center",
+            padding:         "160px 0",
+            textAlign:       "center",
             backgroundColor: "var(--bg)",
           }}
         >

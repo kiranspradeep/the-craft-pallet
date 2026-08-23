@@ -85,3 +85,14 @@ export const markAsPaidSchema = z.object({
 export const generatePaymentLinkSchema = z.object({
   params: z.object({ id: z.string().min(1) }),
 });
+
+export const markAsShippedSchema = z.object({
+  params: z.object({ id: z.string().min(1) }),
+  body: z.object({
+    trackingNumber: z
+      .string({ required_error: "Tracking number is required" })
+      .min(1, "Tracking number is required")
+      .max(100),
+    estimatedDelivery: z.string().optional(),
+  }),
+});

@@ -24,12 +24,12 @@ interface Order {
 }
 
 const PRODUCTION_STAGES = [
-  { value: "QUEUED",    label: "Queued"       },
-  { value: "DESIGN",   label: "Design"        },
-  { value: "PRINTING", label: "Printing"      },
-  { value: "CRAFTING", label: "Crafting"      },
-  { value: "PACKING",  label: "Packing"       },
-  { value: "READY",    label: "Ready to Ship" },
+  { value: "QUEUED",    label: "Queued"        },
+  { value: "DESIGN",   label: "Design"         },
+  { value: "PRINTING", label: "Printing"       },
+  { value: "CRAFTING", label: "Crafting"       },
+  { value: "PACKING",  label: "Packing"        },
+  { value: "READY",    label: "Ready to Ship"  },
 ];
 
 const NEXT_STAGE: Record<string, string> = {
@@ -42,16 +42,19 @@ const NEXT_STAGE: Record<string, string> = {
 
 export default function OrderActions({ order }: { order: Order }) {
   const router = useRouter();
-  const [loading,      setLoading]      = useState<string | null>(null);
-  const [error,        setError]        = useState("");
-  const [success,      setSuccess]      = useState("");
-  const [note,         setNote]         = useState("");
-  const [showMarkPaid, setShowMarkPaid] = useState(false);
-  const [refNumber,    setRefNumber]    = useState("");
-  const [paidNote,     setPaidNote]     = useState("");
-  const [showCancel,   setShowCancel]   = useState(false);
-  const [cancelReason, setCancelReason] = useState("");
-  const [paymentLink,  setPaymentLink]  = useState<string | null>(null);
+  const [loading,           setLoading]           = useState<string | null>(null);
+  const [error,             setError]             = useState("");
+  const [success,           setSuccess]           = useState("");
+  const [note,              setNote]              = useState("");
+  const [showMarkPaid,      setShowMarkPaid]      = useState(false);
+  const [refNumber,         setRefNumber]         = useState("");
+  const [paidNote,          setPaidNote]          = useState("");
+  const [showCancel,        setShowCancel]        = useState(false);
+  const [cancelReason,      setCancelReason]      = useState("");
+  const [paymentLink,       setPaymentLink]       = useState<string | null>(null);
+  const [showShipForm,      setShowShipForm]      = useState(false);
+  const [trackingNumber,    setTrackingNumber]    = useState("");
+  const [estimatedDelivery, setEstimatedDelivery] = useState("");
 
   const call = async (path: string, method: string, body?: object) => {
     const res = await fetch(`/api/admin/orders/${order.id}${path}`, {
@@ -93,7 +96,7 @@ export default function OrderActions({ order }: { order: Order }) {
 
   // ── Styles ────────────────────────────────────────────────────────────────
 
-  const inputStyle = {
+  const inputStyle: React.CSSProperties = {
     width: "100%",
     padding: "9px 12px",
     borderRadius: "6px",
@@ -105,17 +108,17 @@ export default function OrderActions({ order }: { order: Order }) {
     transition: "border-color 200ms ease",
   };
 
-  const sectionLabel = {
+  const sectionLabel: React.CSSProperties = {
     fontSize: "10px",
     fontWeight: 600,
     letterSpacing: "0.14em",
-    textTransform: "uppercase" as const,
+    textTransform: "uppercase",
     color: "var(--text-secondary)",
     marginBottom: "8px",
     display: "block",
   };
 
-  const solidBtn = (color = "var(--text-primary)") => ({
+  const solidBtn = (color = "var(--text-primary)"): React.CSSProperties => ({
     display: "inline-flex",
     alignItems: "center",
     gap: "7px",
@@ -128,10 +131,10 @@ export default function OrderActions({ order }: { order: Order }) {
     border: "none",
     cursor: "pointer",
     width: "100%",
-    justifyContent: "center" as const,
+    justifyContent: "center",
   });
 
-  const ghostBtn = {
+  const ghostBtn: React.CSSProperties = {
     display: "inline-flex",
     alignItems: "center",
     gap: "7px",
@@ -144,7 +147,7 @@ export default function OrderActions({ order }: { order: Order }) {
     border: "1px solid var(--border)",
     cursor: "pointer",
     width: "100%",
-    justifyContent: "center" as const,
+    justifyContent: "center",
   };
 
   const paymentLinkBox = paymentLink ? (
@@ -300,10 +303,8 @@ export default function OrderActions({ order }: { order: Order }) {
             fontSize: "12px", color: "var(--text-secondary)",
             marginBottom: "10px", lineHeight: 1.5,
           }}>
-            Draft order. Generate a payment link and send to the customer
-            via WhatsApp.
+            Draft order. Generate a payment link and send to the customer via WhatsApp.
           </div>
-
           <button
             style={solidBtn()}
             disabled={loading === "paylink"}
@@ -320,9 +321,7 @@ export default function OrderActions({ order }: { order: Order }) {
             }
             Generate Payment Link
           </button>
-
           {paymentLinkBox}
-
           <button
             style={{ ...ghostBtn, marginTop: "8px" }}
             disabled={loading === "activate"}
@@ -348,7 +347,6 @@ export default function OrderActions({ order }: { order: Order }) {
           {order.status === "AWAITING_PAYMENT" && (
             <span style={sectionLabel}>Payment</span>
           )}
-
           {!showMarkPaid ? (
             <button
               onClick={() => setShowMarkPaid(true)}
@@ -497,24 +495,94 @@ export default function OrderActions({ order }: { order: Order }) {
         </div>
       )}
 
-      {/* ── IN_PRODUCTION + READY: Mark as Shipped ───────────────────────── */}
+      {/* ── IN_PRODUCTION + READY: Mark as Shipped (with tracking form) ───── */}
       {order.status === "IN_PRODUCTION" && order.productionStage === "READY" && (
-        <button
-          style={solidBtn()}
-          disabled={loading === "ship"}
-          onClick={() =>
-            action("ship",
-              () => call("/status", "PATCH", { status: "SHIPPED" }),
-              "Order marked as shipped"
-            )
-          }
-        >
-          {loading === "ship"
-            ? <Loader2 size={13} className="animate-spin" />
-            : <Truck size={13} strokeWidth={1.75} />
-          }
-          Mark as Shipped
-        </button>
+        <div>
+          <span style={sectionLabel}>Ship Order</span>
+          {!showShipForm ? (
+            <button style={ghostBtn} onClick={() => setShowShipForm(true)}>
+              <Truck size={13} strokeWidth={1.75} />
+              Mark as Shipped
+            </button>
+          ) : (
+            <div style={{
+              padding: "14px", borderRadius: "6px",
+              border: "1px solid var(--border)",
+              backgroundColor: "var(--bg-primary)",
+              display: "flex", flexDirection: "column", gap: "10px",
+            }}>
+              <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
+                Enter Tracking Details
+              </p>
+
+              <div>
+                <label style={{ ...sectionLabel, marginBottom: "5px" }}>
+                  Tracking Number *
+                </label>
+                <input
+                  placeholder="e.g. EA123456789IN"
+                  value={trackingNumber}
+                  onChange={(e) => setTrackingNumber(e.target.value.toUpperCase())}
+                  style={inputStyle}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "var(--brand)"; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--border)"; }}
+                />
+              </div>
+
+              <div>
+                <label style={{ ...sectionLabel, marginBottom: "5px" }}>
+                  Estimated Delivery (optional)
+                </label>
+                <input
+                  type="date"
+                  value={estimatedDelivery}
+                  onChange={(e) => setEstimatedDelivery(e.target.value)}
+                  style={inputStyle}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = "var(--brand)"; }}
+                  onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--border)"; }}
+                />
+              </div>
+
+              <div style={{ display: "flex", gap: "8px" }}>
+                <button
+                  style={{
+                    ...solidBtn(),
+                    flex: 1,
+                    opacity: !trackingNumber.trim() || loading === "ship" ? 0.5 : 1,
+                    cursor: !trackingNumber.trim() || loading === "ship"
+                      ? "not-allowed" : "pointer",
+                  }}
+                  disabled={!trackingNumber.trim() || loading === "ship"}
+                  onClick={() =>
+                    action("ship",
+                      () => call("/ship", "PATCH", {
+                        trackingNumber: trackingNumber.trim(),
+                        estimatedDelivery: estimatedDelivery || undefined,
+                      }),
+                      "Order marked as shipped"
+                    )
+                  }
+                >
+                  {loading === "ship"
+                    ? <Loader2 size={13} className="animate-spin" />
+                    : <Truck size={13} strokeWidth={1.75} />
+                  }
+                  Confirm Shipped
+                </button>
+                <button
+                  style={{ ...ghostBtn, flex: 1 }}
+                  onClick={() => {
+                    setShowShipForm(false);
+                    setTrackingNumber("");
+                    setEstimatedDelivery("");
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* ── SHIPPED: Mark as Delivered ───────────────────────────────────── */}

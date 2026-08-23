@@ -1,3 +1,4 @@
+//client\src\app\checkout\page.tsx
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
@@ -11,6 +12,7 @@ import {
   ImageIcon,
   Lock,
   AlertCircle,
+  ShieldCheck,
 } from "lucide-react";
 import {
   cartApi,
@@ -97,9 +99,7 @@ function validateForm(
   }
 
   if (!sameShipping) {
-    if (!form.shipName.trim()) {
-      errors.shipName = "Recipient name is required";
-    }
+    if (!form.shipName.trim()) errors.shipName = "Recipient name is required";
     if (!form.shipPhone.trim()) {
       errors.shipPhone = "Recipient phone is required";
     } else if (!/^\d{10}$/.test(form.shipPhone.trim())) {
@@ -108,8 +108,8 @@ function validateForm(
   }
 
   if (!form.shipLine1.trim()) errors.shipLine1 = "Address is required";
-  if (!form.shipCity.trim()) errors.shipCity = "City is required";
-  if (!form.shipState.trim()) errors.shipState = "State is required";
+  if (!form.shipCity.trim())   errors.shipCity  = "City is required";
+  if (!form.shipState.trim())  errors.shipState  = "State is required";
 
   if (!form.shipPincode.trim()) {
     errors.shipPincode = "Pincode is required";
@@ -123,45 +123,41 @@ function validateForm(
 // ── Main Component ────────────────────────────────────────────────────────
 
 function CheckoutContent() {
-  const router = useRouter();
+  const router      = useRouter();
   const searchParams = useSearchParams();
-  const buyNowId = searchParams.get("bn");
-  const method =
+  const buyNowId    = searchParams.get("bn");
+  const method      =
     searchParams.get("method") === "whatsapp" ? "whatsapp" : "website";
 
-  const [items, setItems] = useState<any[]>([]);
-  const [subtotal, setSubtotal] = useState(0);
-  const [loading, setLoading] = useState(true);
-  const [placing, setPlacing] = useState(false);
-  const [error, setError] = useState("");
-  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
-
-  // Shipping settings fetched once on mount
+  const [items,           setItems]           = useState<any[]>([]);
+  const [subtotal,        setSubtotal]        = useState(0);
+  const [loading,         setLoading]         = useState(true);
+  const [placing,         setPlacing]         = useState(false);
+  const [error,           setError]           = useState("");
+  const [fieldErrors,     setFieldErrors]     = useState<FormErrors>({});
+  const [touched,         setTouched]         = useState<Record<string, boolean>>({});
+  const [termsAccepted,   setTermsAccepted]   = useState(false);
+  const [termsError,      setTermsError]      = useState(false);
   const [shippingSettings, setShippingSettings] =
     useState<ShippingSettings | null>(null);
 
   const [form, setForm] = useState({
-    name: "",
-    phone: "",
-    email: "",
-    shipName: "",
-    shipPhone: "",
-    shipLine1: "",
-    shipLine2: "",
-    shipCity: "",
-    shipState: "",
-    shipPincode: "",
+    name:         "",
+    phone:        "",
+    email:        "",
+    shipName:     "",
+    shipPhone:    "",
+    shipLine1:    "",
+    shipLine2:    "",
+    shipCity:     "",
+    shipState:    "",
+    shipPincode:  "",
     customerNote: "",
   });
 
   const [sameShipping, setSameShipping] = useState(true);
 
-  // Derived shipping charge — recalculates whenever state field changes
-  const shippingCharge = resolveShippingCharge(
-    shippingSettings,
-    form.shipState
-  );
+  const shippingCharge    = resolveShippingCharge(shippingSettings, form.shipState);
   const totalWithShipping =
     shippingCharge !== null ? subtotal + shippingCharge : subtotal;
 
@@ -172,46 +168,42 @@ function CheckoutContent() {
   }, [buyNowId]);
 
   const fetchShippingSettings = async () => {
-  try {
-    const res = await fetch(`${API_URL}/api/settings/shipping`);
-    const data = await res.json();
-    if (res.ok && data.data) {
-      setShippingSettings({
-        keralaShippingCharge:
-          data.data.keralaShippingCharge !== null &&
-          data.data.keralaShippingCharge !== undefined
-            ? String(data.data.keralaShippingCharge)
-            : null,
-        outsideKeralaShippingCharge:
-          data.data.outsideKeralaShippingCharge !== null &&
-          data.data.outsideKeralaShippingCharge !== undefined
-            ? String(data.data.outsideKeralaShippingCharge)
-            : null,
-      });
+    try {
+      const res  = await fetch(`${API_URL}/api/settings/shipping`);
+      const data = await res.json();
+      if (res.ok && data.data) {
+        setShippingSettings({
+          keralaShippingCharge:
+            data.data.keralaShippingCharge != null
+              ? String(data.data.keralaShippingCharge)
+              : null,
+          outsideKeralaShippingCharge:
+            data.data.outsideKeralaShippingCharge != null
+              ? String(data.data.outsideKeralaShippingCharge)
+              : null,
+        });
+      }
+    } catch {
+      // silently fail
     }
-  } catch {
-    // silently fail
-  }
-};
+  };
 
   const load = async () => {
     try {
       if (buyNowId) {
-        const session = await buyNowApi.get(buyNowId);
-        const productRes = await fetch(
-          `${API_URL}/api/products/${session.productId}`
-        );
+        const session     = await buyNowApi.get(buyNowId);
+        const productRes  = await fetch(`${API_URL}/api/products/${session.productId}`);
         const productData = await productRes.json();
-        const product = productData.data;
-        const variant = product?.variants?.find(
+        const product     = productData.data;
+        const variant     = product?.variants?.find(
           (v: any) => v.id === session.variantId
         );
         const total = Number(session.unitPrice) * session.quantity;
         setItems([
           {
-            id: session.id,
-            product: { name: product?.name, images: product?.images },
-            variant: variant ? { name: variant.name } : null,
+            id:       session.id,
+            product:  { name: product?.name, images: product?.images },
+            variant:  variant ? { name: variant.name } : null,
             quantity: session.quantity,
             unitPrice: session.unitPrice,
           },
@@ -240,13 +232,19 @@ function CheckoutContent() {
     }
   };
 
-  const touch = (k: string) => {
+  const touch = (k: string) =>
     setTouched((prev) => ({ ...prev, [k]: true }));
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    // Terms check
+    if (!termsAccepted) {
+      setTermsError(true);
+      return;
+    }
+    setTermsError(false);
 
     const errors = validateForm(form, sameShipping);
     if (Object.keys(errors).length > 0) {
@@ -265,19 +263,19 @@ function CheckoutContent() {
     try {
       const couponCode = sessionStorage.getItem("tcp_coupon");
       const body = {
-        name: form.name.trim(),
-        phone: form.phone.trim(),
-        email: form.email.trim() || undefined,
-        shipName: sameShipping ? form.name.trim() : form.shipName.trim(),
-        shipPhone: sameShipping ? form.phone.trim() : form.shipPhone.trim(),
-        shipLine1: form.shipLine1.trim(),
-        shipLine2: form.shipLine2.trim() || undefined,
-        shipCity: form.shipCity.trim(),
-        shipState: form.shipState.trim(),
-        shipPincode: form.shipPincode.trim(),
-        shipCountry: "India",
-        customerNote: form.customerNote.trim() || undefined,
-        couponCode: couponCode || undefined,
+        name:             form.name.trim(),
+        phone:            form.phone.trim(),
+        email:            form.email.trim() || undefined,
+        shipName:         sameShipping ? form.name.trim() : form.shipName.trim(),
+        shipPhone:        sameShipping ? form.phone.trim() : form.shipPhone.trim(),
+        shipLine1:        form.shipLine1.trim(),
+        shipLine2:        form.shipLine2.trim() || undefined,
+        shipCity:         form.shipCity.trim(),
+        shipState:        form.shipState.trim(),
+        shipPincode:      form.shipPincode.trim(),
+        shipCountry:      "India",
+        customerNote:     form.customerNote.trim() || undefined,
+        couponCode:       couponCode || undefined,
         buyNowCheckoutId: buyNowId || undefined,
       };
       sessionStorage.removeItem("tcp_coupon");
@@ -308,9 +306,7 @@ function CheckoutContent() {
     ]
       .filter(Boolean)
       .join("\n");
-    window.location.href = `https://wa.me/918086415357?text=${encodeURIComponent(
-      parts
-    )}`;
+    window.location.href = `https://wa.me/918086415357?text=${encodeURIComponent(parts)}`;
   };
 
   const openRazorpayCheckout = async (order: any) => {
@@ -318,7 +314,7 @@ function CheckoutContent() {
       const rzpRes = await fetch(
         `${API_URL}/api/checkout/razorpay-order/${order.orderNumber}`,
         {
-          method: "POST",
+          method:  "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Session-Id": getSessionId(),
@@ -331,15 +327,15 @@ function CheckoutContent() {
       const razorpayData = rzpData.data;
 
       const options = {
-        key: RAZORPAY_KEY,
-        amount: razorpayData.amount,
-        currency: razorpayData.currency,
-        name: "The Craft Pallet",
+        key:         RAZORPAY_KEY,
+        amount:      razorpayData.amount,
+        currency:    razorpayData.currency,
+        name:        "The Craft Pallet",
         description: `Order ${order.orderNumber}`,
-        order_id: razorpayData.razorpayOrderId,
+        order_id:    razorpayData.razorpayOrderId,
         prefill: {
-          name: razorpayData.customer?.name || form.name,
-          email: razorpayData.customer?.email || form.email,
+          name:    razorpayData.customer?.name  || form.name,
+          email:   razorpayData.customer?.email || form.email,
           contact: `+91${razorpayData.customer?.phone || form.phone}`,
         },
         notes: { orderNumber: order.orderNumber, orderId: order.id },
@@ -378,8 +374,8 @@ function CheckoutContent() {
     return (
       <div
         style={{
-          padding: "160px 0",
-          textAlign: "center",
+          padding:         "160px 0",
+          textAlign:       "center",
           backgroundColor: "var(--bg)",
         }}
       >
@@ -399,21 +395,20 @@ function CheckoutContent() {
 
       <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
         <div className="tcp-container">
+
           {/* Header */}
           <div style={{ marginBottom: "48px" }}>
             <Link
-              href={`/checkout/upload-method${
-                buyNowId ? `?bn=${buyNowId}` : ""
-              }`}
+              href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "6px",
-                fontSize: "12px",
-                color: "var(--text-tertiary)",
+                display:      "inline-flex",
+                alignItems:   "center",
+                gap:          "6px",
+                fontSize:     "12px",
+                color:        "var(--text-tertiary)",
                 marginBottom: "24px",
-                letterSpacing: "0.02em",
-                transition: "color 200ms ease",
+                letterSpacing:"0.02em",
+                transition:   "color 200ms ease",
               }}
               className="hover:text-[var(--text-primary)]"
             >
@@ -428,10 +423,10 @@ function CheckoutContent() {
             </p>
             <h1
               style={{
-                fontFamily: "'Playfair Display', serif",
-                fontSize: "clamp(28px, 4vw, 42px)",
-                fontWeight: 500,
-                color: "var(--text-primary)",
+                fontFamily:    "'Playfair Display', serif",
+                fontSize:      "clamp(28px, 4vw, 42px)",
+                fontWeight:    500,
+                color:         "var(--text-primary)",
                 letterSpacing: "-0.02em",
               }}
             >
@@ -470,9 +465,9 @@ function CheckoutContent() {
             <div
               className="checkout-grid"
               style={{
-                display: "grid",
+                display:             "grid",
                 gridTemplateColumns: "1fr",
-                gap: "32px",
+                gap:                 "32px",
               }}
             >
               {/* ── Left — Form ─────────────────────────────────────── */}
@@ -482,9 +477,9 @@ function CheckoutContent() {
                   <div
                     className="field-grid-2"
                     style={{
-                      display: "grid",
+                      display:             "grid",
                       gridTemplateColumns: "1fr 1fr",
-                      gap: "16px",
+                      gap:                 "16px",
                     }}
                   >
                     <Field
@@ -541,13 +536,13 @@ function CheckoutContent() {
                 <FormSection title="Shipping Address" step={2}>
                   <label
                     style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
+                      display:      "flex",
+                      alignItems:   "center",
+                      gap:          "8px",
                       marginBottom: "20px",
-                      fontSize: "13px",
-                      color: "var(--text-secondary)",
-                      cursor: "pointer",
+                      fontSize:     "13px",
+                      color:        "var(--text-secondary)",
+                      cursor:       "pointer",
                     }}
                   >
                     <input
@@ -557,7 +552,7 @@ function CheckoutContent() {
                         setSameShipping(e.target.checked);
                         setFieldErrors((prev) => ({
                           ...prev,
-                          shipName: undefined,
+                          shipName:  undefined,
                           shipPhone: undefined,
                         }));
                       }}
@@ -570,49 +565,38 @@ function CheckoutContent() {
                     <div
                       className="field-grid-2"
                       style={{
-                        display: "grid",
+                        display:             "grid",
                         gridTemplateColumns: "1fr 1fr",
-                        gap: "16px",
+                        gap:                 "16px",
                       }}
                     >
                       <Field
                         label="Recipient Name"
                         required
-                        error={
-                          touched.shipName ? fieldErrors.shipName : undefined
-                        }
+                        error={touched.shipName ? fieldErrors.shipName : undefined}
                       >
                         <Input
                           data-field="shipName"
                           value={form.shipName}
                           onChange={(v) => set("shipName", v)}
                           onBlur={() => touch("shipName")}
-                          hasError={
-                            !!(touched.shipName && fieldErrors.shipName)
-                          }
+                          hasError={!!(touched.shipName && fieldErrors.shipName)}
                           placeholder="Priya Sharma"
                         />
                       </Field>
                       <Field
                         label="Recipient Phone"
                         required
-                        error={
-                          touched.shipPhone ? fieldErrors.shipPhone : undefined
-                        }
+                        error={touched.shipPhone ? fieldErrors.shipPhone : undefined}
                       >
                         <Input
                           data-field="shipPhone"
                           value={form.shipPhone}
                           onChange={(v) =>
-                            set(
-                              "shipPhone",
-                              v.replace(/\D/g, "").slice(0, 10)
-                            )
+                            set("shipPhone", v.replace(/\D/g, "").slice(0, 10))
                           }
                           onBlur={() => touch("shipPhone")}
-                          hasError={
-                            !!(touched.shipPhone && fieldErrors.shipPhone)
-                          }
+                          hasError={!!(touched.shipPhone && fieldErrors.shipPhone)}
                           maxLength={10}
                           inputMode="numeric"
                           placeholder="9876543210"
@@ -624,9 +608,7 @@ function CheckoutContent() {
                   <Field
                     label="Address Line 1"
                     required
-                    error={
-                      touched.shipLine1 ? fieldErrors.shipLine1 : undefined
-                    }
+                    error={touched.shipLine1 ? fieldErrors.shipLine1 : undefined}
                   >
                     <Input
                       data-field="shipLine1"
@@ -649,17 +631,15 @@ function CheckoutContent() {
                   <div
                     className="field-grid-3"
                     style={{
-                      display: "grid",
+                      display:             "grid",
                       gridTemplateColumns: "1fr 1fr 1fr",
-                      gap: "16px",
+                      gap:                 "16px",
                     }}
                   >
                     <Field
                       label="City"
                       required
-                      error={
-                        touched.shipCity ? fieldErrors.shipCity : undefined
-                      }
+                      error={touched.shipCity ? fieldErrors.shipCity : undefined}
                     >
                       <Input
                         data-field="shipCity"
@@ -673,43 +653,30 @@ function CheckoutContent() {
                     <Field
                       label="State"
                       required
-                      error={
-                        touched.shipState ? fieldErrors.shipState : undefined
-                      }
+                      error={touched.shipState ? fieldErrors.shipState : undefined}
                     >
                       <Input
                         data-field="shipState"
                         value={form.shipState}
                         onChange={(v) => set("shipState", v)}
                         onBlur={() => touch("shipState")}
-                        hasError={
-                          !!(touched.shipState && fieldErrors.shipState)
-                        }
+                        hasError={!!(touched.shipState && fieldErrors.shipState)}
                         placeholder="Kerala"
                       />
                     </Field>
                     <Field
                       label="Pincode"
                       required
-                      error={
-                        touched.shipPincode
-                          ? fieldErrors.shipPincode
-                          : undefined
-                      }
+                      error={touched.shipPincode ? fieldErrors.shipPincode : undefined}
                     >
                       <Input
                         data-field="shipPincode"
                         value={form.shipPincode}
                         onChange={(v) =>
-                          set(
-                            "shipPincode",
-                            v.replace(/\D/g, "").slice(0, 6)
-                          )
+                          set("shipPincode", v.replace(/\D/g, "").slice(0, 6))
                         }
                         onBlur={() => touch("shipPincode")}
-                        hasError={
-                          !!(touched.shipPincode && fieldErrors.shipPincode)
-                        }
+                        hasError={!!(touched.shipPincode && fieldErrors.shipPincode)}
                         maxLength={6}
                         inputMode="numeric"
                         placeholder="682001"
@@ -726,55 +693,45 @@ function CheckoutContent() {
                     value={form.customerNote}
                     onChange={(e) => set("customerNote", e.target.value)}
                     style={{
-                      width: "100%",
-                      padding: "11px 14px",
-                      borderRadius: "var(--radius-input)",
-                      border: "1px solid var(--border)",
-                      fontSize: "14px",
+                      width:           "100%",
+                      padding:         "11px 14px",
+                      borderRadius:    "var(--radius-input)",
+                      border:          "1px solid var(--border)",
+                      fontSize:        "14px",
                       backgroundColor: "var(--bg)",
-                      color: "var(--text-primary)",
-                      resize: "vertical",
-                      transition: "border-color 200ms ease",
+                      color:           "var(--text-primary)",
+                      resize:          "vertical",
+                      transition:      "border-color 200ms ease",
                     }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = "var(--brand)";
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = "var(--border)";
-                    }}
+                    onFocus={(e) => { e.currentTarget.style.borderColor = "var(--brand)"; }}
+                    onBlur={(e)  => { e.currentTarget.style.borderColor = "var(--border)"; }}
                   />
-                  <p
-                    style={{
-                      fontSize: "12px",
-                      color: "var(--text-tertiary)",
-                      marginTop: "6px",
-                    }}
-                  >
+                  <p style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "6px" }}>
                     Optional
                   </p>
                 </FormSection>
               </div>
 
-              {/* ── Right — Summary ──────────────────────────────────── */}
+              {/* ── Right — Order Summary ────────────────────────────── */}
               <div>
                 <div
                   style={{
-                    position: "sticky",
-                    top: "96px",
+                    position:        "sticky",
+                    top:             "96px",
                     backgroundColor: "var(--surface)",
-                    borderRadius: "var(--radius-card)",
-                    border: "1px solid var(--border-soft)",
-                    padding: "24px",
+                    borderRadius:    "var(--radius-card)",
+                    border:          "1px solid var(--border-soft)",
+                    padding:         "24px",
                   }}
                 >
                   <h3
                     style={{
-                      fontFamily: "'Playfair Display', serif",
-                      fontSize: "18px",
-                      fontWeight: 600,
-                      color: "var(--text-primary)",
+                      fontFamily:    "'Playfair Display', serif",
+                      fontSize:      "18px",
+                      fontWeight:    600,
+                      color:         "var(--text-primary)",
                       letterSpacing: "-0.01em",
-                      marginBottom: "20px",
+                      marginBottom:  "20px",
                     }}
                   >
                     Order Summary
@@ -786,90 +743,70 @@ function CheckoutContent() {
                       <div
                         key={item.id}
                         style={{
-                          display: "flex",
-                          gap: "12px",
-                          padding: "12px 0",
+                          display:      "flex",
+                          gap:          "12px",
+                          padding:      "12px 0",
                           borderBottom: "1px solid var(--border-soft)",
                         }}
                       >
                         <div
                           style={{
-                            width: "44px",
-                            height: "44px",
-                            borderRadius: "var(--radius-card)",
-                            overflow: "hidden",
+                            width:           "44px",
+                            height:          "44px",
+                            borderRadius:    "var(--radius-card)",
+                            overflow:        "hidden",
                             backgroundColor: "var(--brand-soft)",
-                            flexShrink: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
+                            flexShrink:      0,
+                            display:         "flex",
+                            alignItems:      "center",
+                            justifyContent:  "center",
                           }}
                         >
                           {item.product?.images?.[0] ? (
                             <img
                               src={item.product.images[0].url}
                               alt=""
-                              style={{
-                                width: "100%",
-                                height: "100%",
-                                objectFit: "cover",
-                              }}
+                              style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />
                           ) : (
                             <ImageIcon
                               size={18}
                               strokeWidth={1}
-                              style={{
-                                color: "var(--border)",
-                                opacity: 0.6,
-                              }}
+                              style={{ color: "var(--border)", opacity: 0.6 }}
                             />
                           )}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <p
                             style={{
-                              fontSize: "13px",
-                              fontWeight: 500,
-                              color: "var(--text-primary)",
-                              overflow: "hidden",
+                              fontSize:     "13px",
+                              fontWeight:   500,
+                              color:        "var(--text-primary)",
+                              overflow:     "hidden",
                               textOverflow: "ellipsis",
-                              whiteSpace: "nowrap",
+                              whiteSpace:   "nowrap",
                             }}
                           >
                             {item.product?.name}
                           </p>
                           {item.variant && (
-                            <p
-                              style={{
-                                fontSize: "11px",
-                                color: "var(--text-tertiary)",
-                                marginTop: "1px",
-                              }}
-                            >
+                            <p style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "1px" }}>
                               {item.variant.name}
                             </p>
                           )}
-                          <p
-                            style={{
-                              fontSize: "11px",
-                              color: "var(--text-tertiary)",
-                            }}
-                          >
+                          <p style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
                             Qty: {item.quantity}
                           </p>
                         </div>
                         <span
                           style={{
-                            fontSize: "13px",
+                            fontSize:   "13px",
                             fontWeight: 600,
-                            color: "var(--text-primary)",
+                            color:      "var(--text-primary)",
                             whiteSpace: "nowrap",
                           }}
                         >
-                          {formatPrice(
-                            Number(item.unitPrice) * item.quantity
-                          )}
+                          {formatPrice(Number(item.unitPrice) * item.quantity)}
                         </span>
                       </div>
                     ))}
@@ -877,67 +814,47 @@ function CheckoutContent() {
 
                   {/* Totals */}
                   <div style={{ marginBottom: "16px" }}>
-                    {/* Subtotal */}
                     <div
                       style={{
-                        display: "flex",
+                        display:        "flex",
                         justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "8px",
+                        alignItems:     "center",
+                        marginBottom:   "8px",
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: "13px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
+                      <span style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
                         Subtotal
                       </span>
-                      <span
-                        style={{
-                          fontSize: "13px",
-                          fontWeight: 500,
-                          color: "var(--text-primary)",
-                        }}
-                      >
+                      <span style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
                         {formatPrice(subtotal)}
                       </span>
                     </div>
 
-                    {/* Shipping — live update based on state field */}
                     <div
                       style={{
-                        display: "flex",
+                        display:        "flex",
                         justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: "8px",
+                        alignItems:     "center",
+                        marginBottom:   "8px",
                       }}
                     >
-                      <span
-                        style={{
-                          fontSize: "12px",
-                          color: "var(--text-secondary)",
-                        }}
-                      >
+                      <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                         Shipping
                         {form.shipState.trim() && shippingCharge !== null && (
                           <span
                             style={{
                               marginLeft: "6px",
-                              fontSize: "10px",
-                              color: "var(--text-tertiary)",
+                              fontSize:   "10px",
+                              color:      "var(--text-tertiary)",
                             }}
                           >
-                            ({isKerala(form.shipState)
-                              ? "Kerala"
-                              : "Outside Kerala"})
+                            ({isKerala(form.shipState) ? "Kerala" : "Outside Kerala"})
                           </span>
                         )}
                       </span>
                       <span
                         style={{
-                          fontSize: "12px",
+                          fontSize:   "12px",
                           fontWeight: shippingCharge !== null ? 500 : 400,
                           color:
                             shippingCharge === 0
@@ -959,32 +876,32 @@ function CheckoutContent() {
                   {/* Total */}
                   <div
                     style={{
-                      display: "flex",
+                      display:        "flex",
                       justifyContent: "space-between",
-                      alignItems: "baseline",
-                      padding: "16px 0",
-                      borderTop: "1px solid var(--border-soft)",
-                      borderBottom: "1px solid var(--border-soft)",
-                      marginBottom: "20px",
+                      alignItems:     "baseline",
+                      padding:        "16px 0",
+                      borderTop:      "1px solid var(--border-soft)",
+                      borderBottom:   "1px solid var(--border-soft)",
+                      marginBottom:   "20px",
                     }}
                   >
                     <span
                       style={{
-                        fontSize: "11px",
-                        fontWeight: 600,
+                        fontSize:      "11px",
+                        fontWeight:    600,
                         letterSpacing: "0.1em",
                         textTransform: "uppercase",
-                        color: "var(--text-tertiary)",
+                        color:         "var(--text-tertiary)",
                       }}
                     >
                       {shippingCharge !== null ? "Total" : "Estimated Total"}
                     </span>
                     <span
                       style={{
-                        fontFamily: "'Playfair Display', serif",
-                        fontSize: "24px",
-                        fontWeight: 600,
-                        color: "var(--text-primary)",
+                        fontFamily:    "'Playfair Display', serif",
+                        fontSize:      "24px",
+                        fontWeight:    600,
+                        color:         "var(--text-primary)",
                         letterSpacing: "-0.02em",
                       }}
                     >
@@ -992,26 +909,147 @@ function CheckoutContent() {
                     </span>
                   </div>
 
+                  {/* ── Payment security badge ─────────────────────── */}
+                  {method === "website" && (
+                    <div
+                      style={{
+                        padding:         "12px 14px",
+                        borderRadius:    "var(--radius-input)",
+                        backgroundColor: "var(--brand-soft)",
+                        border:          "1px solid var(--border-soft)",
+                        marginBottom:    "16px",
+                        display:         "flex",
+                        alignItems:      "center",
+                        gap:             "10px",
+                      }}
+                    >
+                      <ShieldCheck
+                        size={16}
+                        strokeWidth={1.75}
+                        style={{ color: "var(--brand)", flexShrink: 0 }}
+                      />
+                      <div>
+                        <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "2px" }}>
+                          Secure Payment via Razorpay
+                        </p>
+                        <p style={{ fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+                          We do not store your card or banking credentials
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Terms acceptance ──────────────────────────── */}
+                  <div style={{ marginBottom: "16px" }}>
+                    <label
+                      style={{
+                        display:    "flex",
+                        alignItems: "flex-start",
+                        gap:        "10px",
+                        cursor:     "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => {
+                          setTermsAccepted(e.target.checked);
+                          if (e.target.checked) setTermsError(false);
+                        }}
+                        style={{
+                          accentColor: "var(--text-primary)",
+                          marginTop:   "2px",
+                          flexShrink:  0,
+                          width:       "15px",
+                          height:      "15px",
+                          cursor:      "pointer",
+                        }}
+                      />
+                      <span
+                        style={{
+                          fontSize:   "12px",
+                          color:      termsError
+                            ? "#DC2626"
+                            : "var(--text-secondary)",
+                          lineHeight: 1.6,
+                          transition: "color 200ms ease",
+                        }}
+                      >
+                        I have read and agree to the{" "}
+                        <Link
+                          href="/terms"
+                          target="_blank"
+                          style={{
+                            color:          "var(--brand)",
+                            textDecoration: "underline",
+                            fontWeight:     500,
+                          }}
+                        >
+                          Terms & Conditions
+                        </Link>
+                        ,{" "}
+                        <Link
+                          href="/privacy"
+                          target="_blank"
+                          style={{
+                            color:          "var(--brand)",
+                            textDecoration: "underline",
+                            fontWeight:     500,
+                          }}
+                        >
+                          Privacy Policy
+                        </Link>
+                        , and{" "}
+                        <Link
+                          href="/refund-policy"
+                          target="_blank"
+                          style={{
+                            color:          "var(--brand)",
+                            textDecoration: "underline",
+                            fontWeight:     500,
+                          }}
+                        >
+                          Cancellation & Refund Policy
+                        </Link>
+                        .
+                      </span>
+                    </label>
+
+                    {termsError && (
+                      <p
+                        style={{
+                          fontSize:    "11px",
+                          color:       "#DC2626",
+                          marginTop:   "6px",
+                          marginLeft:  "25px",
+                          display:     "flex",
+                          alignItems:  "center",
+                          gap:         "4px",
+                        }}
+                      >
+                        <AlertCircle size={11} strokeWidth={2} />
+                        Please accept the terms to continue
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Errors */}
                   {error && (
                     <div
                       style={{
-                        padding: "12px 14px",
-                        borderRadius: "var(--radius-input)",
+                        padding:         "12px 14px",
+                        borderRadius:    "var(--radius-input)",
                         backgroundColor: "#FEF2F2",
-                        border: "1px solid #FECACA",
-                        color: "#DC2626",
-                        fontSize: "12px",
-                        marginBottom: "16px",
-                        display: "flex",
-                        alignItems: "flex-start",
-                        gap: "8px",
+                        border:          "1px solid #FECACA",
+                        color:           "#DC2626",
+                        fontSize:        "12px",
+                        marginBottom:    "16px",
+                        display:         "flex",
+                        alignItems:      "flex-start",
+                        gap:             "8px",
                       }}
                     >
-                      <AlertCircle
-                        size={14}
-                        strokeWidth={1.75}
-                        style={{ flexShrink: 0, marginTop: "1px" }}
-                      />
+                      <AlertCircle size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: "1px" }} />
                       {error}
                     </div>
                   )}
@@ -1020,47 +1058,41 @@ function CheckoutContent() {
                     Object.values(touched).some(Boolean) && (
                       <div
                         style={{
-                          padding: "12px 14px",
-                          borderRadius: "var(--radius-input)",
+                          padding:         "12px 14px",
+                          borderRadius:    "var(--radius-input)",
                           backgroundColor: "#FEF2F2",
-                          border: "1px solid #FECACA",
-                          color: "#DC2626",
-                          fontSize: "12px",
-                          marginBottom: "16px",
-                          display: "flex",
-                          alignItems: "flex-start",
-                          gap: "8px",
+                          border:          "1px solid #FECACA",
+                          color:           "#DC2626",
+                          fontSize:        "12px",
+                          marginBottom:    "16px",
+                          display:         "flex",
+                          alignItems:      "flex-start",
+                          gap:             "8px",
                         }}
                       >
-                        <AlertCircle
-                          size={14}
-                          strokeWidth={1.75}
-                          style={{ flexShrink: 0, marginTop: "1px" }}
-                        />
+                        <AlertCircle size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: "1px" }} />
                         Please fix the errors in the form above
                       </div>
                     )}
 
+                  {/* Submit button */}
                   <button
                     type="submit"
                     disabled={placing}
                     className="btn-primary"
                     style={{
-                      width: "100%",
-                      justifyContent: "center",
+                      width:           "100%",
+                      justifyContent:  "center",
                       backgroundColor:
                         method === "whatsapp"
                           ? "var(--text-primary)"
                           : "var(--accent)",
+                      opacity: placing ? 0.7 : 1,
                     }}
                   >
                     {placing ? (
                       <>
-                        <Loader2
-                          size={15}
-                          className="animate-spin"
-                          strokeWidth={2}
-                        />
+                        <Loader2 size={15} className="animate-spin" strokeWidth={2} />
                         Processing...
                       </>
                     ) : method === "whatsapp" ? (
@@ -1076,13 +1108,14 @@ function CheckoutContent() {
                     )}
                   </button>
 
+                  {/* Lock line */}
                   <div
                     style={{
-                      marginTop: "14px",
-                      display: "flex",
-                      alignItems: "center",
+                      marginTop:      "12px",
+                      display:        "flex",
+                      alignItems:     "center",
                       justifyContent: "center",
-                      gap: "6px",
+                      gap:            "5px",
                     }}
                   >
                     <Lock
@@ -1090,15 +1123,45 @@ function CheckoutContent() {
                       strokeWidth={1.75}
                       style={{ color: "var(--text-tertiary)" }}
                     />
-                    <p
-                      style={{
-                        fontSize: "11px",
-                        color: "var(--text-tertiary)",
-                        letterSpacing: "0.02em",
-                      }}
-                    >
-                      Your information is encrypted and secure
+                    <p style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.02em" }}>
+                      256-bit encrypted · Powered by Razorpay
                     </p>
+                  </div>
+
+                  {/* Policy links footer */}
+                  <div
+                    style={{
+                      marginTop:   "16px",
+                      paddingTop:  "16px",
+                      borderTop:   "1px solid var(--border-soft)",
+                      display:     "flex",
+                      gap:         "12px",
+                      flexWrap:    "wrap",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {[
+                      { href: "/terms",           label: "Terms"           },
+                      { href: "/privacy",          label: "Privacy"         },
+                      { href: "/refund-policy",    label: "Refund Policy"   },
+                      { href: "/shipping-policy",  label: "Shipping"        },
+                    ].map((link) => (
+                      <Link
+                        key={link.href}
+                        href={link.href}
+                        target="_blank"
+                        style={{
+                          fontSize:       "11px",
+                          color:          "var(--text-tertiary)",
+                          textDecoration: "none",
+                          transition:     "color 200ms ease",
+                          letterSpacing:  "0.02em",
+                        }}
+                        className="hover:text-[var(--text-primary)]"
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -1116,8 +1179,8 @@ export default function CheckoutPage() {
       fallback={
         <div
           style={{
-            padding: "160px 0",
-            textAlign: "center",
+            padding:         "160px 0",
+            textAlign:       "center",
             backgroundColor: "var(--bg)",
           }}
         >
@@ -1132,7 +1195,7 @@ export default function CheckoutPage() {
   );
 }
 
-/* ── Sub-components ──────────────────────────────────────────────────────── */
+/* ── Sub-components (unchanged) ──────────────────────────────────────────── */
 
 function FormSection({
   title,
@@ -1147,43 +1210,43 @@ function FormSection({
     <div
       style={{
         backgroundColor: "var(--surface)",
-        borderRadius: "var(--radius-card)",
-        border: "1px solid var(--border-soft)",
-        padding: "24px",
-        marginBottom: "16px",
+        borderRadius:    "var(--radius-card)",
+        border:          "1px solid var(--border-soft)",
+        padding:         "24px",
+        marginBottom:    "16px",
       }}
     >
       <div
         style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
+          display:      "flex",
+          alignItems:   "center",
+          gap:          "12px",
           marginBottom: "20px",
         }}
       >
         <span
           style={{
-            width: "24px",
-            height: "24px",
-            borderRadius: "4px",
+            width:           "24px",
+            height:          "24px",
+            borderRadius:    "4px",
             backgroundColor: "var(--text-primary)",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "11px",
-            fontWeight: 600,
-            flexShrink: 0,
+            color:           "#fff",
+            display:         "flex",
+            alignItems:      "center",
+            justifyContent:  "center",
+            fontSize:        "11px",
+            fontWeight:      600,
+            flexShrink:      0,
           }}
         >
           {step}
         </span>
         <h3
           style={{
-            fontSize: "14px",
-            fontWeight: 600,
-            color: "var(--text-primary)",
-            letterSpacing: "0.01em",
+            fontSize:     "14px",
+            fontWeight:   600,
+            color:        "var(--text-primary)",
+            letterSpacing:"0.01em",
           }}
         >
           {title}
@@ -1209,14 +1272,14 @@ function Field({
     <div style={{ marginBottom: "14px" }}>
       <label
         style={{
-          display: "block",
-          fontSize: "11px",
-          fontWeight: 500,
+          display:       "block",
+          fontSize:      "11px",
+          fontWeight:    500,
           letterSpacing: "0.1em",
           textTransform: "uppercase",
-          color: error ? "#DC2626" : "var(--text-tertiary)",
-          marginBottom: "7px",
-          transition: "color 200ms ease",
+          color:         error ? "#DC2626" : "var(--text-tertiary)",
+          marginBottom:  "7px",
+          transition:    "color 200ms ease",
         }}
       >
         {label}
@@ -1228,12 +1291,12 @@ function Field({
       {error && (
         <p
           style={{
-            fontSize: "11px",
-            color: "#DC2626",
-            marginTop: "5px",
-            display: "flex",
+            fontSize:   "11px",
+            color:      "#DC2626",
+            marginTop:  "5px",
+            display:    "flex",
             alignItems: "center",
-            gap: "4px",
+            gap:        "4px",
           }}
         >
           <AlertCircle size={11} strokeWidth={2} />
@@ -1267,26 +1330,22 @@ function Input({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       style={{
-        width: "100%",
-        padding: "11px 14px",
-        borderRadius: "var(--radius-input)",
-        border: `1px solid ${hasError ? "#DC2626" : "var(--border)"}`,
-        fontSize: "14px",
+        width:           "100%",
+        padding:         "11px 14px",
+        borderRadius:    "var(--radius-input)",
+        border:          `1px solid ${hasError ? "#DC2626" : "var(--border)"}`,
+        fontSize:        "14px",
         backgroundColor: hasError ? "#FEF2F2" : "var(--bg)",
-        color: "var(--text-primary)",
-        transition: "border-color 200ms ease, background-color 200ms ease",
-        outline: "none",
+        color:           "var(--text-primary)",
+        transition:      "border-color 200ms ease, background-color 200ms ease",
+        outline:         "none",
       }}
       onFocus={(e) => {
-        e.currentTarget.style.borderColor = hasError
-          ? "#DC2626"
-          : "var(--brand)";
+        e.currentTarget.style.borderColor     = hasError ? "#DC2626" : "var(--brand)";
         e.currentTarget.style.backgroundColor = "var(--bg)";
       }}
       onBlurCapture={(e) => {
-        e.currentTarget.style.borderColor = hasError
-          ? "#DC2626"
-          : "var(--border)";
+        e.currentTarget.style.borderColor     = hasError ? "#DC2626" : "var(--border)";
         if (hasError) e.currentTarget.style.backgroundColor = "#FEF2F2";
       }}
     />

@@ -342,4 +342,50 @@ export const orderRepository = {
       photosToVerify,
     };
   },
+
+  createShipment: async (data: {
+  orderId: string;
+  trackingNumber: string;
+  shippingPartnerId?: string;
+  estimatedDelivery?: Date;
+}) => {
+  // Find or create a default shipping partner if none provided
+  let partnerId = data.shippingPartnerId;
+  if (!partnerId) {
+    // Use India Post as default
+    let partner = await prisma.shippingPartner.findFirst({
+      where: { code: "INDIA_POST" },
+    });
+    if (!partner) {
+      partner = await prisma.shippingPartner.create({
+        data: {
+          name: "India Post",
+          code: "INDIA_POST",
+          trackingUrl: "https://www.indiapost.gov.in/",
+          isActive: true,
+        },
+      });
+    }
+    partnerId = partner.id;
+  }
+
+  return prisma.shipment.upsert({
+    where: { orderId: data.orderId },
+    create: {
+      orderId: data.orderId,
+      shippingPartnerId: partnerId,
+      trackingNumber: data.trackingNumber,
+      status: "PENDING",
+      shippedAt: new Date(),
+      estimatedDelivery: data.estimatedDelivery,
+    },
+    update: {
+      trackingNumber: data.trackingNumber,
+      shippingPartnerId: partnerId,
+      shippedAt: new Date(),
+      estimatedDelivery: data.estimatedDelivery,
+    },
+  });
+},
+
 };

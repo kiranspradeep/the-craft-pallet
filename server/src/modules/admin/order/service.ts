@@ -100,7 +100,9 @@ export const orderService = {
         isVisibleToCustomer: true,
       });
     }
-    logger.info(`Order ${order.orderNumber} status: ${order.status} → ${newStatus} by admin ${adminId}`);
+    logger.info(
+      `Order ${order.orderNumber} status: ${order.status} → ${newStatus} by admin ${adminId}`
+    );
     return updated;
   },
 
@@ -111,7 +113,9 @@ export const orderService = {
   ) => {
     const order = await assertOrderExists(orderId);
     if (order.status !== OrderStatus.IN_PRODUCTION) {
-      throw new BadRequestError("Production stage can only be updated when order is IN_PRODUCTION");
+      throw new BadRequestError(
+        "Production stage can only be updated when order is IN_PRODUCTION"
+      );
     }
     if (!order.productionStage) {
       throw new BadRequestError("Order has no current production stage");
@@ -122,7 +126,9 @@ export const orderService = {
       orderId,
       eventType: TimelineEventType.PRODUCTION_STAGE_CHANGED,
       title: `Production: ${formatStage(newStage)}`,
-      description: `Production stage updated from ${formatStage(order.productionStage)} to ${formatStage(newStage)}`,
+      description: `Production stage updated from ${formatStage(
+        order.productionStage
+      )} to ${formatStage(newStage)}`,
       actorType: ActorType.ADMIN,
       actorId: adminId,
       isVisibleToCustomer: false,
@@ -134,7 +140,10 @@ export const orderService = {
   markPhotosReceived: async (orderId: string, adminId: string) => {
     const order = await assertOrderExists(orderId);
     assertValidPhotoStatusTransition(order.photoStatus, PhotoStatus.RECEIVED);
-    const updated = await orderRepository.updatePhotoStatus(orderId, PhotoStatus.RECEIVED);
+    const updated = await orderRepository.updatePhotoStatus(
+      orderId,
+      PhotoStatus.RECEIVED
+    );
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.PHOTOS_RECEIVED,
@@ -151,12 +160,16 @@ export const orderService = {
   markPhotosVerified: async (orderId: string, adminId: string) => {
     const order = await assertOrderExists(orderId);
     assertValidPhotoStatusTransition(order.photoStatus, PhotoStatus.VERIFIED);
-    const updated = await orderRepository.updatePhotoStatus(orderId, PhotoStatus.VERIFIED);
+    const updated = await orderRepository.updatePhotoStatus(
+      orderId,
+      PhotoStatus.VERIFIED
+    );
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.PHOTOS_VERIFIED,
       title: "Photos Verified",
-      description: "Your photos have been reviewed and approved. Production will begin soon.",
+      description:
+        "Your photos have been reviewed and approved. Production will begin soon.",
       actorType: ActorType.ADMIN,
       actorId: adminId,
       isVisibleToCustomer: true,
@@ -190,7 +203,9 @@ export const orderService = {
       order.status !== OrderStatus.AWAITING_PAYMENT &&
       order.status !== OrderStatus.DRAFT
     ) {
-      throw new BadRequestError(`Cannot mark as paid. Order is currently "${order.status}"`);
+      throw new BadRequestError(
+        `Cannot mark as paid. Order is currently "${order.status}"`
+      );
     }
     const now = new Date();
     await orderRepository.updatePayment(orderId, {
@@ -202,7 +217,10 @@ export const orderService = {
       referenceNumber: input.referenceNumber,
       gatewayName: "manual",
     });
-    const updated = await orderRepository.updateStatus(orderId, OrderStatus.CONFIRMED);
+    const updated = await orderRepository.updateStatus(
+      orderId,
+      OrderStatus.CONFIRMED
+    );
     await orderRepository.createTimelineEvent({
       orderId,
       eventType: TimelineEventType.PAYMENT_SUCCESS,
@@ -235,7 +253,9 @@ export const orderService = {
         isVisibleToCustomer: false,
       });
     }
-    logger.info(`Order ${order.orderNumber} manually marked as paid by admin ${adminId}`);
+    logger.info(
+      `Order ${order.orderNumber} manually marked as paid by admin ${adminId}`
+    );
     return updated;
   },
 
@@ -245,7 +265,9 @@ export const orderService = {
       order.status !== OrderStatus.AWAITING_PAYMENT &&
       order.status !== OrderStatus.DRAFT
     ) {
-      throw new BadRequestError(`Cannot generate payment link. Order is currently "${order.status}"`);
+      throw new BadRequestError(
+        `Cannot generate payment link. Order is currently "${order.status}"`
+      );
     }
     const payment = await orderRepository.findPaymentByOrderId(orderId);
     if (!payment) {
@@ -265,7 +287,9 @@ export const orderService = {
       notify: { sms: true, email: !!order.customer.email },
       reminder_enable: true,
       notes: { orderNumber: order.orderNumber, orderId: order.id },
-      callback_url: `${process.env.CLIENT_URL || "http://localhost:3001"}/order-confirmation/${order.orderNumber}?phone=${order.customer.phone}`,
+      callback_url: `${
+        process.env.CLIENT_URL || "http://localhost:3001"
+      }/order-confirmation/${order.orderNumber}?phone=${order.customer.phone}`,
       callback_method: "get",
     });
     await orderRepository.updatePayment(orderId, {
@@ -291,14 +315,57 @@ export const orderService = {
         amount: order.totalAmount,
       },
     });
-    logger.info(`Payment link generated for order ${order.orderNumber}: ${paymentLink.short_url}`);
+    logger.info(
+      `Payment link generated for order ${order.orderNumber}: ${paymentLink.short_url}`
+    );
     return {
       paymentLinkId: paymentLink.id,
       paymentLinkUrl: paymentLink.short_url,
       amount: order.totalAmount,
       currency: order.currency,
-      expiresAt: paymentLink.expire_by ? new Date(paymentLink.expire_by * 1000) : null,
+      expiresAt: paymentLink.expire_by
+        ? new Date(paymentLink.expire_by * 1000)
+        : null,
     };
+  },
+
+  // ── Mark as Shipped (with tracking number) ────────────────────────────
+  markAsShipped: async (
+    orderId: string,
+    adminId: string,
+    input: { trackingNumber: string; estimatedDelivery?: string }
+  ) => {
+    const order = await assertOrderExists(orderId);
+    assertValidStatusTransition(order.status, OrderStatus.SHIPPED);
+
+    await orderRepository.createShipment({
+      orderId,
+      trackingNumber: input.trackingNumber,
+      estimatedDelivery: input.estimatedDelivery
+        ? new Date(input.estimatedDelivery)
+        : undefined,
+    });
+
+    const updated = await orderRepository.updateStatus(
+      orderId,
+      OrderStatus.SHIPPED
+    );
+
+    await orderRepository.createTimelineEvent({
+      orderId,
+      eventType: TimelineEventType.SHIPPED,
+      title: "Order Shipped",
+      description: `Your order has been shipped. Tracking number: ${input.trackingNumber}`,
+      actorType: ActorType.ADMIN,
+      actorId: adminId,
+      isVisibleToCustomer: true,
+      metadata: { trackingNumber: input.trackingNumber },
+    });
+
+    logger.info(
+      `Order ${order.orderNumber} marked as SHIPPED with tracking ${input.trackingNumber}`
+    );
+    return updated;
   },
 
   // ── Stream unit photos as ZIP ─────────────────────────────────────────
@@ -340,7 +407,6 @@ export const orderService = {
     res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
     res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
 
-    // Use ZipArchive class directly — archiver exports classes not a function
     const archiverLib = await import("archiver");
     const archive = new (archiverLib as any).ZipArchive({
       zlib: { level: 5 },
@@ -349,7 +415,9 @@ export const orderService = {
     archive.on("error", (err: Error) => {
       logger.error("ZIP archive error:", err);
       if (!res.headersSent) {
-        res.status(500).json({ success: false, message: "Failed to create ZIP" });
+        res
+          .status(500)
+          .json({ success: false, message: "Failed to create ZIP" });
       }
     });
 

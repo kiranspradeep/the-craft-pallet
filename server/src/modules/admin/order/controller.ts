@@ -182,4 +182,19 @@ export const orderController = {
   }
 ),
 
+markAsShipped: asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const adminId = req.admin!.id;
+    const order = await orderService.markAsShipped(param(req, "id"), adminId, {
+      trackingNumber: req.body.trackingNumber,
+      estimatedDelivery: req.body.estimatedDelivery,
+    });
+    sendSuccess({
+      res,
+      message: "Order marked as shipped",
+      data: order,
+    });
+  }
+),
+
 };

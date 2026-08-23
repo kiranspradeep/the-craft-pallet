@@ -10,6 +10,7 @@ import {
   addNoteSchema,
   markAsPaidSchema,
   generatePaymentLinkSchema,
+  markAsShippedSchema ,
 } from "./validator.js";
 
 const router = Router();
@@ -66,6 +67,12 @@ router.post(
 router.get(
   "/:id/items/:itemId/download",
   orderController.downloadUnitPhotos
+);
+
+router.patch(
+  "/:id/ship",
+  validate(markAsShippedSchema),
+  orderController.markAsShipped
 );
 
 export default router;

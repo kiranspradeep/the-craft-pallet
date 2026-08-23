@@ -122,12 +122,13 @@ async function main() {
   if (!(await prisma.shippingSetting.findFirst())) {
     await prisma.shippingSetting.create({
       data: {
-        freeShippingThreshold: new Decimal(999),
-        defaultShippingCharge: new Decimal(60),
-        defaultProcessingDays: 10,
+        keralaShippingCharge: new Decimal(55),
+        outsideKeralaShippingCharge: new Decimal(60),
+        keralaProcessingDays: 10,
+        outsideKeralaProcessingDays: 10,
       },
     });
-    console.log("✅ Shipping settings created");
+    console.log("✅ Shipping settings created (Kerala: ₹55, Outside: ₹60)");
   }
 
   // ── Categories ─────────────────────────────────────────────────────────
@@ -669,7 +670,7 @@ async function main() {
     await ensureCustomField(product.id, "custom_text", {
       label: "Custom Text / Date (optional)",
       type: CustomFieldType.TEXT,
-      placeholder: "e.g. Always & Forever • 12.02.2024",
+      placeholder: "e.g. Always • 12.02.2024",
       helpText: "Optional text or date to print on your polaroids.",
       isRequired: false,
       sortOrder: 3,
