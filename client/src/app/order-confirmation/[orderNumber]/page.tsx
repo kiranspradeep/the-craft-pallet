@@ -418,7 +418,7 @@ export default function OrderConfirmationPage() {
           }}
         >
           <a
-            href={`https://wa.me/918086415357?text=Hi! I have order ${orderNumber}`}
+            href={`https://wa.me/919746292208?text=Hi! I have order ${orderNumber}`}
             target="_blank"
             rel="noopener noreferrer"
             className="btn-secondary"

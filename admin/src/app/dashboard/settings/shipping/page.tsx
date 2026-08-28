@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Input from "@/components/ui/Input";
 import { adminGet, adminPut } from "@/lib/adminApi";
 import {
@@ -9,35 +9,54 @@ import {
   SaveButton,
 } from "../SettingsPageLayout";
 
+const DEFAULT_FORM = {
+  keralaShippingCharge: "",
+  outsideKeralaShippingCharge: "",
+  keralaProcessingDays: "",
+  outsideKeralaProcessingDays: "",
+};
+
 export default function ShippingSettingsPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
-  const [form, setForm] = useState({
-    keralaShippingCharge: "",
-    outsideKeralaShippingCharge: "",
-    keralaProcessingDays: "",
-    outsideKeralaProcessingDays: "",
-  });
+
+  const [form, setForm] = useState(DEFAULT_FORM);
+  const [savedForm, setSavedForm] = useState(DEFAULT_FORM);
 
   const set = (key: string, val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
+
+  // Check if form has unsaved modifications
+  const isDirty = useMemo(() => {
+    return JSON.stringify(form) !== JSON.stringify(savedForm);
+  }, [form, savedForm]);
 
   useEffect(() => {
     adminGet("/api/admin/settings/shipping")
       .then((d: any) => {
         if (d.data) {
-          setForm({
+          const loadedData = {
             keralaShippingCharge:
-              d.data.keralaShippingCharge?.toString() || "",
+              d.data.keralaShippingCharge != null
+                ? d.data.keralaShippingCharge.toString()
+                : "",
             outsideKeralaShippingCharge:
-              d.data.outsideKeralaShippingCharge?.toString() || "",
+              d.data.outsideKeralaShippingCharge != null
+                ? d.data.outsideKeralaShippingCharge.toString()
+                : "",
             keralaProcessingDays:
-              d.data.keralaProcessingDays?.toString() || "",
+              d.data.keralaProcessingDays != null
+                ? d.data.keralaProcessingDays.toString()
+                : "",
             outsideKeralaProcessingDays:
-              d.data.outsideKeralaProcessingDays?.toString() || "",
-          });
+              d.data.outsideKeralaProcessingDays != null
+                ? d.data.outsideKeralaProcessingDays.toString()
+                : "",
+          };
+          setForm(loadedData);
+          setSavedForm(loadedData);
         }
       })
       .catch(() => {})
@@ -46,26 +65,30 @@ export default function ShippingSettingsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isDirty || loading) return;
+
     setLoading(true);
     setError("");
     setSuccess(false);
 
     const body: Record<string, number> = {};
-    if (form.keralaShippingCharge)
+    if (form.keralaShippingCharge !== "")
       body.keralaShippingCharge = parseFloat(form.keralaShippingCharge);
-    if (form.outsideKeralaShippingCharge)
+    if (form.outsideKeralaShippingCharge !== "")
       body.outsideKeralaShippingCharge = parseFloat(
         form.outsideKeralaShippingCharge
       );
-    if (form.keralaProcessingDays)
+    if (form.keralaProcessingDays !== "")
       body.keralaProcessingDays = parseInt(form.keralaProcessingDays);
-    if (form.outsideKeralaProcessingDays)
+    if (form.outsideKeralaProcessingDays !== "")
       body.outsideKeralaProcessingDays = parseInt(
         form.outsideKeralaProcessingDays
       );
 
     try {
       await adminPut("/api/admin/settings/shipping", body);
+      // Synchronize baseline so the button transitions to "Saved"
+      setSavedForm(form);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
@@ -157,7 +180,19 @@ export default function ShippingSettingsPage() {
           </div>
         </SettingsSection>
 
-        <SaveButton loading={loading} />
+        {/* Wrapper to gracefully disable the button without TypeScript errors */}
+        <div
+          style={{
+            opacity: isDirty ? 1 : 0.5,
+            pointerEvents: isDirty && !loading ? "auto" : "none",
+            transition: "opacity 200ms ease",
+          }}
+        >
+          <SaveButton
+            loading={loading}
+            label={isDirty ? "Save Changes" : "Saved"}
+          />
+        </div>
       </form>
     </SettingsPageLayout>
   );

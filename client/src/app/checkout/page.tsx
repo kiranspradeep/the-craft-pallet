@@ -306,7 +306,7 @@ function CheckoutContent() {
     ]
       .filter(Boolean)
       .join("\n");
-    window.location.href = `https://wa.me/918086415357?text=${encodeURIComponent(parts)}`;
+    window.location.href = `https://wa.me/919746292208?text=${encodeURIComponent(parts)}`;
   };
 
   const openRazorpayCheckout = async (order: any) => {

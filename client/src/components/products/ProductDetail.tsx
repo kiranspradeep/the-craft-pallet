@@ -887,7 +887,7 @@ export default function ProductDetail({ product }: Props) {
 
             {/* WhatsApp help */}
             <a
-              href="https://wa.me/918086415357"
+              href="https://wa.me/919746292208"
               target="_blank"
               rel="noopener noreferrer"
               style={{

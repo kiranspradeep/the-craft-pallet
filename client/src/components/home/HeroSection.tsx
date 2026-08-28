@@ -35,7 +35,7 @@ const handles = [
   },
 ];
 
-const heroBannerSrc = "/images/hero-banner.png"; // replace with your image
+const heroBannerSrc = "/images/hero-banner.webp"; // replace with your image
 
 export default function HeroSection() {
   return (

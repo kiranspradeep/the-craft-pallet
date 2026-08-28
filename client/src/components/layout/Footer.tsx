@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Mail, Phone } from "lucide-react";
 
 function InstagramIcon({ size = 15 }: { size?: number }) {
@@ -54,19 +55,19 @@ export default function Footer() {
 
   const contactLinks = [
     {
-      href:     "tel:+918086415357",
+      href:     "tel:+919746292208",
       icon:     <Phone size={13} strokeWidth={1.75} />,
-      label:    "+91 80864 15357",
+      label:    "+91 97462 92208",
       external: false,
     },
     {
-      href:     "mailto:kiranspradeep2002@gmail.com",
+      href:     "mailto:craftpallet12@gmail.com",
       icon:     <Mail size={13} strokeWidth={1.75} />,
-      label:    "kiranspradeep2002@gmail.com",
+      label:    "craftpallet12@gmail.com",
       external: false,
     },
     {
-      href:     "https://wa.me/918086415357",
+      href:     "https://wa.me/919746292208",
       icon:     <WhatsAppIcon size={13} />,
       label:    "WhatsApp Chat",
       external: true,
@@ -80,7 +81,7 @@ export default function Footer() {
       label: "Instagram",
     },
     {
-      href:  "https://wa.me/918086415357",
+      href:  "https://wa.me/919746292208",
       icon:  <WhatsAppIcon size={15} />,
       label: "WhatsApp",
     },
@@ -93,6 +94,21 @@ export default function Footer() {
         borderTop:       "1px solid var(--border-soft)",
       }}
     >
+      <style>{`
+        :root {
+          --footer-logo-height-mobile: 44px;
+          --footer-logo-height-desktop: 58px;
+        }
+        .tcp-footer-logo {
+          height: var(--footer-logo-height-mobile);
+        }
+        @media (min-width: 768px) {
+          .tcp-footer-logo {
+            height: var(--footer-logo-height-desktop);
+          }
+        }
+      `}</style>
+
       <div className="tcp-container" style={{ padding: "72px 32px 36px" }}>
 
         {/* ── Main grid ──────────────────────────────────────────────── */}
@@ -121,20 +137,24 @@ export default function Footer() {
               gap:                 "48px",
             }}
           >
-            {/* Brand */}
+            {/* Brand / Logo Info Column */}
             <div>
-              <h3
-                style={{
-                  fontFamily:    "'Playfair Display', serif",
-                  fontSize:      "20px",
-                  fontWeight:    600,
-                  color:         "var(--text-primary)",
-                  letterSpacing: "-0.02em",
-                  marginBottom:  "14px",
-                }}
-              >
-                The Craft Pallet
-              </h3>
+              {/* Brand Logo */}
+              <div style={{ marginBottom: "16px" }}>
+                <Image
+                  src="/images/craft-pallet-logo-horizontal.svg"
+                  alt="The Craft Pallet"
+                  width={180}
+                  height={58}
+                  className="tcp-footer-logo"
+                  style={{
+                    width: "auto",
+                    objectFit: "contain",
+                    transition: "height 300ms ease",
+                  }}
+                />
+              </div>
+
               <p
                 style={{
                   fontSize:     "13px",

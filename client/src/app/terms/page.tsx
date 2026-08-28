@@ -219,7 +219,7 @@ export default function TermsPage() {
               </span>,
               <span>
                 <strong style={{ color: "var(--text-primary)" }}>Contact:</strong>{" "}
-                kiranspradeep2002@gmail.com
+                craftpallet12@gmail.com
               </span>,
               <span>
                 <strong style={{ color: "var(--text-primary)" }}>Effective date:</strong>{" "}
@@ -530,10 +530,10 @@ export default function TermsPage() {
             amount will be charged. If an amount is debited from your account
             but the order is not confirmed, please contact us immediately at{" "}
             <a
-              href="mailto:kiranspradeep2002@gmail.com"
+              href="mailto:craftpallet12@gmail.com"
               style={{ color: "var(--brand)", textDecoration: "underline" }}
             >
-              kiranspradeep2002@gmail.com
+              craftpallet12@gmail.com
             </a>{" "}
             and we will investigate and resolve the issue promptly.
           </P>
@@ -704,21 +704,21 @@ export default function TermsPage() {
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
               Email:{" "}
               <a
-                href="mailto:kiranspradeep2002@gmail.com"
+                href="mailto:craftpallet12@gmail.com"
                 style={{ color: "var(--brand)", textDecoration: "underline" }}
               >
-                kiranspradeep2002@gmail.com
+                craftpallet12@gmail.com
               </a>
             </p>
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
               WhatsApp:{" "}
               <a
-                href="https://wa.me/918086415357"
+                href="https://wa.me/919746292208"
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{ color: "var(--brand)", textDecoration: "underline" }}
               >
-                +91 80864 15357
+                +91 97462 92208
               </a>
             </p>
             <p style={{ fontSize: "13px", color: "var(--text-secondary)" }}>

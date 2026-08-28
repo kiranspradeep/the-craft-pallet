@@ -55,9 +55,9 @@ const SUBJECTS = [
 // ── Contact info ──────────────────────────────────────────────────────────────
 
 const CONTACT = {
-  whatsapp:    "+91 80864 15357",
-  whatsappRaw: "918086415357",
-  email:       "kiranspradeep2002@gmail.com",
+  whatsapp:    "+91 97462 92208",
+  whatsappRaw: "9197462 92208",
+  email:       "craftpallet12@gmail.com",
   instagram:   "https://instagram.com",
   instagramHandle: "@thecraftpallet",
   address:     "Kerala, India",

@@ -81,7 +81,7 @@ export const emailService = {
         </div>
 
         <p style="font-size: 13px; color: #7F7F7F; text-align: center; line-height: 1.5; margin-top: 40px; border-top: 1px solid #EAEAEA; padding-top: 20px;">
-          If you have any questions, chat with us on WhatsApp at +91 80864 15357 or reply directly to this email.
+          If you have any questions, chat with us on WhatsApp at +91 97462 92208 or reply directly to this email.
         </p>
       </div>
     `;
@@ -242,7 +242,7 @@ export const emailService = {
         </p>
 
         <p style="font-size: 13px; color: #7F7F7F; text-align: center; line-height: 1.5; margin-top: 40px; border-top: 1px solid #EAEAEA; padding-top: 20px;">
-          Have issues or feedback? Chat with us on WhatsApp at +91 80864 15357.
+          Have issues or feedback? Chat with us on WhatsApp at +91 97462 92208.
         </p>
       </div>
     `;
