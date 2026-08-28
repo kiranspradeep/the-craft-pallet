@@ -24,6 +24,7 @@ import {
   BadRequestError,
 } from "../../../shared/errors/AppError.js";
 import { logger } from "../../../shared/logger/index.js";
+import { emailService } from "../../../shared/services/emailService.js";
 
 const assertOrderExists = async (id: string) => {
   const order = await orderRepository.findById(id);
@@ -103,6 +104,13 @@ export const orderService = {
     logger.info(
       `Order ${order.orderNumber} status: ${order.status} → ${newStatus} by admin ${adminId}`
     );
+
+    if (newStatus === OrderStatus.CONFIRMED) {
+      emailService.sendOrderConfirmedEmail(updated).catch(() => {});
+    } else if (newStatus === OrderStatus.DELIVERED) {
+      emailService.sendOrderDeliveredEmail(updated).catch(() => {});
+    }
+
     return updated;
   },
 
@@ -256,6 +264,9 @@ export const orderService = {
     logger.info(
       `Order ${order.orderNumber} manually marked as paid by admin ${adminId}`
     );
+
+    emailService.sendOrderConfirmedEmail(updated).catch(() => {});
+
     return updated;
   },
 
@@ -365,6 +376,9 @@ export const orderService = {
     logger.info(
       `Order ${order.orderNumber} marked as SHIPPED with tracking ${input.trackingNumber}`
     );
+
+    emailService.sendOrderShippedEmail(updated, input.trackingNumber).catch(() => {});
+
     return updated;
   },
 

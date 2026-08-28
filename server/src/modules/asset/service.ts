@@ -1,18 +1,16 @@
+// src/modules/asset/service.ts
 import fs from "fs";
 import path from "path";
 import { AssetSourceType, AssetStatus, JobType } from "@prisma/client";
 import { assetRepository } from "./repository.js";
-import { processImage } from "./imageProcessor.js";
+import { processAndOptimizeImage } from "./imageProcessor.js";
 import { extractZip } from "./zipExtractor.js";
 import { computeFileHash } from "../../shared/utils/fileHash.js";
-import { DIRS } from "../../shared/utils/storage.js";
-import {
-  NotFoundError,
-  BadRequestError,
-} from "../../shared/errors/AppError.js";
+import { NotFoundError, BadRequestError } from "../../shared/errors/AppError.js";
 import { logger } from "../../shared/logger/index.js";
 
-// ── Validation helpers ────────────────────────────────────────────────────
+// Max concurrent images to process at once. Adjust based on server CPU cores.
+const PROCESSING_CONCURRENCY_LIMIT = 4;
 
 interface UploadConstraints {
   maxImages?: number | null;
@@ -21,6 +19,25 @@ interface UploadConstraints {
   maxZipSizeMb?: number | null;
   allowedExtensions?: string[];
   allowDuplicateImages?: boolean;
+}
+
+// ── Controlled Pool Helper ───────────────────────────────────────────
+async function runWithPool<T, R>(
+  items: T[],
+  limit: number,
+  iteratorFn: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let i = 0;
+  const execute = async () => {
+    while (i < items.length) {
+      const currentIdx = i++;
+      results[currentIdx] = await iteratorFn(items[currentIdx], currentIdx);
+    }
+  };
+  const workers = Array.from({ length: Math.min(limit, items.length) }, execute);
+  await Promise.all(workers);
+  return results;
 }
 
 const validateFileSize = (
@@ -53,9 +70,7 @@ const validateExtension = (
 
 export const assetService = {
   /**
-   * Direct image upload — one or more image files.
-   * files: from multer req.files
-   * constraints: from ProductConfiguration
+   * Direct image upload - processes multiple images in parallel with controlled concurrency
    */
   uploadDirect: async (
     files: Express.Multer.File[],
@@ -65,23 +80,12 @@ export const assetService = {
       throw new BadRequestError("No files provided");
     }
 
-    // Check image count against maxImages
-    if (
-      constraints.maxImages &&
-      files.length > constraints.maxImages
-    ) {
-      throw new BadRequestError(
-        `You can upload a maximum of ${constraints.maxImages} images`
-      );
+    if (constraints.maxImages && files.length > constraints.maxImages) {
+      throw new BadRequestError(`You can upload a maximum of ${constraints.maxImages} images`);
     }
 
-    if (
-      constraints.minImages &&
-      files.length < constraints.minImages
-    ) {
-      throw new BadRequestError(
-        `You must upload at least ${constraints.minImages} images`
-      );
+    if (constraints.minImages && files.length < constraints.minImages) {
+      throw new BadRequestError(`You must upload at least ${constraints.minImages} images`);
     }
 
     // Create asset record
@@ -90,71 +94,67 @@ export const assetService = {
       status: AssetStatus.UPLOADING,
     });
 
-    const savedFiles = [];
+    const activeChecksums = new Set<string>();
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!;
+    // Process all images concurrently using the pool worker queue
+    const savedFiles = await runWithPool(
+      files,
+      PROCESSING_CONCURRENCY_LIMIT,
+      async (file, index) => {
+        validateExtension(file.originalname, constraints.allowedExtensions);
+        validateFileSize(file.size, constraints.maxFileSizeMb);
 
-      // Validate extension
-      validateExtension(file.originalname, constraints.allowedExtensions);
+        const checksum = await computeFileHash(file.path);
 
-      // Validate file size
-      validateFileSize(file.size, constraints.maxFileSizeMb);
-
-      // Compute hash
-      const checksum = await computeFileHash(file.path);
-
-      // Duplicate detection
-      if (!constraints.allowDuplicateImages) {
-        const duplicate = await assetRepository.findFileByChecksum(
-          asset.id,
-          checksum
-        );
-        if (duplicate) {
-          // Delete the duplicate from disk
-          fs.unlinkSync(file.path);
-          continue;
+        // Deduplication Check
+        if (!constraints.allowDuplicateImages) {
+          if (activeChecksums.has(checksum)) {
+            try { fs.unlinkSync(file.path); } catch {}
+            return null; // skip processing
+          }
+          const duplicate = await assetRepository.findFileByChecksum(asset.id, checksum);
+          if (duplicate) {
+            try { fs.unlinkSync(file.path); } catch {}
+            return null;
+          }
+          activeChecksums.add(checksum);
         }
+
+        let width = 0;
+        let height = 0;
+        let previewPath: string | undefined;
+        let finalSize = file.size;
+
+        try {
+          // Perform image optimization & thumbnail generation
+          const processed = await processAndOptimizeImage(file.path);
+          width = processed.width;
+          height = processed.height;
+          previewPath = processed.previewPath;
+          finalSize = processed.optimizedSize;
+        } catch (err) {
+          logger.warn(`Could not process image ${file.originalname}:`, err);
+        }
+
+        const storedName = path.basename(file.path);
+        return assetRepository.createFile({
+          assetId: asset.id,
+          originalName: file.originalname,
+          storedName,
+          storagePath: `uploads/originals/${storedName}`,
+          previewPath,
+          mimeType: file.mimetype,
+          fileSize: finalSize,
+          checksum,
+          width,
+          height,
+          sortOrder: index,
+        });
       }
+    );
 
-      // Process image — generate thumbnail + get dimensions
-      let width = 0;
-      let height = 0;
-      let previewPath: string | undefined;
-
-      try {
-        const processed = await processImage(file.path);
-        width = processed.width;
-        height = processed.height;
-        previewPath = processed.previewPath;
-      } catch (err) {
-        logger.warn(`Could not process image ${file.originalname}:`, err);
-      }
-
-      // Save file record
-      const storedName = path.basename(file.path);
-      const assetFile = await assetRepository.createFile({
-        assetId: asset.id,
-        originalName: file.originalname,
-        storedName,
-        storagePath: `uploads/originals/${storedName}`,
-        previewPath,
-        mimeType: file.mimetype,
-        fileSize: file.size,
-        checksum,
-        width,
-        height,
-        sortOrder: i,
-      });
-
-      // Queue thumbnail job
-      await assetRepository.createJob({
-        assetId: asset.id,
-        type: JobType.IMAGE_COMPRESSION,
-      });
-
-      savedFiles.push(assetFile);
-    }
+    // Clean null duplicates
+    const filteredFiles = savedFiles.filter(Boolean);
 
     // Mark asset as uploaded
     await assetRepository.updateStatus(asset.id, AssetStatus.UPLOADED, {
@@ -165,7 +165,7 @@ export const assetService = {
   },
 
   /**
-   * ZIP upload — extract images from ZIP, process each.
+   * ZIP upload - extracts and processes images concurrently with controlled concurrency
    */
   uploadZip: async (
     file: Express.Multer.File,
@@ -175,22 +175,18 @@ export const assetService = {
       throw new BadRequestError("No ZIP file provided");
     }
 
-    // Validate ZIP size
     validateFileSize(file.size, constraints.maxZipSizeMb);
 
-    // Create asset record
     const asset = await assetRepository.create({
       sourceType: AssetSourceType.ZIP_UPLOAD,
       status: AssetStatus.UPLOADING,
     });
 
-    // Queue ZIP extraction job
     await assetRepository.createJob({
       assetId: asset.id,
       type: JobType.ZIP_EXTRACTION,
     });
 
-    // Extract synchronously for now
     let extracted;
     try {
       extracted = await extractZip(file.path, constraints.allowedExtensions);
@@ -205,73 +201,72 @@ export const assetService = {
       await assetRepository.updateStatus(asset.id, AssetStatus.FAILED, {
         notes: "No valid images found in ZIP",
       });
-      throw new BadRequestError(
-        "No valid image files found inside the ZIP archive"
-      );
+      throw new BadRequestError("No valid image files found inside the ZIP archive");
     }
 
     if (constraints.maxImages && extracted.length > constraints.maxImages) {
-      throw new BadRequestError(
-        `ZIP contains ${extracted.length} images but maximum allowed is ${constraints.maxImages}`
-      );
+      throw new BadRequestError(`ZIP contains ${extracted.length} images but max allowed is ${constraints.maxImages}`);
     }
 
     if (constraints.minImages && extracted.length < constraints.minImages) {
-      throw new BadRequestError(
-        `ZIP contains ${extracted.length} images but minimum required is ${constraints.minImages}`
-      );
+      throw new BadRequestError(`ZIP contains ${extracted.length} images but min required is ${constraints.minImages}`);
     }
 
-    const savedFiles = [];
+    const activeChecksums = new Set<string>();
 
-    for (let i = 0; i < extracted.length; i++) {
-      const ef = extracted[i]!;
+    // Process extracted files concurrently with controlled concurrency
+    const savedFiles = await runWithPool(
+      extracted,
+      PROCESSING_CONCURRENCY_LIMIT,
+      async (ef, index) => {
+        const fullPath = path.join(process.cwd(), ef.storagePath);
+        const checksum = await computeFileHash(fullPath);
 
-      const fullPath = path.join(process.cwd(), ef.storagePath);
+        if (!constraints.allowDuplicateImages) {
+          if (activeChecksums.has(checksum)) {
+            try { fs.unlinkSync(fullPath); } catch {}
+            return null;
+          }
+          const duplicate = await assetRepository.findFileByChecksum(asset.id, checksum);
+          if (duplicate) {
+            try { fs.unlinkSync(fullPath); } catch {}
+            return null;
+          }
+          activeChecksums.add(checksum);
+        }
 
-      // Compute hash
-      const checksum = await computeFileHash(fullPath);
+        let width = 0;
+        let height = 0;
+        let previewPath: string | undefined;
+        let finalSize = ef.fileSize;
 
-      // Duplicate detection
-      if (!constraints.allowDuplicateImages) {
-        const duplicate = await assetRepository.findFileByChecksum(
-          asset.id,
-          checksum
-        );
-        if (duplicate) continue;
+        try {
+          const processed = await processAndOptimizeImage(fullPath);
+          width = processed.width;
+          height = processed.height;
+          previewPath = processed.previewPath;
+          finalSize = processed.optimizedSize;
+        } catch (err) {
+          logger.warn(`Could not process extracted file ${ef.originalName}:`, err);
+        }
+
+        return assetRepository.createFile({
+          assetId: asset.id,
+          originalName: ef.originalName,
+          storedName: ef.storedName,
+          storagePath: ef.storagePath,
+          previewPath,
+          mimeType: ef.mimeType,
+          fileSize: finalSize,
+          checksum,
+          width,
+          height,
+          sortOrder: index,
+        });
       }
+    );
 
-      let width = 0;
-      let height = 0;
-      let previewPath: string | undefined;
-
-      try {
-        const processed = await processImage(fullPath);
-        width = processed.width;
-        height = processed.height;
-        previewPath = processed.previewPath;
-      } catch (err) {
-        logger.warn(`Could not process extracted file ${ef.originalName}:`, err);
-      }
-
-      const assetFile = await assetRepository.createFile({
-        assetId: asset.id,
-        originalName: ef.originalName,
-        storedName: ef.storedName,
-        storagePath: ef.storagePath,
-        previewPath,
-        mimeType: ef.mimeType,
-        fileSize: ef.fileSize,
-        checksum,
-        width,
-        height,
-        sortOrder: i,
-      });
-
-      savedFiles.push(assetFile);
-    }
-
-    // Clean up ZIP file from disk
+    // Clean up temporary ZIP archive from disk
     try {
       fs.unlinkSync(file.path);
     } catch {
@@ -285,16 +280,11 @@ export const assetService = {
     return assetRepository.findById(asset.id);
   },
 
-  /**
-   * Google Drive link — store reference only.
-   * Actual download queued as a background job.
-   */
   uploadDriveLink: async (driveUrl: string) => {
     if (!driveUrl) {
       throw new BadRequestError("Google Drive URL is required");
     }
 
-    // Basic validation — must be a Google Drive share URL
     const isDriveUrl =
       driveUrl.includes("drive.google.com") ||
       driveUrl.includes("docs.google.com");
@@ -308,7 +298,6 @@ export const assetService = {
       externalUrl: driveUrl,
     });
 
-    // Queue drive download job
     await assetRepository.createJob({
       assetId: asset.id,
       type: JobType.DRIVE_DOWNLOAD,
@@ -317,32 +306,21 @@ export const assetService = {
     return assetRepository.findById(asset.id);
   },
 
-  /**
-   * Get asset by ID.
-   */
   findById: async (id: string) => {
     const asset = await assetRepository.findById(id);
     if (!asset) throw new NotFoundError("Asset not found");
     return asset;
   },
 
-  /**
-   * Delete asset and all its files from disk.
-   */
   delete: async (id: string) => {
     const asset = await assetRepository.findById(id);
     if (!asset) throw new NotFoundError("Asset not found");
 
-    // Delete all physical files
     for (const file of asset.files) {
       const paths = [
         path.join(process.cwd(), file.storagePath),
-        ...(file.previewPath
-          ? [path.join(process.cwd(), file.previewPath)]
-          : []),
-        ...(file.printReadyPath
-          ? [path.join(process.cwd(), file.printReadyPath)]
-          : []),
+        ...(file.previewPath ? [path.join(process.cwd(), file.previewPath)] : []),
+        ...(file.printReadyPath ? [path.join(process.cwd(), file.printReadyPath)] : []),
       ];
 
       for (const p of paths) {
@@ -357,9 +335,6 @@ export const assetService = {
     await assetRepository.delete(id);
   },
 
-  /**
-   * Reorder files within an asset.
-   */
   reorder: async (
     id: string,
     updates: { id: string; sortOrder: number }[]

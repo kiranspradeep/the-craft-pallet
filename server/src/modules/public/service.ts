@@ -297,7 +297,6 @@ export const publicService = {
     };
   },
 };
-
 // import { publicRepository } from "./repository.js";
 // import { prisma } from "../../prisma/client.js";
 // import { NotFoundError } from "../../shared/errors/AppError.js";
@@ -597,3 +596,4 @@ export const publicService = {
 //     };
 //   },
 // };
+

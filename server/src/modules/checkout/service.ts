@@ -25,6 +25,7 @@ import {
   NotFoundError,
 } from "../../shared/errors/AppError.js";
 import { logger } from "../../shared/logger/index.js";
+import { emailService } from "../../shared/services/emailService.js";
 
 // ── Common inputs ─────────────────────────────────────────────────────────
 
@@ -557,7 +558,12 @@ export const checkoutService = {
       return newOrder;
     });
 
-    return checkoutRepository.findOrderById(order.id);
+    const fullOrder = await checkoutRepository.findOrderById(order.id);
+    if (fullOrder) {
+      emailService.sendOrderPlacedEmail(fullOrder).catch(() => {});
+    }
+
+    return fullOrder;
   },
 
   // ────────────────────────────────────────────────────────────────────────
@@ -864,7 +870,12 @@ export const checkoutService = {
       return newOrder;
     });
 
-    return checkoutRepository.findOrderById(order.id);
+    const fullOrder = await checkoutRepository.findOrderById(order.id);
+    if (fullOrder) {
+      emailService.sendOrderPlacedEmail(fullOrder).catch(() => {});
+    }
+
+    return fullOrder;
   },
 
   // ────────────────────────────────────────────────────────────────────────

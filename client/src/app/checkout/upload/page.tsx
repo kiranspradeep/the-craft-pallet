@@ -13,8 +13,9 @@ import {
   Check,
   Loader2,
   AlertCircle,
+  Image as ImageIcon,
 } from "lucide-react";
-import { assetApi, cartApi, buyNowApi } from "@/lib/cart";
+import { assetApi, cartApi, buyNowApi, getSessionId } from "@/lib/cart";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
@@ -41,6 +42,15 @@ interface FieldUploadState {
   error: string;
 }
 
+interface UploadProgressState {
+  productName: string;
+  fieldName: string;
+  totalFiles: number;
+  progress: number;
+  isZip: boolean;
+  status: "uploading" | "optimizing";
+}
+
 function WhatsAppIcon({ size = 13 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor">
@@ -48,6 +58,52 @@ function WhatsAppIcon({ size = 13 }: { size?: number }) {
     </svg>
   );
 }
+
+// Helper function to upload files with real-time progress callbacks using XHR
+const uploadWithProgress = (
+  url: string,
+  formData: FormData,
+  onProgress: (percent: number) => void
+): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", url);
+
+    // Maintain session parity with cart operations
+    const sessionId = getSessionId();
+    if (sessionId) {
+      xhr.setRequestHeader("X-Session-Id", sessionId);
+    }
+
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        onProgress(percent);
+      }
+    };
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const resData = JSON.parse(xhr.responseText);
+          resolve(resData.data || resData);
+        } catch {
+          resolve(xhr.responseText);
+        }
+      } else {
+        try {
+          const errRes = JSON.parse(xhr.responseText);
+          reject(new Error(errRes.message || "Upload failed"));
+        } catch {
+          reject(new Error(`Server responded with code ${xhr.status}`));
+        }
+      }
+    };
+
+    xhr.onerror = () => reject(new Error("Network connection error."));
+    xhr.send(formData);
+  });
+};
 
 // ── Main Content ──────────────────────────────────────────────────────────────
 
@@ -61,6 +117,9 @@ function UploadContent() {
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [buyNowSession, setBuyNowSession] = useState<any>(null);
+
+  // Overlay progress state
+  const [activeUpload, setActiveUpload] = useState<UploadProgressState | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -82,7 +141,6 @@ function UploadContent() {
           const fields: UploadField[] = [];
           const sessionCustomizations = (session.customizations as any[]) ?? [];
 
-          // Find photo custom fields on the product
           const photoCustomFields = product.customFields?.filter(
             (cf: any) => cf.type === "PHOTO_UPLOAD"
           ) ?? [];
@@ -116,7 +174,6 @@ function UploadContent() {
               }
             }
           } else {
-            // Fallback for uploadRequired with no explicit customField
             for (let u = 0; u < unitTotal; u++) {
               fields.push({
                 customizationId: `default_upload_${u}`,
@@ -231,6 +288,48 @@ function UploadContent() {
     }));
   };
 
+  const syncAssetIdToDatabase = async (field: UploadField, assetId: string) => {
+    if (buyNowId) {
+      const existingCustomizations = (buyNowSession?.customizations as any[]) ?? [];
+      const updatedCustomizations = [...existingCustomizations];
+      const matchIdx = updatedCustomizations.findIndex(
+        (c: any) => c.customFieldId === field.customFieldId && (c.unitIndex ?? 0) === field.unitIndex
+      );
+
+      if (matchIdx >= 0) {
+        updatedCustomizations[matchIdx] = {
+          ...updatedCustomizations[matchIdx],
+          assetId,
+        };
+      } else {
+        updatedCustomizations.push({
+          customFieldId: field.customFieldId,
+          fieldLabel: field.fieldLabel,
+          fieldType: "PHOTO_UPLOAD",
+          unitIndex: field.unitIndex,
+          assetId,
+        });
+      }
+
+      await buyNowApi.update(buyNowId, {
+        assetId,
+        customizations: updatedCustomizations,
+      });
+
+      setBuyNowSession((prev: any) => ({
+        ...prev,
+        assetId,
+        customizations: updatedCustomizations,
+      }));
+    } else {
+      await cartApi.linkAssetToUploadField(
+        field.cartItemId,
+        field.customizationId,
+        assetId
+      );
+    }
+  };
+
   const uploadFilesForField = async (field: UploadField, files: File[]) => {
     if (field.minImages && files.length < field.minImages) {
       updateField(field.customizationId, {
@@ -246,49 +345,37 @@ function UploadContent() {
     }
 
     updateField(field.customizationId, { files, uploading: true, error: "" });
+    setActiveUpload({
+      productName: field.productName,
+      fieldName: field.fieldLabel,
+      totalFiles: files.length,
+      progress: 0,
+      isZip: false,
+      status: "uploading",
+    });
 
     try {
-      const asset = await assetApi.uploadDirect(files, field.productId);
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+      formData.append("productId", field.productId);
 
-      if (buyNowId) {
-        const existingCustomizations = (buyNowSession?.customizations as any[]) ?? [];
-        const updatedCustomizations = [...existingCustomizations];
-        const matchIdx = updatedCustomizations.findIndex(
-          (c: any) => c.customFieldId === field.customFieldId && (c.unitIndex ?? 0) === field.unitIndex
-        );
-
-        if (matchIdx >= 0) {
-          updatedCustomizations[matchIdx] = {
-            ...updatedCustomizations[matchIdx],
-            assetId: asset.id,
-          };
-        } else {
-          updatedCustomizations.push({
-            customFieldId: field.customFieldId,
-            fieldLabel: field.fieldLabel,
-            fieldType: "PHOTO_UPLOAD",
-            unitIndex: field.unitIndex,
-            assetId: asset.id,
-          });
+      const asset = await uploadWithProgress(
+        `${API_URL}/api/assets/upload`,
+        formData,
+        (percent) => {
+          setActiveUpload((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progress: percent,
+                  status: percent === 100 ? "optimizing" : "uploading",
+                }
+              : null
+          );
         }
+      );
 
-        await buyNowApi.update(buyNowId, {
-          assetId: asset.id,
-          customizations: updatedCustomizations,
-        });
-
-        setBuyNowSession((prev: any) => ({
-          ...prev,
-          assetId: asset.id,
-          customizations: updatedCustomizations,
-        }));
-      } else {
-        await cartApi.linkAssetToUploadField(
-          field.cartItemId,
-          field.customizationId,
-          asset.id
-        );
-      }
+      await syncAssetIdToDatabase(field, asset.id);
 
       updateField(field.customizationId, {
         uploading: false,
@@ -300,53 +387,44 @@ function UploadContent() {
         uploading: false,
         error: err.message || "Upload failed",
       });
+    } finally {
+      setActiveUpload(null);
     }
   };
 
   const uploadZipForField = async (field: UploadField, file: File) => {
     updateField(field.customizationId, { uploading: true, error: "" });
+    setActiveUpload({
+      productName: field.productName,
+      fieldName: field.fieldLabel,
+      totalFiles: 1,
+      progress: 0,
+      isZip: true,
+      status: "uploading",
+    });
+
     try {
-      const asset = await assetApi.uploadZip(file, field.productId);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("productId", field.productId);
 
-      if (buyNowId) {
-        const existingCustomizations = (buyNowSession?.customizations as any[]) ?? [];
-        const updatedCustomizations = [...existingCustomizations];
-        const matchIdx = updatedCustomizations.findIndex(
-          (c: any) => c.customFieldId === field.customFieldId && (c.unitIndex ?? 0) === field.unitIndex
-        );
-
-        if (matchIdx >= 0) {
-          updatedCustomizations[matchIdx] = {
-            ...updatedCustomizations[matchIdx],
-            assetId: asset.id,
-          };
-        } else {
-          updatedCustomizations.push({
-            customFieldId: field.customFieldId,
-            fieldLabel: field.fieldLabel,
-            fieldType: "PHOTO_UPLOAD",
-            unitIndex: field.unitIndex,
-            assetId: asset.id,
-          });
+      const asset = await uploadWithProgress(
+        `${API_URL}/api/assets/upload-zip`,
+        formData,
+        (percent) => {
+          setActiveUpload((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  progress: percent,
+                  status: percent === 100 ? "optimizing" : "uploading",
+                }
+              : null
+          );
         }
+      );
 
-        await buyNowApi.update(buyNowId, {
-          assetId: asset.id,
-          customizations: updatedCustomizations,
-        });
-
-        setBuyNowSession((prev: any) => ({
-          ...prev,
-          assetId: asset.id,
-          customizations: updatedCustomizations,
-        }));
-      } else {
-        await cartApi.linkAssetToUploadField(
-          field.cartItemId,
-          field.customizationId,
-          asset.id
-        );
-      }
+      await syncAssetIdToDatabase(field, asset.id);
 
       updateField(field.customizationId, {
         uploading: false,
@@ -358,6 +436,8 @@ function UploadContent() {
         uploading: false,
         error: err.message || "ZIP upload failed",
       });
+    } finally {
+      setActiveUpload(null);
     }
   };
 
@@ -368,46 +448,7 @@ function UploadContent() {
     updateField(field.customizationId, { uploading: true, error: "" });
     try {
       const asset = await assetApi.uploadDriveLink(driveLink);
-
-      if (buyNowId) {
-        const existingCustomizations = (buyNowSession?.customizations as any[]) ?? [];
-        const updatedCustomizations = [...existingCustomizations];
-        const matchIdx = updatedCustomizations.findIndex(
-          (c: any) => c.customFieldId === field.customFieldId && (c.unitIndex ?? 0) === field.unitIndex
-        );
-
-        if (matchIdx >= 0) {
-          updatedCustomizations[matchIdx] = {
-            ...updatedCustomizations[matchIdx],
-            assetId: asset.id,
-          };
-        } else {
-          updatedCustomizations.push({
-            customFieldId: field.customFieldId,
-            fieldLabel: field.fieldLabel,
-            fieldType: "PHOTO_UPLOAD",
-            unitIndex: field.unitIndex,
-            assetId: asset.id,
-          });
-        }
-
-        await buyNowApi.update(buyNowId, {
-          assetId: asset.id,
-          customizations: updatedCustomizations,
-        });
-
-        setBuyNowSession((prev: any) => ({
-          ...prev,
-          assetId: asset.id,
-          customizations: updatedCustomizations,
-        }));
-      } else {
-        await cartApi.linkAssetToUploadField(
-          field.cartItemId,
-          field.customizationId,
-          asset.id
-        );
-      }
+      await syncAssetIdToDatabase(field, asset.id);
 
       updateField(field.customizationId, {
         uploading: false,
@@ -492,150 +533,157 @@ function UploadContent() {
   ).length;
 
   return (
-    <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
-      <div className="tcp-container" style={{ maxWidth: "860px" }}>
-        
-        {/* Back */}
-        <Link
-          href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "6px",
-            fontSize: "12px",
-            color: "var(--text-tertiary)",
-            marginBottom: "32px",
-            letterSpacing: "0.02em",
-            textDecoration: "none",
-          }}
-        >
-          <ArrowLeft size={13} strokeWidth={1.75} />
-          Back
-        </Link>
+    <>
+      {/* Dynamic visual upload status modal overlay */}
+      {activeUpload && (
+        <UploadProgressOverlay activeUpload={activeUpload} />
+      )}
 
-        {/* Header */}
-        <div style={{ marginBottom: "36px" }}>
-          <p className="tcp-eyebrow">Website Order — Step 2 of 3</p>
-          <h1
+      <div style={{ backgroundColor: "var(--bg)", padding: "56px 0 120px" }}>
+        <div className="tcp-container" style={{ maxWidth: "860px" }}>
+          
+          {/* Back */}
+          <Link
+            href={`/checkout/upload-method${buyNowId ? `?bn=${buyNowId}` : ""}`}
             style={{
-              fontFamily: "'Playfair Display', serif",
-              fontSize: "clamp(26px, 4vw, 38px)",
-              fontWeight: 500,
-              color: "var(--text-primary)",
-              letterSpacing: "-0.02em",
-              marginBottom: "12px",
-            }}
-          >
-            Upload your{" "}
-            <em style={{ fontStyle: "italic", color: "var(--brand)" }}>
-              photos
-            </em>
-          </h1>
-
-          {/* Progress dots */}
-          <div
-            style={{
-              display: "flex",
+              display: "inline-flex",
               alignItems: "center",
-              gap: "10px",
-              fontSize: "13px",
-              color: "var(--text-secondary)",
-            }}
-          >
-            <div style={{ display: "flex", gap: "4px" }}>
-              {uploadFields.map((f) => (
-                <div
-                  key={f.customizationId}
-                  style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "999px",
-                    backgroundColor: fieldStates[f.customizationId]?.assetId
-                      ? "var(--success)"
-                      : "var(--border)",
-                    transition: "background-color 300ms ease",
-                  }}
-                />
-              ))}
-            </div>
-            <span>
-              {completedCount} of {uploadFields.length} uploads complete
-            </span>
-          </div>
-        </div>
-
-        {/* Dynamic upload sections */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-          {uploadFields.map((field, index) => (
-            <UploadSection
-              key={field.customizationId}
-              field={field}
-              state={fieldStates[field.customizationId]!}
-              index={index}
-              onUploadFiles={(files) => uploadFilesForField(field, files)}
-              onUploadZip={(file) => uploadZipForField(field, file)}
-              onSubmitDrive={(link) => submitDriveLinkForField(field, link)}
-              onClear={() => clearField(field)}
-            />
-          ))}
-        </div>
-
-        {/* Actions panel */}
-        <div
-          style={{
-            marginTop: "28px",
-            padding: "20px",
-            borderRadius: "var(--radius-card)",
-            backgroundColor: "var(--surface)",
-            border: "1px solid var(--border-soft)",
-          }}
-        >
-          {!allComplete && (
-            <p
-              style={{
-                fontSize: "12px",
-                color: "var(--text-tertiary)",
-                marginBottom: "12px",
-                textAlign: "center",
-              }}
-            >
-              Upload photos for all products above to continue
-            </p>
-          )}
-          <button
-            onClick={() => router.push(`/checkout${buyNowId ? `?bn=${buyNowId}` : ""}`)}
-            disabled={!allComplete}
-            className="btn-primary"
-            style={{
-              width: "100%",
-              justifyContent: "center",
-              opacity: allComplete ? 1 : 0.4,
-            }}
-          >
-            Continue to Checkout
-            <ArrowRight size={15} strokeWidth={2} />
-          </button>
-
-          <button
-            onClick={() => router.push(`/checkout?method=whatsapp${buyNowId ? `&bn=${buyNowId}` : ""}`)}
-            style={{
-              width: "100%",
-              marginTop: "12px",
-              padding: "10px",
+              gap: "6px",
               fontSize: "12px",
               color: "var(--text-tertiary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              gap: "6px",
+              marginBottom: "32px",
+              letterSpacing: "0.02em",
+              textDecoration: "none",
             }}
           >
-            <WhatsAppIcon size={13} />
-            Or continue on WhatsApp instead
-          </button>
+            <ArrowLeft size={13} strokeWidth={1.75} />
+            Back
+          </Link>
+
+          {/* Header */}
+          <div style={{ marginBottom: "36px" }}>
+            <p className="tcp-eyebrow">Website Order — Step 2 of 3</p>
+            <h1
+              style={{
+                fontFamily: "'Playfair Display', serif",
+                fontSize: "clamp(26px, 4vw, 38px)",
+                fontWeight: 500,
+                color: "var(--text-primary)",
+                letterSpacing: "-0.02em",
+                marginBottom: "12px",
+              }}
+            >
+              Upload your{" "}
+              <em style={{ fontStyle: "italic", color: "var(--brand)" }}>
+                photos
+              </em>
+            </h1>
+
+            {/* Progress dots */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                fontSize: "13px",
+                color: "var(--text-secondary)",
+              }}
+            >
+              <div style={{ display: "flex", gap: "4px" }}>
+                {uploadFields.map((f) => (
+                  <div
+                    key={f.customizationId}
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "999px",
+                      backgroundColor: fieldStates[f.customizationId]?.assetId
+                        ? "var(--success)"
+                        : "var(--border)",
+                      transition: "background-color 300ms ease",
+                    }}
+                  />
+                ))}
+              </div>
+              <span>
+                {completedCount} of {uploadFields.length} uploads complete
+              </span>
+            </div>
+          </div>
+
+          {/* Dynamic upload sections */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {uploadFields.map((field, index) => (
+              <UploadSection
+                key={field.customizationId}
+                field={field}
+                state={fieldStates[field.customizationId]!}
+                index={index}
+                onUploadFiles={(files) => uploadFilesForField(field, files)}
+                onUploadZip={(file) => uploadZipForField(field, file)}
+                onSubmitDrive={(link) => submitDriveLinkForField(field, link)}
+                onClear={() => clearField(field)}
+              />
+            ))}
+          </div>
+
+          {/* Actions panel */}
+          <div
+            style={{
+              marginTop: "28px",
+              padding: "20px",
+              borderRadius: "var(--radius-card)",
+              backgroundColor: "var(--surface)",
+              border: "1px solid var(--border-soft)",
+            }}
+          >
+            {!allComplete && (
+              <p
+                style={{
+                  fontSize: "12px",
+                  color: "var(--text-tertiary)",
+                  marginBottom: "12px",
+                  textAlign: "center",
+                }}
+              >
+                Upload photos for all products above to continue
+              </p>
+            )}
+            <button
+              onClick={() => router.push(`/checkout${buyNowId ? `?bn=${buyNowId}` : ""}`)}
+              disabled={!allComplete}
+              className="btn-primary"
+              style={{
+                width: "100%",
+                justifyContent: "center",
+                opacity: allComplete ? 1 : 0.4,
+              }}
+            >
+              Continue to Checkout
+              <ArrowRight size={15} strokeWidth={2} />
+            </button>
+
+            <button
+              onClick={() => router.push(`/checkout?method=whatsapp${buyNowId ? `&bn=${buyNowId}` : ""}`)}
+              style={{
+                width: "100%",
+                marginTop: "12px",
+                padding: "10px",
+                fontSize: "12px",
+                color: "var(--text-tertiary)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "6px",
+              }}
+            >
+              <WhatsAppIcon size={13} />
+              Or continue on WhatsApp instead
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -658,6 +706,162 @@ export default function UploadPage() {
     >
       <UploadContent />
     </Suspense>
+  );
+}
+
+// ── Upload Progress Overlay Modal ──────────────────────────────────────────
+
+function UploadProgressOverlay({ activeUpload }: { activeUpload: UploadProgressState }) {
+  const isOptimizing = activeUpload.status === "optimizing";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(18, 18, 18, 0.65)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
+        zIndex: 9999,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "20px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "480px",
+          backgroundColor: "var(--surface)",
+          border: "1px solid var(--border-soft)",
+          borderRadius: "var(--radius-card)",
+          padding: "32px",
+          boxShadow: "0 20px 40px rgba(0,0,0,0.3)",
+          textAlign: "center",
+        }}
+      >
+        {/* Animated Visual Icon */}
+        <div style={{ display: "inline-flex", marginBottom: "20px", position: "relative" }}>
+          <div
+            style={{
+              width: "64px",
+              height: "64px",
+              borderRadius: "50%",
+              backgroundColor: "var(--brand-soft)",
+              color: "var(--brand)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            {isOptimizing ? (
+              <Loader2 size={28} className="animate-spin" strokeWidth={1.5} />
+            ) : (
+              <ImageIcon size={28} strokeWidth={1.5} className="pulse-icon" />
+            )}
+          </div>
+        </div>
+
+        {/* Labels */}
+        <h3
+          style={{
+            fontFamily: "'Playfair Display', serif",
+            fontSize: "22px",
+            color: "var(--text-primary)",
+            marginBottom: "8px",
+          }}
+        >
+          {isOptimizing ? "Optimizing Assets" : "Transferring Files"}
+        </h3>
+        <p
+          style={{
+            fontSize: "13px",
+            color: "var(--text-secondary)",
+            marginBottom: "24px",
+            lineHeight: 1.5,
+          }}
+        >
+          {isOptimizing ? (
+            <>
+              Resizing to high-clarity output profiles.
+              <br />
+              <span style={{ color: "var(--text-tertiary)", fontSize: "11px" }}>
+                Preserving print configurations...
+              </span>
+            </>
+          ) : activeUpload.isZip ? (
+            `Sending ZIP bundle to secure processing repository...`
+          ) : (
+            `Transferring ${activeUpload.totalFiles} images to our server...`
+          )}
+        </p>
+
+        {/* Real Progress Bar */}
+        <div style={{ marginBottom: "12px" }}>
+          <div
+            style={{
+              width: "100%",
+              height: "6px",
+              backgroundColor: "var(--bg)",
+              borderRadius: "999px",
+              overflow: "hidden",
+              position: "relative",
+            }}
+          >
+            <div
+              style={{
+                height: "100%",
+                width: `${activeUpload.progress}%`,
+                backgroundColor: isOptimizing ? "var(--success)" : "var(--brand)",
+                borderRadius: "999px",
+                transition: "width 250ms ease-out",
+                backgroundImage: isOptimizing
+                  ? "linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)"
+                  : "none",
+                backgroundSize: "1rem 1rem",
+                animation: isOptimizing ? "progress-bar-stripes 1s linear infinite" : "none",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Progress Stats */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: "12px",
+            color: "var(--text-tertiary)",
+          }}
+        >
+          <span>
+            {activeUpload.productName}
+          </span>
+          <span style={{ fontWeight: 600, color: "var(--text-secondary)" }}>
+            {isOptimizing ? "Processing..." : `${activeUpload.progress}%`}
+          </span>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes progress-bar-stripes {
+          from { background-position: 1rem 0; }
+          to { background-position: 0 0; }
+        }
+        @keyframes pulse-soft {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.05); opacity: 0.85; }
+        }
+        .pulse-icon {
+          animation: pulse-soft 2s infinite ease-in-out;
+        }
+      `}</style>
+    </div>
   );
 }
 
@@ -953,8 +1157,7 @@ function UploadSection({
               }}
             >
               <Loader2 size={14} className="animate-spin" strokeWidth={2} />
-              Uploading
-              {state.files.length > 0 ? ` ${state.files.length} photos` : ""}...
+              Initializing secure stream connection...
             </div>
           )}
 
@@ -966,8 +1169,8 @@ function UploadSection({
                 color: "var(--text-secondary)",
               }}
             >
-              {state.files.length} photo
-              {state.files.length !== 1 ? "s" : ""} selected — uploading...
+              Readying {state.files.length} file
+              {state.files.length !== 1 ? "s" : ""}...
             </p>
           )}
         </div>

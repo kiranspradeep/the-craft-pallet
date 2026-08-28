@@ -1,18 +1,21 @@
+// src/server.ts
 import "dotenv/config";
 import app from "./app";
 import { prisma } from "./prisma/client";
 import { logger } from "./shared/logger";
 import { startCheckoutCleanupJob } from "./modules/checkout/cleanupJob.js";
+import { startAssetRetentionCleanupJob } from "./modules/asset/cleanupJob.js";
 
 const PORT = parseInt(process.env.PORT || "4000", 10);
 
 const start = async (): Promise<void> => {
   try {
     await prisma.$connect();
-    logger.info("Database connected");
+    logger.info("Database connected successfully");
 
-    // Start background jobs
-    startCheckoutCleanupJob();
+    // Start background cleanups
+    startCheckoutCleanupJob();         // Purges abandoned checkout sessions (30 mins)
+    startAssetRetentionCleanupJob();   // Purges expired local customer uploads (daily retentionDays check)
 
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
@@ -26,13 +29,13 @@ const start = async (): Promise<void> => {
 };
 
 process.on("SIGINT", async () => {
-  logger.info("Shutting down...");
+  logger.info("Shutting down via SIGINT...");
   await prisma.$disconnect();
   process.exit(0);
 });
 
 process.on("SIGTERM", async () => {
-  logger.info("Shutting down...");
+  logger.info("Shutting down via SIGTERM...");
   await prisma.$disconnect();
   process.exit(0);
 });

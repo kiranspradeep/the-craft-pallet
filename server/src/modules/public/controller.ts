@@ -204,19 +204,19 @@ export const publicController = {
 
 //   // GET /api/orders/track/:orderNumber?phone=
 //   trackOrder: asyncHandler(
-//   async (req: Request, res: Response): Promise<void> => {
-//     const orderNumber = param(req, "orderNumber");
-//     const phone = req.query["phone"] as string;
+//     async (req: Request, res: Response): Promise<void> => {
+//       const orderNumber = param(req, "orderNumber");
+//       const phone = req.query["phone"] as string;
 
-//     console.log("TRACK REQUEST:", { orderNumber, phone }); // ← add this
+//       if (!phone) {
+//         throw new BadRequestError(
+//           "Phone number is required to track your order"
+//         );
+//       }
 
-//     if (!phone) {
-//       throw new BadRequestError("Phone number is required");
+//       const order = await publicService.trackOrder(orderNumber, phone);
+//       sendSuccess({ res, data: order });
 //     }
-
-//     const order = await publicService.trackOrder(orderNumber, phone);
-//     sendSuccess({ res, data: order });
-//   }
-// ),
-
+//   ),
 // };
+

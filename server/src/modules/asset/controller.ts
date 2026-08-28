@@ -1,22 +1,61 @@
+// src/modules/asset/controller.ts
 import { Request, Response } from "express";
 import { assetService } from "./service.js";
 import { sendSuccess } from "../../shared/helpers/response.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { prisma } from "../../prisma/client.js";
 
-// Load product constraints from DB if productId is provided
+/**
+ * Loads and merges global ImageRetentionSetting with product-level ProductConfiguration.
+ *
+ * Priority:
+ *   1. Product-specific constraints (if productId is provided and config exists)
+ *   2. Global ImageRetentionSetting (fallback defaults from admin panel)
+ *   3. Hardcoded safe defaults (last resort if DB has no records yet)
+ */
 const loadConstraints = async (productId?: string) => {
-  if (!productId) return {};
+  // ── 1. Fetch global retention / upload settings ──────────────────────
+  const globalSettings = await prisma.imageRetentionSetting.findFirst();
+
+  // Convert MIME types → file extensions for validation
+  const globalExtensions =
+    globalSettings?.allowedMimeTypes && globalSettings.allowedMimeTypes.length > 0
+      ? globalSettings.allowedMimeTypes.map((mime) => {
+          const ext = mime.split("/")[1];
+          return ext === "jpeg" ? ".jpg" : `.${ext}`;
+        })
+      : [".jpg", ".jpeg", ".png", ".webp"];
+
+  // Base constraints from global settings (or safe defaults)
+  const base = {
+    maxImages: null as number | null,
+    minImages: null as number | null,
+    maxFileSizeMb: globalSettings?.maxUploadSizeMb ?? 500,
+    maxZipSizeMb: globalSettings?.maxUploadSizeMb ?? 500,
+    allowedExtensions: globalExtensions,
+    allowDuplicateImages: false,
+  };
+
+  // ── 2. If no productId, return global-only constraints ───────────────
+  if (!productId) return base;
+
+  // ── 3. Fetch product-specific configuration ──────────────────────────
   const config = await prisma.productConfiguration.findUnique({
     where: { productId },
   });
-  if (!config) return {};
+
+  if (!config) return base;
+
+  // ── 4. Merge — product values override global where present ──────────
   return {
-    maxImages: config.maxImages,
-    minImages: config.minImages,
-    maxFileSizeMb: config.maxFileSizeMb,
-    maxZipSizeMb: config.maxZipSizeMb,
-    allowedExtensions: config.allowedExtensions,
+    maxImages: config.maxImages ?? base.maxImages,
+    minImages: config.minImages ?? base.minImages,
+    maxFileSizeMb: config.maxFileSizeMb ?? base.maxFileSizeMb,
+    maxZipSizeMb: config.maxZipSizeMb ?? base.maxZipSizeMb,
+    allowedExtensions:
+      config.allowedExtensions && config.allowedExtensions.length > 0
+        ? config.allowedExtensions
+        : base.allowedExtensions,
     allowDuplicateImages: config.allowDuplicateImages,
   };
 };
@@ -99,7 +138,11 @@ export const assetController = {
         param(req, "id"),
         req.body.files
       );
-      sendSuccess({ res, message: "Files reordered successfully", data: asset });
+      sendSuccess({
+        res,
+        message: "Files reordered successfully",
+        data: asset,
+      });
     }
   ),
 };

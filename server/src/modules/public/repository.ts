@@ -230,9 +230,6 @@ export const publicRepository = {
     });
   },
 };
-
-// // server/src/modules/public/publicRepository.ts
-
 // import { prisma } from "../../prisma/client.js";
 // import { Prisma } from "@prisma/client";
 
@@ -293,7 +290,6 @@ export const publicRepository = {
 
 //     const skip = (page - 1) * limit;
 
-//     // Resolve category slug → id if provided
 //     let categoryId: string | undefined;
 //     if (categorySlug) {
 //       const category = await prisma.category.findFirst({
@@ -336,7 +332,6 @@ export const publicRepository = {
 //           variants: {
 //             where: { isActive: true },
 //             orderBy: { sortOrder: "asc" },
-//             // ↓ removed thumbnailUrl (field deleted), added images
 //             select: {
 //               id: true,
 //               name: true,
@@ -368,9 +363,16 @@ export const publicRepository = {
 //     };
 //   },
 
-//   findProductBySlug: async (slug: string) => {
+//   findProductBySlug: async (slugOrId: string) => {
 //     return prisma.product.findFirst({
-//       where: { slug, isActive: true, deletedAt: null },
+//       where: {
+//         isActive: true,
+//         deletedAt: null,
+//         OR: [
+//           { slug: slugOrId },
+//           { id: slugOrId },
+//         ],
+//       },
 //       include: {
 //         category: {
 //           select: { id: true, name: true, slug: true },
@@ -381,7 +383,6 @@ export const publicRepository = {
 //         variants: {
 //           where: { isActive: true },
 //           orderBy: { sortOrder: "asc" },
-//           // ↓ added images so ProductDetail gallery swap works
 //           include: {
 //             images: { orderBy: { sortOrder: "asc" } },
 //           },
@@ -430,7 +431,6 @@ export const publicRepository = {
 //         variants: {
 //           where: { isActive: true },
 //           orderBy: { sortOrder: "asc" },
-//           // ↓ removed thumbnailUrl (field deleted)
 //           select: {
 //             id: true,
 //             name: true,
@@ -462,3 +462,4 @@ export const publicRepository = {
 //     });
 //   },
 // };
+
