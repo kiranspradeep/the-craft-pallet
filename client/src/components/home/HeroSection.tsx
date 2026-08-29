@@ -26,12 +26,12 @@ const handles = [
   {
     username: "@craft.pallet_",
     href: "https://www.instagram.com/craft.pallet_/",
-    followers: "7K+",
+    followers: "8K+",
   },
   {
     username: "@the_craft.pallet_",
     href: "https://www.instagram.com/the_craft.pallet_/",
-    followers: "3K+",
+    followers: "4K+",
   },
 ];
 
@@ -306,20 +306,20 @@ export default function HeroSection() {
               {/* Stats */}
               <div className="hero-strip-stats">
                 <div className="hero-strip-item">
-                  <span className="hero-strip-value">11,000+</span>
+                  <span className="hero-strip-value">12,000+</span>
                   <span className="hero-strip-label">
                     Instagram followers
                   </span>
                 </div>
 
                 <div className="hero-strip-item">
-                  <span className="hero-strip-value">1000+</span>
+                  <span className="hero-strip-value">5000+</span>
                   <span className="hero-strip-label">Happy customers</span>
                 </div>
 
                 <div className="hero-strip-item">
                   <span className="hero-strip-value">7–10</span>
-                  <span className="hero-strip-label">Days delivery(inside kerala)</span>
+                  <span className="hero-strip-label">Working Days delivery(inside kerala)</span>
                 </div>
               </div>
 
