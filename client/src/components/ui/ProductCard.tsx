@@ -1,4 +1,3 @@
-//client\src\components\ui\ProductCard.tsx
 import Link from "next/link";
 import { formatPrice } from "@/lib/cart";
 import { ImageIcon } from "lucide-react";
@@ -8,7 +7,10 @@ interface Product {
   name: string;
   slug: string;
   shortDescription: string | null;
-  thumbnail: { url: string; altText: string | null } | null;
+  thumbnail: {
+    url: string;
+    altText: string | null;
+  } | null;
   pricingConfig: {
     strategy: string;
     unitPrice: string | null;
@@ -22,71 +24,120 @@ interface Product {
       isSpecialOffer: boolean;
     }[];
   } | null;
-  variants: { id: string; name: string; price: string }[];
+  variants: {
+    id: string;
+    name: string;
+    price: string;
+  }[];
 }
 
 function getStartingPrice(product: Product): string {
   const p = product.pricingConfig;
+
   if (!p) return "Contact us";
 
   switch (p.strategy) {
     case "PER_UNIT":
-      return p.unitPrice ? formatPrice(p.unitPrice) : "Contact us";
+      return p.unitPrice
+        ? formatPrice(p.unitPrice)
+        : "Contact us";
+
     case "INCREMENTAL_QUANTITY":
       return p.incrementPrice
         ? `From ${formatPrice(p.incrementPrice)}`
         : "Contact us";
+
     case "TIERED_PRICING": {
       const sorted = [...p.tiers].sort(
         (a, b) => Number(a.price) - Number(b.price)
       );
-      if (sorted.length > 0) return `From ${formatPrice(sorted[0].price)}`;
-      if (p.baseUnitPrice) return `${formatPrice(p.baseUnitPrice)}/print`;
+
+      if (sorted.length > 0) {
+        return `From ${formatPrice(sorted[0].price)}`;
+      }
+
+      if (p.baseUnitPrice) {
+        return `${formatPrice(p.baseUnitPrice)}/print`;
+      }
+
       return "Contact us";
     }
+
     case "FIXED_VARIANTS": {
       if (product.variants.length > 0) {
         const prices = product.variants.map((v) => Number(v.price));
+
         return `From ${formatPrice(Math.min(...prices))}`;
       }
+
       return "Contact us";
     }
+
     case "CUSTOM_QUOTE":
       return "Get a quote";
+
     default:
       return "Contact us";
   }
 }
 
-export default function ProductCard({ product }: { product: Product }) {
+export default function ProductCard({
+  product,
+}: {
+  product: Product;
+}) {
   const price = getStartingPrice(product);
 
   return (
     <Link
       href={`/products/${product.slug}`}
       className="group"
-      style={{ display: "block" }}
+      style={{
+        display: "block",
+      }}
     >
-      {/* Image */}
+      {/* ─────────────────────────────────────────────────────────────
+          Product Image
+          ───────────────────────────────────────────────────────────── */}
       <div
         style={{
           position: "relative",
-          aspectRatio: "1/1",
+          aspectRatio: "1 / 1",
           borderRadius: "var(--radius-card)",
           overflow: "hidden",
           backgroundColor: "var(--brand-soft)",
           marginBottom: "16px",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
         {product.thumbnail ? (
           <img
             src={product.thumbnail.url}
-            alt={product.thumbnail.altText || product.name}
+            alt={
+              product.thumbnail.altText ||
+              product.name
+            }
+            loading="lazy"
+            decoding="async"
             style={{
               width: "100%",
               height: "100%",
-              objectFit: "cover",
-              transition: "transform 500ms ease",
+
+              // IMPORTANT:
+              // contain prevents the product image from being cropped.
+              objectFit: "contain",
+              objectPosition: "center",
+
+              // Keeps the image clean inside the card.
+              display: "block",
+
+              // Small zoom only on hover.
+              // Because the image uses contain, important
+              // portions remain visible.
+              transition:
+                "transform 500ms ease",
             }}
             className="group-hover:scale-[1.03]"
           />
@@ -103,13 +154,18 @@ export default function ProductCard({ product }: { product: Product }) {
             <ImageIcon
               size={32}
               strokeWidth={1}
-              style={{ color: "var(--border)", opacity: 0.6 }}
+              style={{
+                color: "var(--border)",
+                opacity: 0.6,
+              }}
             />
           </div>
         )}
       </div>
 
-      {/* Info */}
+      {/* ─────────────────────────────────────────────────────────────
+          Product Information
+          ───────────────────────────────────────────────────────────── */}
       <div>
         <h3
           style={{

@@ -10,6 +10,12 @@ export const metadata: Metadata = {
     "Transform your favourite memories into beautifully crafted keepsakes. Premium personalised polaroids, photo prints, and custom gifts.",
   keywords:
     "personalised gifts, polaroids, photo prints, custom gifts, memory keepsakes",
+
+  icons: {
+    icon: "/images/craft-pallet-logo-icon.png",
+    shortcut: "/images/craft-pallet-logo-icon.png",
+    apple: "/images/craft-pallet-logo-icon.png",
+  },
 };
 
 export const viewport: Viewport = {
