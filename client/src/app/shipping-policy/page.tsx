@@ -536,7 +536,7 @@ export default function ShippingPolicyPage() {
             <P>
               You can track your order at any time using our{" "}
               <Link
-                href="/track"
+                href="/track-order"
                 style={{ color: "var(--brand)", textDecoration: "underline", fontWeight: 500 }}
               >
                 Track Order

@@ -108,4 +108,20 @@ export const checkoutController = {
     });
   }
 ),
+
+verifyRazorpayPayment: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const sessionId = req.headers["x-session-id"] as string | undefined;
+      const result = await checkoutService.verifyRazorpayPayment({
+        ...req.body,
+        sessionId,
+      });
+      sendSuccess({
+        res,
+        message: "Payment verified successfully",
+        data: result,
+      });
+    }
+  ),
+
 };

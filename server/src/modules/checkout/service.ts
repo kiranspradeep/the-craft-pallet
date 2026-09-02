@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import Razorpay from "razorpay";
 import {
   ActorType,
   OrderStatus,
@@ -239,6 +240,7 @@ export const checkoutService = {
     return checkoutRepository.updateCheckoutSession(id, data);
   },
 
+  
   // ────────────────────────────────────────────────────────────────────────
   // WEBSITE CHECKOUT — creates AWAITING_PAYMENT order
   // ────────────────────────────────────────────────────────────────────────
@@ -542,27 +544,14 @@ export const checkoutService = {
         },
       });
 
-      // ── 12. Cleanup source ───────────────────────────────────────────
-      if (itemsSource === "cart") {
-        await tx.cart.delete({ where: { id: cart.id } });
-      } else {
-        await tx.checkoutSession.delete({
-          where: { id: buyNowSession.id },
-        });
-      }
-
       logger.info(
-        `Website order placed: ${orderNumber} (${itemsSource}) for ${customer.phone}`
+        `Website order created: ${orderNumber} (${itemsSource}) for ${customer.phone}`
       );
 
       return newOrder;
     });
 
     const fullOrder = await checkoutRepository.findOrderById(order.id);
-    if (fullOrder) {
-      emailService.sendOrderPlacedEmail(fullOrder).catch(() => {});
-    }
-
     return fullOrder;
   },
 
@@ -891,20 +880,35 @@ export const checkoutService = {
     return order;
   },
 
-  // ────────────────────────────────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────────────────────
   // Create Razorpay Order
   // ────────────────────────────────────────────────────────────────────────
   createRazorpayOrder: async (orderNumber: string) => {
-    const Razorpay = (await import("razorpay")).default;
-
     const settings = await prisma.paymentSetting.findFirst();
-    const keyId = settings?.apiKey || process.env.RAZORPAY_KEY_ID;
-    const keySecret =
-      settings?.apiSecret || process.env.RAZORPAY_KEY_SECRET;
+
+    // Prefer DB settings if they exist and are non-empty; otherwise fall back to .env
+    const keyId = (
+      (settings?.apiKey && settings.apiKey.trim().length > 0
+        ? settings.apiKey
+        : process.env.RAZORPAY_KEY_ID) || ""
+    ).trim();
+
+    const keySecret = (
+      (settings?.apiSecret && settings.apiSecret.trim().length > 0
+        ? settings.apiSecret
+        : process.env.RAZORPAY_KEY_SECRET) || ""
+    ).trim();
 
     if (!keyId || !keySecret) {
+      logger.error("Razorpay initialization failed: Key ID or Secret is missing in both DB and .env");
       throw new BadRequestError("Payment gateway is not configured");
     }
+
+    // Safe diagnostic log (masks keys for security)
+    logger.info(
+      `Initializing Razorpay order for ${orderNumber} using Key ID: ${keyId.slice(0, 8)}... ` +
+      `(Source: ${settings?.apiKey ? "Database payment_settings" : "server/.env"})`
+    );
 
     const order = await prisma.order.findUnique({
       where: { orderNumber },
@@ -923,16 +927,30 @@ export const checkoutService = {
       key_secret: keySecret,
     });
 
-    const rzpOrder = await razorpay.orders.create({
-      amount: Math.round(Number(order.totalAmount) * 100),
-      currency: order.currency || "INR",
-      receipt: order.orderNumber,
-      payment_capture: true,
-      notes: {
-        orderNumber: order.orderNumber,
-        orderId: order.id,
-      },
-    });
+    let rzpOrder;
+    try {
+      rzpOrder = (await razorpay.orders.create({
+        amount: Math.round(Number(order.totalAmount) * 100),
+        currency: order.currency || "INR",
+        receipt: order.orderNumber,
+        payment_capture: true,
+        notes: {
+          orderNumber: order.orderNumber,
+          orderId: order.id,
+        },
+      } as any)) as any;
+    } catch (err: any) {
+      const errorDescription =
+        err?.error?.description || err?.message || "Unknown Razorpay SDK error";
+      const errorCode = err?.error?.code || "ORDER_CREATION_FAILED";
+
+      logger.error(`Razorpay API Request Failed [${errorCode}]: ${errorDescription}`, {
+        orderNumber,
+        keyIdPrefix: keyId.slice(0, 10),
+      });
+
+      throw new BadRequestError(`Payment initialization failed: ${errorDescription}`);
+    }
 
     await prisma.payment.update({
       where: { orderId: order.id },
@@ -954,5 +972,157 @@ export const checkoutService = {
         phone: order.customer.phone,
       },
     };
+  },
+
+    // ────────────────────────────────────────────────────────────────────────
+  // Verify Razorpay Payment (Standard Checkout callback)
+  // ────────────────────────────────────────────────────────────────────────
+  verifyRazorpayPayment: async (input: {
+    orderNumber: string;
+    razorpay_payment_id: string;
+    razorpay_order_id: string;
+    razorpay_signature: string;
+    sessionId?: string;
+  }) => {
+    // 1. Find order + payment
+    const order = await prisma.order.findUnique({
+      where: { orderNumber: input.orderNumber },
+      include: { payment: true, customer: true, items: true },
+    });
+
+    if (!order) throw new NotFoundError("Order not found");
+
+    // 2. Idempotency — already confirmed (webhook may have beaten us)
+    if (order.status === OrderStatus.CONFIRMED) {
+      logger.info(
+        `verifyRazorpay: order ${order.orderNumber} already CONFIRMED — skipping`
+      );
+      return { verified: true, alreadyConfirmed: true };
+    }
+
+    if (
+      order.status !== OrderStatus.AWAITING_PAYMENT &&
+      order.status !== OrderStatus.PAYMENT_FAILED
+    ) {
+      throw new BadRequestError(
+        `Cannot verify payment. Order is "${order.status}"`
+      );
+    }
+
+    if (!order.payment) throw new BadRequestError("No payment record found");
+
+    // 3. Verify the Razorpay order ID matches what WE stored
+    const storedOrderId = order.payment.gatewayOrderId;
+    if (!storedOrderId || storedOrderId !== input.razorpay_order_id) {
+      logger.warn(
+        `verifyRazorpay: order ID mismatch for ${order.orderNumber}. ` +
+          `stored=${storedOrderId}, received=${input.razorpay_order_id}`
+      );
+      throw new BadRequestError("Payment order ID mismatch");
+    }
+
+    // 4. Get Razorpay key secret
+    const settings = await prisma.paymentSetting.findFirst();
+    const keySecret =
+      (settings?.apiSecret && settings.apiSecret.trim().length > 0
+        ? settings.apiSecret
+        : process.env.RAZORPAY_KEY_SECRET) || "";
+
+    if (!keySecret) {
+      throw new BadRequestError("Payment gateway is not configured");
+    }
+
+    // 5. Verify HMAC-SHA256 signature
+    const payload = `${storedOrderId}|${input.razorpay_payment_id}`;
+    const expectedSignature = crypto
+      .createHmac("sha256", keySecret)
+      .update(payload)
+      .digest("hex");
+
+    const receivedBuf = Buffer.from(input.razorpay_signature);
+    const expectedBuf = Buffer.from(expectedSignature);
+
+    if (receivedBuf.length !== expectedBuf.length) {
+      throw new BadRequestError("Invalid payment signature");
+    }
+
+    const isValid = crypto.timingSafeEqual(expectedBuf, receivedBuf);
+
+    if (!isValid) {
+      logger.warn(
+        `verifyRazorpay: signature verification failed for ${order.orderNumber}`
+      );
+      throw new BadRequestError("Invalid payment signature");
+    }
+
+    // 6. Atomic update — payment + order + timeline + cleanup cart
+    const now = new Date();
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.update({
+        where: { orderId: order.id },
+        data: {
+          status: PaymentStatus.SUCCESS,
+          gatewayPaymentId: input.razorpay_payment_id,
+          gatewaySignature: input.razorpay_signature,
+          gatewayName: "razorpay",
+          paidAt: now,
+        },
+      });
+
+      await tx.order.update({
+        where: { id: order.id },
+        data: { status: OrderStatus.CONFIRMED },
+      });
+
+      await tx.orderTimeline.create({
+        data: {
+          orderId: order.id,
+          eventType: TimelineEventType.PAYMENT_SUCCESS,
+          title: "Payment Successful",
+          description: `Payment of ₹${Number(order.totalAmount).toFixed(
+            2
+          )} verified via Razorpay`,
+          actorType: ActorType.SYSTEM,
+          isVisibleToCustomer: true,
+          metadata: {
+            razorpayPaymentId: input.razorpay_payment_id,
+            razorpayOrderId: input.razorpay_order_id,
+            amount: order.totalAmount,
+          } as any,
+        },
+      });
+
+      await tx.orderTimeline.create({
+        data: {
+          orderId: order.id,
+          eventType: TimelineEventType.ORDER_CONFIRMED,
+          title: "Order Confirmed",
+          description:
+            "Your order has been confirmed and will enter production soon.",
+          actorType: ActorType.SYSTEM,
+          isVisibleToCustomer: true,
+        },
+      });
+
+      // ── Clean up cart / checkout session only AFTER payment is verified ──
+      if (input.sessionId) {
+        await tx.cart.deleteMany({ where: { sessionId: input.sessionId } });
+        await tx.checkoutSession.deleteMany({ where: { sessionId: input.sessionId } });
+      }
+    });
+
+    // 7. Send confirmation email ONLY on confirmed payment
+    const fullOrder = await checkoutRepository.findOrderById(order.id);
+    if (fullOrder) {
+      emailService.sendOrderConfirmedEmail(fullOrder).catch(() => {});
+    }
+
+    logger.info(
+      `Order ${order.orderNumber} payment verified via Razorpay checkout ` +
+        `(payment: ${input.razorpay_payment_id})`
+    );
+
+    return { verified: true, alreadyConfirmed: false };
   },
 };

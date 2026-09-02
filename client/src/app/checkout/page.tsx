@@ -1,4 +1,3 @@
-//client\src\app\checkout\page.tsx
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
@@ -156,6 +155,7 @@ function CheckoutContent() {
   });
 
   const [sameShipping, setSameShipping] = useState(true);
+  const [activeOrder, setActiveOrder] = useState<any>(null);
 
   const shippingCharge    = resolveShippingCharge(shippingSettings, form.shipState);
   const totalWithShipping =
@@ -261,30 +261,53 @@ function CheckoutContent() {
     setPlacing(true);
 
     try {
-      const couponCode = sessionStorage.getItem("tcp_coupon");
-      const body = {
-        name:             form.name.trim(),
-        phone:            form.phone.trim(),
-        email:            form.email.trim() || undefined,
-        shipName:         sameShipping ? form.name.trim() : form.shipName.trim(),
-        shipPhone:        sameShipping ? form.phone.trim() : form.shipPhone.trim(),
-        shipLine1:        form.shipLine1.trim(),
-        shipLine2:        form.shipLine2.trim() || undefined,
-        shipCity:         form.shipCity.trim(),
-        shipState:        form.shipState.trim(),
-        shipPincode:      form.shipPincode.trim(),
-        shipCountry:      "India",
-        customerNote:     form.customerNote.trim() || undefined,
-        couponCode:       couponCode || undefined,
-        buyNowCheckoutId: buyNowId || undefined,
-      };
-      sessionStorage.removeItem("tcp_coupon");
-
       if (method === "whatsapp") {
+        const couponCode = sessionStorage.getItem("tcp_coupon");
+        const body = {
+          name:             form.name.trim(),
+          phone:            form.phone.trim(),
+          email:            form.email.trim() || undefined,
+          shipName:         sameShipping ? form.name.trim() : form.shipName.trim(),
+          shipPhone:        sameShipping ? form.phone.trim() : form.shipPhone.trim(),
+          shipLine1:        form.shipLine1.trim(),
+          shipLine2:        form.shipLine2.trim() || undefined,
+          shipCity:         form.shipCity.trim(),
+          shipState:        form.shipState.trim(),
+          shipPincode:      form.shipPincode.trim(),
+          shipCountry:      "India",
+          customerNote:     form.customerNote.trim() || undefined,
+          couponCode:       couponCode || undefined,
+          buyNowCheckoutId: buyNowId || undefined,
+        };
+        sessionStorage.removeItem("tcp_coupon");
         const order = await checkoutApi.placeDraftOrder(body);
         redirectToWhatsApp(order);
       } else {
-        const order = await checkoutApi.placeWebsiteOrder(body);
+        // Reuse existing pending order if already created, otherwise place a new one
+        let order = activeOrder;
+        if (!order) {
+          const couponCode = sessionStorage.getItem("tcp_coupon");
+          const body = {
+            name:             form.name.trim(),
+            phone:            form.phone.trim(),
+            email:            form.email.trim() || undefined,
+            shipName:         sameShipping ? form.name.trim() : form.shipName.trim(),
+            shipPhone:        sameShipping ? form.phone.trim() : form.shipPhone.trim(),
+            shipLine1:        form.shipLine1.trim(),
+            shipLine2:        form.shipLine2.trim() || undefined,
+            shipCity:         form.shipCity.trim(),
+            shipState:        form.shipState.trim(),
+            shipPincode:      form.shipPincode.trim(),
+            shipCountry:      "India",
+            customerNote:     form.customerNote.trim() || undefined,
+            couponCode:       couponCode || undefined,
+            buyNowCheckoutId: buyNowId || undefined,
+          };
+          sessionStorage.removeItem("tcp_coupon");
+          order = await checkoutApi.placeWebsiteOrder(body);
+          setActiveOrder(order);
+        }
+
         await openRazorpayCheckout(order);
       }
     } catch (err: any) {
@@ -314,7 +337,7 @@ function CheckoutContent() {
       const rzpRes = await fetch(
         `${API_URL}/api/checkout/razorpay-order/${order.orderNumber}`,
         {
-          method:  "POST",
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             "X-Session-Id": getSessionId(),
@@ -327,41 +350,67 @@ function CheckoutContent() {
       const razorpayData = rzpData.data;
 
       const options = {
-        key:         RAZORPAY_KEY,
-        amount:      razorpayData.amount,
-        currency:    razorpayData.currency,
-        name:        "The Craft Pallet",
+        key: RAZORPAY_KEY,
+        amount: razorpayData.amount,
+        currency: razorpayData.currency,
+        name: "The Craft Pallet",
         description: `Order ${order.orderNumber}`,
-        order_id:    razorpayData.razorpayOrderId,
+        order_id: razorpayData.razorpayOrderId,
         prefill: {
-          name:    razorpayData.customer?.name  || form.name,
-          email:   razorpayData.customer?.email || form.email,
+          name: razorpayData.customer?.name || form.name,
+          email: razorpayData.customer?.email || form.email,
           contact: `+91${razorpayData.customer?.phone || form.phone}`,
         },
         notes: { orderNumber: order.orderNumber, orderId: order.id },
         theme: { color: "#2B2B2B" },
-        handler: function () {
-          setTimeout(() => {
-            router.push(
-              `/order-confirmation/${order.orderNumber}?phone=${form.phone}&paid=true`
+
+        // ── SUCCESS: Verify on server and redirect ONLY if verified ──
+        handler: async function (response: any) {
+          try {
+            const verifyRes = await fetch(
+              `${API_URL}/api/checkout/razorpay-verify`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "X-Session-Id": getSessionId(),
+                },
+                body: JSON.stringify({
+                  orderNumber: order.orderNumber,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              }
             );
-          }, 1500);
+
+            if (verifyRes.ok) {
+              router.push(
+                `/order-confirmation/${order.orderNumber}?phone=${form.phone}&paid=true`
+              );
+            } else {
+              setError("Payment verification failed. Please contact support if amount was deducted.");
+              setPlacing(false);
+            }
+          } catch {
+            setError("Network error while verifying payment. Please refresh or check your email.");
+            setPlacing(false);
+          }
         },
+
         modal: {
           ondismiss: function () {
             setPlacing(false);
-            router.push(
-              `/order-confirmation/${order.orderNumber}?phone=${form.phone}`
-            );
+            setError("Payment was cancelled. You can click 'Pay Securely' to try again.");
           },
         },
       };
 
       const rzp = new window.Razorpay(options);
-      rzp.on("payment.failed", function () {
-        router.push(
-          `/order-confirmation/${order.orderNumber}?phone=${form.phone}`
-        );
+      rzp.on("payment.failed", function (response: any) {
+        setPlacing(false);
+        const reason = response?.error?.description || "Payment failed. Please try again or use another payment method.";
+        setError(reason);
       });
       rzp.open();
     } catch (err: any) {

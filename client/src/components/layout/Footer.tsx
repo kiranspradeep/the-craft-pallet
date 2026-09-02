@@ -36,7 +36,7 @@ export default function Footer() {
     { href: "/products",              label: "All Products"  },
     { href: "/categories",            label: "Collections"   },
     { href: "/products?featured=true",label: "Best Sellers"  },
-    { href: "/track",                 label: "Track Order"   },
+    { href: "/track-order",                 label: "Track Order"   },
   ];
 
   const helpLinks = [

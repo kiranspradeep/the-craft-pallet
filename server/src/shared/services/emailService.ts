@@ -3,12 +3,24 @@ import { logger } from "../logger/index.js";
 
 const resendApiKey = process.env.RESEND_API_KEY;
 const fromEmail = process.env.RESEND_FROM_EMAIL || "The Craft Pallet <onboarding@resend.dev>";
-const clientUrl = process.env.CLIENT_URL || "http://localhost:3000";
+const clientUrl = (process.env.CLIENT_URL || "http://localhost:3000").replace(/\/+$/, "");
 
 const resend = resendApiKey ? new Resend(resendApiKey) : null;
 
 const formatEmailPrice = (amount: any): string => {
-  return `₹${Number(amount).toFixed(2)}`;
+  return `₹${Number(amount || 0).toFixed(2)}`;
+};
+
+/**
+ * Helper to construct safe, properly encoded tracking URLs
+ */
+const getTrackingUrl = (orderNumber?: string, phone?: string): string => {
+  const params = new URLSearchParams();
+  if (orderNumber) params.set("order", orderNumber.trim());
+  if (phone) params.set("phone", phone.trim());
+
+  const queryString = params.toString();
+  return `${clientUrl}/track-order${queryString ? `?${queryString}` : ""}`;
 };
 
 export const emailService = {
@@ -16,10 +28,10 @@ export const emailService = {
    * 1. Order Placed Email (Awaiting Payment / Draft)
    */
   sendOrderPlacedEmail: async (order: any) => {
-    if (!resend || !order.customer?.email) return;
+    if (!resend || !order?.customer?.email) return;
 
     const isDraft = order.status === "DRAFT";
-    const trackLink = `${clientUrl}/track?order=${order.orderNumber}&phone=${order.customer.phone}`;
+    const trackLink = getTrackingUrl(order.orderNumber, order.customer?.phone);
 
     const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #2B2B2B; background-color: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px;">
@@ -28,7 +40,7 @@ export const emailService = {
           <p style="font-style: italic; color: #A68A75; margin: 4px 0 0;">Crafting Memories</p>
         </div>
         
-        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name},</p>
+        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name || "there"},</p>
         <p style="font-size: 15px; line-height: 1.6;">
           ${isDraft 
             ? "Your WhatsApp draft order has been successfully created! Let's complete the final steps on WhatsApp." 
@@ -38,12 +50,12 @@ export const emailService = {
         <div style="background-color: #FFFFFF; border: 1px solid #EAEAEA; border-radius: 6px; padding: 18px; margin: 24px 0;">
           <p style="margin: 0 0 8px; font-size: 12px; font-weight: 600; color: #A68A75; text-transform: uppercase; letter-spacing: 0.05em;">Order Details</p>
           <p style="margin: 0 0 4px; font-size: 16px; font-weight: 700; color: #2B2B2B;">${order.orderNumber}</p>
-          <p style="margin: 0; font-size: 13px; color: #7F7F7F;">Placed on ${new Date(order.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+          <p style="margin: 0; font-size: 13px; color: #7F7F7F;">Placed on ${new Date(order.createdAt || Date.now()).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
         </div>
 
         <h3 style="font-size: 14px; text-transform: uppercase; letter-spacing: 0.05em; color: #7F7F7F; margin-bottom: 12px;">Order Summary</h3>
         <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-          ${order.items.map((item: any) => `
+          ${(order.items || []).map((item: any) => `
             <tr style="border-bottom: 1px solid #EAEAEA;">
               <td style="padding: 10px 0; font-size: 14px; color: #2B2B2B;">
                 <strong>${item.productName}</strong> ${item.variantName ? `(${item.variantName})` : ""}
@@ -108,9 +120,9 @@ export const emailService = {
    * 2. Order Confirmed Email (Payment Success)
    */
   sendOrderConfirmedEmail: async (order: any) => {
-    if (!resend || !order.customer?.email) return;
+    if (!resend || !order?.customer?.email) return;
 
-    const trackLink = `${clientUrl}/track?order=${order.orderNumber}&phone=${order.customer.phone}`;
+    const trackLink = getTrackingUrl(order.orderNumber, order.customer?.phone);
 
     const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #2B2B2B; background-color: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px;">
@@ -119,7 +131,7 @@ export const emailService = {
           <p style="font-style: italic; color: #A68A75; margin: 4px 0 0;">Crafting Memories</p>
         </div>
         
-        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name},</p>
+        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name || "there"},</p>
         <p style="font-size: 15px; line-height: 1.6; color: #25D366; font-weight: 600;">✓ Payment Verified & Order Confirmed!</p>
         <p style="font-size: 15px; line-height: 1.6;">
           Your payment has been successfully verified. We are now preparing your custom order. If your product requires photos and you haven't uploaded them yet, please upload them via the tracking page link below.
@@ -164,9 +176,9 @@ export const emailService = {
    * 3. Order Shipped Email (with tracking link)
    */
   sendOrderShippedEmail: async (order: any, trackingNumber: string) => {
-    if (!resend || !order.customer?.email) return;
+    if (!resend || !order?.customer?.email) return;
 
-    const trackLink = `${clientUrl}/track?order=${order.orderNumber}&phone=${order.customer.phone}`;
+    const trackLink = getTrackingUrl(order.orderNumber, order.customer?.phone);
 
     const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #2B2B2B; background-color: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px;">
@@ -175,7 +187,7 @@ export const emailService = {
           <p style="font-style: italic; color: #A68A75; margin: 4px 0 0;">Crafting Memories</p>
         </div>
         
-        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name},</p>
+        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name || "there"},</p>
         <p style="font-size: 16px; line-height: 1.6; color: #A68A75; font-weight: 600;">🚚 Your Order Has Been Shipped!</p>
         <p style="font-size: 15px; line-height: 1.6;">
           Your custom keepsakes have finished production and are on their way to you!
@@ -223,7 +235,9 @@ export const emailService = {
    * 4. Order Delivered Email
    */
   sendOrderDeliveredEmail: async (order: any) => {
-    if (!resend || !order.customer?.email) return;
+    if (!resend || !order?.customer?.email) return;
+
+    const trackLink = getTrackingUrl(order.orderNumber, order.customer?.phone);
 
     const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #2B2B2B; background-color: #FAFAFA; border: 1px solid #EAEAEA; border-radius: 8px;">
@@ -232,7 +246,7 @@ export const emailService = {
           <p style="font-style: italic; color: #A68A75; margin: 4px 0 0;">Crafting Memories</p>
         </div>
         
-        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name},</p>
+        <p style="font-size: 15px; line-height: 1.6;">Hi ${order.customer.name || "there"},</p>
         <p style="font-size: 16px; line-height: 1.6; color: #25D366; font-weight: 600;">🎉 Order Delivered!</p>
         <p style="font-size: 15px; line-height: 1.6;">
           Your order <strong>${order.orderNumber}</strong> has been successfully delivered. We hope these handmade keepsakes bring a smile to your face!
@@ -240,6 +254,12 @@ export const emailService = {
         <p style="font-size: 15px; line-height: 1.6;">
           If you love your items, we would appreciate it if you could share a picture and tag us on Instagram or WhatsApp!
         </p>
+
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${trackLink}" target="_blank" style="background-color: #2B2B2B; color: #FFFFFF; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-size: 14px; font-weight: 600; display: inline-block;">
+            View Order Details
+          </a>
+        </div>
 
         <p style="font-size: 13px; color: #7F7F7F; text-align: center; line-height: 1.5; margin-top: 40px; border-top: 1px solid #EAEAEA; padding-top: 20px;">
           Have issues or feedback? Chat with us on WhatsApp at +91 97462 92208.

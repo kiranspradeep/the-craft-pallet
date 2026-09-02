@@ -7,6 +7,7 @@ import {
   createBuyNowSchema,
   buyNowIdSchema,
   updateBuyNowSchema,
+  verifyRazorpaySchema,
 } from "./validator.js";
 
 const router = Router();
@@ -45,6 +46,12 @@ router.get("/track/:orderNumber", checkoutController.trackOrder);
 router.post(
   "/razorpay-order/:orderNumber",
   checkoutController.createRazorpayOrder
+);
+
+router.post(
+  "/razorpay-verify",
+  validate(verifyRazorpaySchema),
+  checkoutController.verifyRazorpayPayment
 );
 
 export default router;

@@ -9,6 +9,7 @@ import {
   ActorType,
 } from "@prisma/client";
 import { logger } from "../../../shared/logger/index.js";
+import { emailService } from "../../../shared/services/emailService.js";
 
 // ── Signature Verification ────────────────────────────────────────────────
 
@@ -21,10 +22,15 @@ const verifyWebhookSignature = (
     .createHmac("sha256", secret)
     .update(rawBody)
     .digest("hex");
-  return crypto.timingSafeEqual(
-    Buffer.from(expectedSignature),
-    Buffer.from(signature)
-  );
+
+  const expectedBuf = Buffer.from(expectedSignature);
+  const signatureBuf = Buffer.from(signature);
+
+  if (expectedBuf.length !== signatureBuf.length) {
+    return false;
+  }
+
+  return crypto.timingSafeEqual(expectedBuf, signatureBuf);
 };
 
 // ── Main Webhook Handler ──────────────────────────────────────────────────
@@ -75,6 +81,7 @@ export const razorpayWebhookHandler = async (
 
       case "payment.authorized":
       case "payment.captured":
+      case "order.paid":
         await handlePaymentSuccess(event);
         break;
 
@@ -105,7 +112,7 @@ const findOrderForPayment = async (payment: any) => {
   if (razorpayOrderId) {
     const rec = await prisma.payment.findFirst({
       where: { gatewayOrderId: razorpayOrderId },
-      include: { order: { include: { customer: true } } },
+      include: { order: { include: { customer: true, items: true } } },
     });
     if (rec) return rec;
   }
@@ -114,7 +121,7 @@ const findOrderForPayment = async (payment: any) => {
   if (paymentLinkId) {
     const rec = await prisma.payment.findFirst({
       where: { gatewayOrderId: paymentLinkId },
-      include: { order: { include: { customer: true } } },
+      include: { order: { include: { customer: true, items: true } } },
     });
     if (rec) return rec;
   }
@@ -123,7 +130,7 @@ const findOrderForPayment = async (payment: any) => {
   if (orderId) {
     const rec = await prisma.payment.findFirst({
       where: { orderId },
-      include: { order: { include: { customer: true } } },
+      include: { order: { include: { customer: true, items: true } } },
     });
     if (rec) return rec;
   }
@@ -132,7 +139,7 @@ const findOrderForPayment = async (payment: any) => {
   if (orderNumber) {
     const order = await prisma.order.findUnique({
       where: { orderNumber },
-      include: { customer: true, payment: true },
+      include: { customer: true, items: true, payment: true },
     });
     if (order?.payment) {
       return { ...order.payment, order };
@@ -159,7 +166,7 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
 
   const paymentRecord = await prisma.payment.findFirst({
     where: { gatewayOrderId: paymentLinkId },
-    include: { order: { include: { customer: true } } },
+    include: { order: { include: { customer: true, items: true } } },
   });
 
   if (!paymentRecord) {
@@ -171,6 +178,7 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
 
   const order = paymentRecord.order;
 
+  // Idempotency: Already confirmed by browser verify route
   if (order.status === OrderStatus.CONFIRMED) {
     logger.info(
       `payment_link.paid: order ${order.orderNumber} already confirmed — skipping`
@@ -228,12 +236,15 @@ const handlePaymentLinkPaid = async (event: any): Promise<void> => {
     },
   });
 
+  // Dispatch confirmation email
+  emailService.sendOrderConfirmedEmail(order).catch(() => {});
+
   logger.info(
     `Order ${order.orderNumber} confirmed via payment_link.paid webhook`
   );
 };
 
-// ── payment.authorized / payment.captured — customer checkout flow ───────
+// ── payment.authorized / payment.captured / order.paid ──────────────────
 
 const handlePaymentSuccess = async (event: any): Promise<void> => {
   const payment = event.payload?.payment?.entity;
@@ -258,6 +269,7 @@ const handlePaymentSuccess = async (event: any): Promise<void> => {
 
   const order = paymentRecord.order;
 
+  // Idempotency: Already confirmed by browser verify route
   if (order.status === OrderStatus.CONFIRMED) {
     logger.info(
       `payment webhook: order ${order.orderNumber} already confirmed — skipping`
@@ -321,6 +333,9 @@ const handlePaymentSuccess = async (event: any): Promise<void> => {
     },
   });
 
+  // Dispatch confirmation email
+  emailService.sendOrderConfirmedEmail(order).catch(() => {});
+
   logger.info(
     `Order ${order.orderNumber} confirmed via payment webhook (payment: ${razorpayPaymentId}, method: ${method})`
   );
@@ -351,11 +366,9 @@ const handlePaymentFailed = async (event: any): Promise<void> => {
 
   const order = paymentRecord.order;
 
-  // ── IDEMPOTENCY GUARDS ─────────────────────────────────────────────
-  // Never downgrade a successful payment / confirmed order
   if (paymentRecord.status === PaymentStatus.SUCCESS) {
     logger.info(
-      `payment.failed: payment for order ${order.orderNumber} already SUCCESS — ignoring failure event (retried card etc)`
+      `payment.failed: payment for order ${order.orderNumber} already SUCCESS — ignoring failure event`
     );
     return;
   }

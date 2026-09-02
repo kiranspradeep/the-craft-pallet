@@ -462,7 +462,7 @@ export default function ContactPage() {
                   <strong style={{ color: "var(--text-primary)" }}>Order ID</strong>{" "}
                   when contacting us so we can assist you faster.{" "}
                   <Link
-                    href="/track"
+                    href="/track-order"
                     style={{
                       color: "var(--brand)", fontWeight: 500, textDecoration: "underline",
                     }}

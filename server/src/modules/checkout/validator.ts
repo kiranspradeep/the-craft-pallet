@@ -74,3 +74,14 @@ export const updateBuyNowSchema = z.object({
     customizations: z.array(customizationSchema).optional(),
   }),
 });
+
+// ── Razorpay Verify ───────────────────────────────────────────────────────
+
+export const verifyRazorpaySchema = z.object({
+  body: z.object({
+    orderNumber: z.string({ required_error: "Order number is required" }).min(1),
+    razorpay_payment_id: z.string().min(1),
+    razorpay_order_id: z.string().min(1),
+    razorpay_signature: z.string().min(1),
+  }),
+});
