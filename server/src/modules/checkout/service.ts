@@ -240,7 +240,6 @@ export const checkoutService = {
     return checkoutRepository.updateCheckoutSession(id, data);
   },
 
-  
   // ────────────────────────────────────────────────────────────────────────
   // WEBSITE CHECKOUT — creates AWAITING_PAYMENT order
   // ────────────────────────────────────────────────────────────────────────
@@ -473,19 +472,39 @@ export const checkoutService = {
         });
 
         const customizations = (buyNowSession.customizations as any[]) ?? [];
+        const usedAssetIds = new Set<string>();
         let sessionAssetAssigned = false;
 
         for (const c of customizations) {
-          let assetId: string | null = c.assetId ?? null;
+          let assetId: string | null = null;
 
+          // Only set standard assetId if it hasn't been mapped yet in this transaction loop
+          if (c.assetId && !usedAssetIds.has(c.assetId)) {
+            assetId = c.assetId;
+          }
+
+          // Fallback to buyNowSession.assetId if eligible and not already assigned
           if (
             !assetId &&
             !sessionAssetAssigned &&
             c.fieldType === "PHOTO_UPLOAD" &&
-            buyNowSession.assetId
+            buyNowSession.assetId &&
+            !usedAssetIds.has(buyNowSession.assetId)
           ) {
             assetId = buyNowSession.assetId;
             sessionAssetAssigned = true;
+          }
+
+          // Strict Database Unique Constraint Safety Check
+          if (assetId) {
+            const alreadyExists = await tx.customization.findUnique({
+              where: { assetId },
+            });
+            if (alreadyExists) {
+              assetId = null; // Do not crash, nullify duplicate asset assignments
+            } else {
+              usedAssetIds.add(assetId);
+            }
           }
 
           await tx.customization.create({
@@ -772,19 +791,39 @@ export const checkoutService = {
         });
 
         const customizations = (buyNowSession.customizations as any[]) ?? [];
+        const usedAssetIds = new Set<string>();
         let sessionAssetAssigned = false;
 
         for (const c of customizations) {
-          let assetId: string | null = c.assetId ?? null;
+          let assetId: string | null = null;
 
+          // Only set standard assetId if it hasn't been mapped yet in this transaction loop
+          if (c.assetId && !usedAssetIds.has(c.assetId)) {
+            assetId = c.assetId;
+          }
+
+          // Fallback to buyNowSession.assetId if eligible and not already assigned
           if (
             !assetId &&
             !sessionAssetAssigned &&
             c.fieldType === "PHOTO_UPLOAD" &&
-            buyNowSession.assetId
+            buyNowSession.assetId &&
+            !usedAssetIds.has(buyNowSession.assetId)
           ) {
             assetId = buyNowSession.assetId;
             sessionAssetAssigned = true;
+          }
+
+          // Strict Database Unique Constraint Safety Check
+          if (assetId) {
+            const alreadyExists = await tx.customization.findUnique({
+              where: { assetId },
+            });
+            if (alreadyExists) {
+              assetId = null; // Do not crash, nullify duplicate asset assignments
+            } else {
+              usedAssetIds.add(assetId);
+            }
           }
 
           await tx.customization.create({
@@ -880,7 +919,7 @@ export const checkoutService = {
     return order;
   },
 
-    // ────────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────
   // Create Razorpay Order
   // ────────────────────────────────────────────────────────────────────────
   createRazorpayOrder: async (orderNumber: string) => {
@@ -974,7 +1013,7 @@ export const checkoutService = {
     };
   },
 
-    // ────────────────────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────────────────────
   // Verify Razorpay Payment (Standard Checkout callback)
   // ────────────────────────────────────────────────────────────────────────
   verifyRazorpayPayment: async (input: {
