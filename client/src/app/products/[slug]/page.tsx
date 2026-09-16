@@ -1,142 +1,212 @@
-// app/products/[slug]/page.tsx
-import { apiGet } from "@/lib/api";
-import { notFound } from "next/navigation";
-import Link from "next/link";
-import { ChevronRight } from "lucide-react";
-import ProductDetail from "@/components/products/ProductDetail";
-import ProductCard from "@/components/ui/ProductCard";
+import { apiGet } from "@/lib/api"; 
+import { notFound } from "next/navigation"; 
+import Link from "next/link"; 
+import { ChevronRight } from "lucide-react"; 
+import ProductDetail from "@/components/products/ProductDetail"; 
+import ProductCard from "@/components/ui/ProductCard"; 
 
-interface Props {
-  params: Promise<{ slug: string }>;
-}
+interface Props { 
+  params: Promise<{ slug: string }>; 
+} 
 
-export async function generateMetadata({ params }: Props) {
-  const { slug } = await params;
-  try {
-    const product = await apiGet<any>(`/api/products/${slug}`);
-    return {
-      title: product.metaTitle || `${product.name} — The Craft Pallet`,
-      description: product.metaDescription || product.shortDescription,
-      keywords: product.metaKeywords,
-    };
-  } catch {
-    return { title: "Product Not Found — The Craft Pallet" };
-  }
-}
+const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://www.craftpallet.com";
 
-export default async function ProductPage({ params }: Props) {
-  const { slug } = await params;
+export async function generateMetadata({ params }: Props) { 
+  const { slug } = await params; 
+  try { 
+    const product = await apiGet<any>(`/api/products/${slug}`); 
+    const productUrl = `${siteUrl}/products/${slug}`;
+    const productImg = product.thumbnail?.url || "/images/og-default.jpg";
 
-  let product: any;
-  try {
-    product = await apiGet<any>(`/api/products/${slug}`);
-  } catch {
-    notFound();
-  }
+    return { 
+      title: product.metaTitle || `${product.name} — Personalised Gift`, 
+      description: product.metaDescription || product.shortDescription, 
+      keywords: product.metaKeywords || "personalised polaroid prints, custom photo gift",
+      alternates: {
+        canonical: productUrl,
+      },
+      openGraph: {
+        title: product.metaTitle || `${product.name} — The Craft Pallet`,
+        description: product.metaDescription || product.shortDescription,
+        url: productUrl,
+        type: "article",
+        images: [
+          {
+            url: productImg,
+            alt: product.name,
+          }
+        ]
+      }
+    }; 
+  } catch { 
+    return { title: "Product Not Found — The Craft Pallet" }; 
+  } 
+} 
+
+export default async function ProductPage({ params }: Props) { 
+  const { slug } = await params; 
+
+  let product: any; 
+  try { 
+    product = await apiGet<any>(`/api/products/${slug}`); 
+  } catch { 
+    notFound(); 
+  } 
+
+  // Helper to extract schema price
+  const getSchemaPrice = () => {
+    const config = product.pricingConfig;
+    if (!config) return "0.00";
+    if (config.strategy === "PER_UNIT" && config.unitPrice) return config.unitPrice;
+    if (config.strategy === "INCREMENTAL_QUANTITY" && config.incrementPrice) return config.incrementPrice;
+    if (config.strategy === "TIERED_PRICING" && config.tiers?.length > 0) {
+      return config.tiers[0].price;
+    }
+    if (config.strategy === "FIXED_VARIANTS" && product.variants?.length > 0) {
+      return product.variants[0].price;
+    }
+    return "0.00";
+  };
+
+  // Structured Data (JSON-LD) for Google Rich Snippets
+  const productSchema = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": product.name,
+    "image": product.thumbnail?.url ? [product.thumbnail.url] : [],
+    "description": product.shortDescription || product.description,
+    "sku": product.id,
+    "brand": {
+      "@type": "Brand",
+      "name": "The Craft Pallet"
+    },
+    "offers": {
+      "@type": "Offer",
+      "url": `${siteUrl}/products/${product.slug}`,
+      "priceCurrency": "INR",
+      "price": getSchemaPrice(),
+      "itemCondition": "https://schema.org/NewCondition",
+      "availability": "https://schema.org/InStock",
+      "seller": {
+        "@type": "Organization",
+        "name": "The Craft Pallet"
+      }
+    }
+  };
 
   return (
-    <div
-      style={{
-        backgroundColor: "var(--bg)",
-        paddingTop: "28px",
-        paddingBottom: "120px",
-      }}
-    >
-      {/* Breadcrumb */}
-      <div className="tcp-container" style={{ marginBottom: "40px" }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-            fontSize: "12px",
-            color: "var(--text-tertiary)",
-            flexWrap: "wrap",
-          }}
-        >
-          <Link
-            href="/"
-            style={{ transition: "color 200ms ease" }}
-            className="hover:text-[var(--text-primary)]"
-          >
-            Home
-          </Link>
-          <ChevronRight size={13} strokeWidth={1.75} />
-          <Link
-            href="/products"
-            style={{ transition: "color 200ms ease" }}
-            className="hover:text-[var(--text-primary)]"
-          >
-            Products
-          </Link>
-          <ChevronRight size={13} strokeWidth={1.75} />
-          <Link
-            href={`/categories/${product.category.slug}`}
-            style={{ transition: "color 200ms ease" }}
-            className="hover:text-[var(--text-primary)]"
-          >
-            {product.category.name}
-          </Link>
-          <ChevronRight size={13} strokeWidth={1.75} />
-          <span
-            style={{
-              color: "var(--text-primary)",
-              fontWeight: 500,
-              maxWidth: "200px",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {product.name}
-          </span>
-        </div>
-      </div>
+    <div 
+      style={{ 
+        backgroundColor: "var(--bg)", 
+        paddingTop: "28px", 
+        paddingBottom: "120px", 
+      }} 
+    > 
+      {/* Inject Structured Data into the Page Head */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
+      />
 
-      {/* Product detail */}
-      <ProductDetail product={product} />
-
-      {/* Related products */}
-      {product.relatedProducts?.length > 0 && (
-        <section
-          style={{
-            marginTop: "96px",
-            paddingTop: "64px",
-            borderTop: "1px solid var(--border-soft)",
-          }}
-        >
-          <div className="tcp-container">
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-end",
-                justifyContent: "space-between",
-                gap: "24px",
-                marginBottom: "48px",
-                flexWrap: "wrap",
-              }}
-            >
-              <div>
-                <p className="tcp-eyebrow">You May Also Like</p>
-                <h2 className="tcp-heading">Related Products</h2>
-              </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns:
-                  "repeat(auto-fill, minmax(240px, 1fr))",
-                gap: "40px 28px",
-              }}
-            >
+      {/* Breadcrumb */} 
+      <div className="tcp-container" style={{ marginBottom: "40px" }}> 
+        <div 
+          style={{ 
+            display: "flex", 
+            alignItems: "center", 
+            gap: "6px", 
+            fontSize: "12px", 
+            color: "var(--text-tertiary)", 
+            flexWrap: "wrap", 
+          }} 
+        > 
+          <Link 
+            href="/" 
+            style={{ transition: "color 200ms ease" }} 
+            className="hover:text-[var(--text-primary)]" 
+          > 
+            Home 
+          </Link> 
+          <ChevronRight size={13} strokeWidth={1.75} /> 
+          <Link 
+            href="/products" 
+            style={{ transition: "color 200ms ease" }} 
+            className="hover:text-[var(--text-primary)]" 
+          > 
+            Products 
+          </Link> 
+          {product.category && (
+            <>
+              <ChevronRight size={13} strokeWidth={1.75} /> 
+              <Link 
+                href={`/categories/${product.category.slug}`} 
+                style={{ transition: "color 200ms ease" }} 
+                className="hover:text-[var(--text-primary)]" 
+              > 
+                {product.category.name} 
+              </Link> 
+            </>
+          )}
+          <ChevronRight size={13} strokeWidth={1.75} /> 
+          <span 
+            style={{ 
+              color: "var(--text-primary)", 
+              fontWeight: 500, 
+              maxWidth: "200px", 
+              overflow: "hidden", 
+              textOverflow: "ellipsis", 
+              whiteSpace: "nowrap", 
+            }} 
+          > 
+            {product.name} 
+          </span> 
+        </div> 
+      </div> 
+ 
+      {/* Product detail */} 
+      <ProductDetail product={product} /> 
+ 
+      {/* Related products */} 
+      {product.relatedProducts?.length > 0 && ( 
+        <section 
+          style={{ 
+            marginTop: "96px", 
+            paddingTop: "64px", 
+            borderTop: "1px solid var(--border-soft)", 
+          }} 
+        > 
+          <div className="tcp-container"> 
+            <div 
+              style={{ 
+                display: "flex", 
+                alignItems: "flex-end", 
+                justifyContent: "space-between", 
+                gap: "24px", 
+                marginBottom: "48px", 
+                flexWrap: "wrap", 
+              }} 
+            > 
+              <div> 
+                <p className="tcp-eyebrow">You May Also Like</p> 
+                <h2 className="tcp-heading">Related Products</h2> 
+              </div> 
+            </div> 
+ 
+            <div 
+              style={{ 
+                display: "grid", 
+                gridTemplateColumns: 
+                  "repeat(auto-fill, minmax(240px, 1fr))", 
+                gap: "40px 28px", 
+              }} 
+            > 
               {product.relatedProducts.map((p: any) => (
-                <ProductCard key={p.id} product={p} />
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-    </div>
-  );
+                <ProductCard key={p.id} product={p} /> 
+              ))} 
+            </div> 
+          </div> 
+        </section> 
+      )} 
+    </div> 
+  ); 
 }

@@ -4,6 +4,17 @@ import { apiGet, apiGetList } from "@/lib/api";
 import ProductCard from "@/components/ui/ProductCard";
 import ProductFilters from "@/components/products/ProductFilters";
 import { Package } from "lucide-react";
+import { Metadata } from "next";
+
+const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://www.craftpallet.com";
+
+export const metadata: Metadata = {
+  title: "Shop Personalised Keepsakes & Gifts Online",
+  description: "Explore our collection of custom premium products. High-quality polaroids, custom wood printing, photo frames, and customized memories.",
+  alternates: {
+    canonical: `${siteUrl}/products`,
+  },
+};
 
 interface Category {
   id: string;
