@@ -6,7 +6,7 @@ import ProductFilters from "@/components/products/ProductFilters";
 import { Package } from "lucide-react";
 import { Metadata } from "next";
 
-const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://www.craftpallet.com";
+const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://craftpallet.com";
 
 export const metadata: Metadata = {
   title: "Shop Personalised Keepsakes & Gifts Online",
