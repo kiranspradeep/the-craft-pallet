@@ -874,7 +874,7 @@ model ImageRetentionSetting {
   maxUploadSizeMb  Int      @default(500)
   allowedMimeTypes String[]
   storageProvider  String   @default("local")
-  storageBucket    String?Z
+  storageBucket    String?
   storageRegion    String?
   updatedAt        DateTime @updatedAt
 
