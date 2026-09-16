@@ -50,7 +50,6 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "./",
   },
-  // Put your Google Search Console Verification tag code in .env as NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || "",
   },
@@ -96,7 +95,7 @@ export default function RootLayout({
   children: React.ReactNode; 
 }) { 
   return ( 
-    <html lang="en" className={`${poppins.variable} ${playfair.variable}`}> 
+    <html lang="en" data-scroll-behavior="smooth" className={`${poppins.variable} ${playfair.variable}`}>
       <body className="min-h-screen flex flex-col font-sans"> 
         <PreventZoom /> 
         <Navbar /> 

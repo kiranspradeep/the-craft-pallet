@@ -8,18 +8,25 @@ interface Props {
   params: Promise<{ slug: string }>; 
 } 
 
-const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://www.craftpallet.com";
+const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://craftpallet.com";
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params;
   try {
     const category = await apiGet<any>(`/api/categories/${slug}`);
+    const canonicalUrl = `${siteUrl}/categories/${slug}`;
     return {
       title: `${category.name} Collection — Personalised Gifts`,
       description: category.description || `Browse the exclusive handcrafted items inside the ${category.name} collection at The Craft Pallet.`,
       alternates: {
-        canonical: `${siteUrl}/categories/${slug}`,
+        canonical: canonicalUrl,
       },
+      openGraph: {
+        title: `${category.name} Collection — The Craft Pallet`,
+        description: category.description,
+        url: canonicalUrl,
+        type: "website",
+      }
     };
   } catch {
     return { title: "Collection — The Craft Pallet" };

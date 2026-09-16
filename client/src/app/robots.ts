@@ -1,6 +1,6 @@
 import { MetadataRoute } from "next";
 
-const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://www.craftpallet.com";
+const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://craftpallet.com";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -13,7 +13,7 @@ export default function robots(): MetadataRoute.Robots {
         "/checkout/",
         "/order-confirmation/",
         "/api/",
-        "*?order=*",  // Block search query params tracking
+        "*?order=*",
         "*?phone=*",
       ],
     },

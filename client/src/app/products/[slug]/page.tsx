@@ -4,48 +4,48 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react"; 
 import ProductDetail from "@/components/products/ProductDetail"; 
 import ProductCard from "@/components/ui/ProductCard"; 
-
+ 
 interface Props { 
   params: Promise<{ slug: string }>; 
 } 
 
-const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://www.craftpallet.com";
-
+const siteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://craftpallet.com";
+ 
 export async function generateMetadata({ params }: Props) { 
   const { slug } = await params; 
   try { 
     const product = await apiGet<any>(`/api/products/${slug}`); 
-    const productUrl = `${siteUrl}/products/${slug}`;
-    const productImg = product.thumbnail?.url || "/images/og-default.jpg";
+    const canonicalUrl = `${siteUrl}/products/${slug}`;
+    const ogImage = product.thumbnail?.url || `${siteUrl}/images/og-default.jpg`;
 
     return { 
-      title: product.metaTitle || `${product.name} — Personalised Gift`, 
+      title: product.metaTitle || `${product.name} — Personalised Keepsake`, 
       description: product.metaDescription || product.shortDescription, 
-      keywords: product.metaKeywords || "personalised polaroid prints, custom photo gift",
+      keywords: product.metaKeywords,
       alternates: {
-        canonical: productUrl,
+        canonical: canonicalUrl,
       },
       openGraph: {
         title: product.metaTitle || `${product.name} — The Craft Pallet`,
         description: product.metaDescription || product.shortDescription,
-        url: productUrl,
+        url: canonicalUrl,
         type: "article",
         images: [
           {
-            url: productImg,
+            url: ogImage,
             alt: product.name,
           }
         ]
       }
     }; 
   } catch { 
-    return { title: "Product Not Found — The Craft Pallet" }; 
+    return { title: "Product Not Found" }; 
   } 
 } 
-
+ 
 export default async function ProductPage({ params }: Props) { 
   const { slug } = await params; 
-
+ 
   let product: any; 
   try { 
     product = await apiGet<any>(`/api/products/${slug}`); 
@@ -53,7 +53,6 @@ export default async function ProductPage({ params }: Props) {
     notFound(); 
   } 
 
-  // Helper to extract schema price
   const getSchemaPrice = () => {
     const config = product.pricingConfig;
     if (!config) return "0.00";
@@ -68,7 +67,6 @@ export default async function ProductPage({ params }: Props) {
     return "0.00";
   };
 
-  // Structured Data (JSON-LD) for Google Rich Snippets
   const productSchema = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -93,8 +91,8 @@ export default async function ProductPage({ params }: Props) {
       }
     }
   };
-
-  return (
+ 
+  return ( 
     <div 
       style={{ 
         backgroundColor: "var(--bg)", 
@@ -102,7 +100,6 @@ export default async function ProductPage({ params }: Props) {
         paddingBottom: "120px", 
       }} 
     > 
-      {/* Inject Structured Data into the Page Head */}
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(productSchema) }}
@@ -200,7 +197,7 @@ export default async function ProductPage({ params }: Props) {
                 gap: "40px 28px", 
               }} 
             > 
-              {product.relatedProducts.map((p: any) => (
+              {product.relatedProducts.map((p: any) => ( 
                 <ProductCard key={p.id} product={p} /> 
               ))} 
             </div> 

@@ -110,17 +110,17 @@ export default function Navbar() {
             }}
           >
             <Image
-              src="/images/craft-pallet-logo-horizontal.svg"
-              alt="The Craft Pallet"
-              width={160}
-              height={40}
-              priority
-              style={{
-                height: "68px",
-                width: "auto",
-                objectFit: "contain",
-              }}
-            />
+  src="/images/craft-pallet-logo-horizontal.svg"
+  alt="The Craft Pallet"
+  width={160}
+  height={40}
+  priority
+  style={{
+    height: "auto",
+    width: "160px",
+    objectFit: "contain",
+  }}
+/>
           </Link>
 
           {/* Desktop Nav */}

@@ -1,6 +1,5 @@
 import { MetadataRoute } from "next";
 
-// Ensure no trailing slash on base URL
 const rawSiteUrl = process.env.NEXT_PUBLIC_CLIENT_URL || "https://craftpallet.com";
 const siteUrl = rawSiteUrl.replace(/\/+$/, "");
 const apiUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000").replace(/\/+$/, "");
@@ -45,7 +44,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }));
     }
   } catch (err) {
-    console.error("Sitemap error (categories):", err);
+    console.error("Sitemap error loading categories:", err);
   }
 
   try {
@@ -63,7 +62,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       }));
     }
   } catch (err) {
-    console.error("Sitemap error (products):", err);
+    console.error("Sitemap error loading products:", err);
   }
 
   return [...staticRoutes, ...categoryRoutes, ...productRoutes];
