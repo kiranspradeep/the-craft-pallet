@@ -63,8 +63,31 @@ async function getHomeData() {
 export default async function HomePage() {
   const { categories, featuredProducts } = await getHomeData();
 
+  const organizationSchema = {
+    "@context": "https://schema.org",
+    "@type": "OnlineStore",
+    "@id": "https://craftpallet.com/#organization",
+    name: "The Craft Pallet",
+    url: "https://craftpallet.com/",
+    logo: "https://craftpallet.com/images/craft-pallet-logo-horizontal.png",
+    description:
+      "Premium personalised polaroids, photo prints, and custom gifts.",
+    sameAs: [
+      "https://www.instagram.com/craft.pallet_/",
+      "https://www.instagram.com/the_craft.pallet_/",
+    ],
+  };
+
   return (
     <>
+      {/* Organization / OnlineStore structured data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(organizationSchema),
+        }}
+      />
+
       {/* 1. Brand statement + immediate shop CTA */}
       <HeroSection />
 
@@ -74,10 +97,10 @@ export default async function HomePage() {
       {/* 3. Help them browse by category */}
       <CategoriesSection categories={categories} />
 
-      {/* 4. Brand story — build emotional connection after product interest */}
+      {/* 4. Brand story */}
       <FeaturedStory />
 
-      {/* 5. Reassurance — reinforce quality before objections */}
+      {/* 5. Reassurance */}
       <TrustBar />
 
       {/* 6. Answer final objections */}
