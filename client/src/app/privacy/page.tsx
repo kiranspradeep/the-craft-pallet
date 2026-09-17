@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy | The Craft Pallet",
+  title: "Privacy Policy",
   description:
     "Read The Craft Pallet's privacy policy to learn how we collect, use, protect, and retain customer information, orders, payments, and uploaded photographs.",
   alternates: {

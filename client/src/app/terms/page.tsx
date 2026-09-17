@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Terms & Conditions | The Craft Pallet",
+  title: "Terms & Conditions",
   description:
     "Read The Craft Pallet's terms and conditions for personalised gifts, orders, payments, shipping, cancellations, and customer responsibilities.",
   alternates: {

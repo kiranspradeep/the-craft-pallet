@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Shipping & Delivery Policy | The Craft Pallet",
+  title: "Shipping & Delivery Policy",
   description:
     "Learn about The Craft Pallet's shipping charges, processing times, delivery timelines, order tracking, and delivery policies across India.",
   alternates: {
