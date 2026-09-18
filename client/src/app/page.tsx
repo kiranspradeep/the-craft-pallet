@@ -14,15 +14,23 @@ export const metadata: Metadata = {
   description:
     "Transform your favourite memories into beautifully crafted keepsakes. Premium personalised polaroids, photo prints, and custom gifts.",
   alternates: {
-    canonical: "https://craftpallet.com/",
+    canonical: "https://craftpallet.com",
   },
   openGraph: {
     title: "The Craft Pallet | Personalised Gifts & Keepsakes",
     description:
       "Transform your favourite memories into beautifully crafted keepsakes. Premium personalised polaroids, photo prints, and custom gifts.",
-    url: "https://craftpallet.com/",
+    url: "https://craftpallet.com",
     siteName: "The Craft Pallet",
     type: "website",
+    images: [
+      {
+        url: "/images/og-default.jpg",
+        width: 1200,
+        height: 630,
+        alt: "The Craft Pallet — Crafting Memories",
+      },
+    ],
   },
 };
 
@@ -81,19 +89,31 @@ async function getHomeData() {
 export default async function HomePage() {
   const { categories, featuredProducts } = await getHomeData();
 
+  // Structured Data linking your Brand, Store, and official Instagram handle
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "OnlineStore",
     "@id": "https://craftpallet.com/#organization",
     name: "The Craft Pallet",
-    url: "https://craftpallet.com/",
-    logo: "https://craftpallet.com/images/craft-pallet-logo-horizontal.png",
+    url: "https://craftpallet.com",
+    logo: "https://craftpallet.com/images/craft-pallet-logo-icon.png",
+    image: "https://craftpallet.com/images/craft-pallet-logo-horizontal.svg",
     description:
-      "Premium personalised polaroids, photo prints, and custom gifts.",
+      "Premium personalised polaroids, photo prints, custom frames, and memory keepsakes crafted in India.",
+    currenciesAccepted: "INR",
+    paymentAccepted: "UPI, Credit Card, Debit Card, Net Banking",
+    priceRange: "₹",
+    telephone: "+919746292208",
     sameAs: [
       "https://www.instagram.com/craft.pallet_/",
-      "https://www.instagram.com/the_craft.pallet_/",
     ],
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+91-97462-92208",
+      contactType: "customer service",
+      areaServed: "IN",
+      availableLanguage: ["en", "ml", "hi"],
+    },
   };
 
   return (

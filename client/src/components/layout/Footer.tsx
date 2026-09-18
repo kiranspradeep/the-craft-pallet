@@ -75,17 +75,17 @@ export default function Footer() {
   ];
 
   const socialLinks = [
-    {
-      href:  "https://instagram.com",
-      icon:  <InstagramIcon size={15} />,
-      label: "Instagram",
-    },
-    {
-      href:  "https://wa.me/919746292208",
-      icon:  <WhatsAppIcon size={15} />,
-      label: "WhatsApp",
-    },
-  ];
+  {
+    href:  "https://www.instagram.com/craft.pallet_/",
+    icon:  <InstagramIcon size={15} />,
+    label: "Instagram",
+  },
+  {
+    href:  "https://wa.me/919746292208",
+    icon:  <WhatsAppIcon size={15} />,
+    label: "WhatsApp",
+  },
+];
 
   return (
     <footer
