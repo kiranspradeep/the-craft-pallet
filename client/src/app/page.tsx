@@ -1,4 +1,4 @@
-//client\src\app\page.tsx
+import type { Metadata } from "next";
 import { apiGet, apiGetList } from "@/lib/api";
 import HeroSection from "@/components/home/HeroSection";
 import BestSellersSection from "@/components/home/BestSellersSection";
@@ -7,6 +7,24 @@ import FeaturedStory from "@/components/home/FeaturedStory";
 import TrustBar from "@/components/home/TrustBar";
 import FaqSection from "@/components/home/FaqSection";
 import WhatsAppButton from "@/components/ui/WhatsAppButton";
+
+// ── Next.js SEO Metadata Configuration ───────────────────────────────────────
+export const metadata: Metadata = {
+  title: "The Craft Pallet | Personalised Gifts, Photo Prints & Polaroids",
+  description:
+    "Transform your favourite memories into beautifully crafted keepsakes. Premium personalised polaroids, photo prints, and custom gifts.",
+  alternates: {
+    canonical: "https://craftpallet.com/",
+  },
+  openGraph: {
+    title: "The Craft Pallet | Personalised Gifts & Keepsakes",
+    description:
+      "Transform your favourite memories into beautifully crafted keepsakes. Premium personalised polaroids, photo prints, and custom gifts.",
+    url: "https://craftpallet.com/",
+    siteName: "The Craft Pallet",
+    type: "website",
+  },
+};
 
 interface Category {
   id: string;
