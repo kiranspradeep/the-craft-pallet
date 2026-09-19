@@ -68,34 +68,48 @@ export default async function ProductPage({ params }: Props) {
   };
 
   const productSchema = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    "name": product.name,
-    // "image": product.thumbnail?.url ? [product.thumbnail.url] : [],
-    image: Array.isArray(product.images)
-  ? product.images
-      .map((img: any) => img.url)
-      .filter(Boolean)
-  : [],
-    "description": product.shortDescription || product.description,
-    "sku": product.id,
-    "brand": {
-      "@type": "Brand",
-      "name": "The Craft Pallet"
+  "@context": "https://schema.org",
+  "@type": "Product",
+
+  "name": product.name,
+
+  "image": Array.isArray(product.images)
+    ? product.images
+        .map((img: any) => img.url)
+        .filter(Boolean)
+    : [],
+
+  "description":
+    product.shortDescription || product.description,
+
+  "sku": product.id,
+
+  "brand": {
+    "@type": "Brand",
+    "name": "The Craft Pallet",
+  },
+
+  "offers": {
+    "@type": "Offer",
+
+    "url": `${siteUrl}/products/${product.slug}`,
+
+    "priceCurrency": "INR",
+
+    "price": getSchemaPrice(),
+
+    "itemCondition":
+      "https://schema.org/NewCondition",
+
+    "availability":
+      "https://schema.org/InStock",
+
+    "seller": {
+      "@type": "Organization",
+      "name": "The Craft Pallet",
     },
-    "offers": {
-      "@type": "Offer",
-      "url": `${siteUrl}/products/${product.slug}`,
-      "priceCurrency": "INR",
-      "price": getSchemaPrice(),
-      "itemCondition": "https://schema.org/NewCondition",
-      "availability": "https://schema.org/InStock",
-      "seller": {
-        "@type": "Organization",
-        "name": "The Craft Pallet"
-      }
-    }
-  };
+  },
+};
  
   return ( 
     <div 
