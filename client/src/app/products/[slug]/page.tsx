@@ -71,7 +71,12 @@ export default async function ProductPage({ params }: Props) {
     "@context": "https://schema.org",
     "@type": "Product",
     "name": product.name,
-    "image": product.thumbnail?.url ? [product.thumbnail.url] : [],
+    // "image": product.thumbnail?.url ? [product.thumbnail.url] : [],
+    image: Array.isArray(product.images)
+  ? product.images
+      .map((img: any) => img.url)
+      .filter(Boolean)
+  : [],
     "description": product.shortDescription || product.description,
     "sku": product.id,
     "brand": {

@@ -44,6 +44,7 @@ export default function Footer() {
     { href: "/#about",        label: "About Us"               },
     { href: "/contact",       label: "Contact Us"             },
     { href: "/refund-policy", label: "Cancellation & Refunds" },
+    { href: "/sitemap", label: "Sitemap" },
   ];
 
   const legalLinks = [
