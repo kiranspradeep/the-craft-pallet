@@ -31,36 +31,6 @@ declare global {
   }
 }
 
-// ── Shipping helpers ──────────────────────────────────────────────────────
-
-interface ShippingSettings {
-  keralaShippingCharge: string | null;
-  outsideKeralaShippingCharge: string | null;
-}
-
-function isKerala(state: string): boolean {
-  return state.trim().toLowerCase().includes("kerala");
-}
-
-function resolveShippingCharge(
-  settings: ShippingSettings | null,
-  state: string
-): number | null {
-  if (!settings) return null;
-  if (!state.trim()) return null;
-  if (isKerala(state)) {
-    return settings.keralaShippingCharge !== null &&
-      settings.keralaShippingCharge !== undefined
-      ? Number(String(settings.keralaShippingCharge))
-      : 0;
-  } else {
-    return settings.outsideKeralaShippingCharge !== null &&
-      settings.outsideKeralaShippingCharge !== undefined
-      ? Number(String(settings.outsideKeralaShippingCharge))
-      : 0;
-  }
-}
-
 // ── Validation ────────────────────────────────────────────────────────────
 
 interface FormErrors {
@@ -137,8 +107,8 @@ function CheckoutContent() {
   const [touched,         setTouched]         = useState<Record<string, boolean>>({});
   const [termsAccepted,   setTermsAccepted]   = useState(false);
   const [termsError,      setTermsError]      = useState(false);
-  const [shippingSettings, setShippingSettings] =
-    useState<ShippingSettings | null>(null);
+  const [shippingCharge,  setShippingCharge]  = useState<number | null>(null);
+  const [fetchingShipping, setFetchingShipping] = useState(false);
 
   const [form, setForm] = useState({
     name:         "",
@@ -157,36 +127,55 @@ function CheckoutContent() {
   const [sameShipping, setSameShipping] = useState(true);
   const [activeOrder, setActiveOrder] = useState<any>(null);
 
-  const shippingCharge    = resolveShippingCharge(shippingSettings, form.shipState);
   const totalWithShipping =
     shippingCharge !== null ? subtotal + shippingCharge : subtotal;
 
   useEffect(() => {
     load();
-    fetchShippingSettings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [buyNowId]);
 
-  const fetchShippingSettings = async () => {
-    try {
-      const res  = await fetch(`${API_URL}/api/settings/shipping`);
-      const data = await res.json();
-      if (res.ok && data.data) {
-        setShippingSettings({
-          keralaShippingCharge:
-            data.data.keralaShippingCharge != null
-              ? String(data.data.keralaShippingCharge)
-              : null,
-          outsideKeralaShippingCharge:
-            data.data.outsideKeralaShippingCharge != null
-              ? String(data.data.outsideKeralaShippingCharge)
-              : null,
-        });
+  // Securely query API for live shipping rates with variant-level support
+  useEffect(() => {
+    const fetchShippingRate = async () => {
+      if (!form.shipState.trim() || items.length === 0) {
+        setShippingCharge(null);
+        return;
       }
-    } catch {
-      // silently fail
-    }
-  };
+
+      setFetchingShipping(true);
+      try {
+        const res = await fetch(`${API_URL}/api/checkout/calculate-shipping`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Session-Id": getSessionId(),
+          },
+          body: JSON.stringify({
+            shipState: form.shipState,
+            cartItems: items.map((item) => ({
+              productId: item.productId || item.product?.id,
+              variantId: item.variantId || item.variant?.id || undefined,
+              quantity: item.quantity,
+            })),
+          }),
+        });
+
+        const json = await res.json();
+        if (res.ok && json.success) {
+          setShippingCharge(json.data.shippingCharge);
+        } else {
+          setShippingCharge(null);
+        }
+      } catch {
+        setShippingCharge(null);
+      } finally {
+        setFetchingShipping(false);
+      }
+    };
+
+    fetchShippingRate();
+  }, [form.shipState, items]);
 
   const load = async () => {
     try {
@@ -201,10 +190,12 @@ function CheckoutContent() {
         const total = Number(session.unitPrice) * session.quantity;
         setItems([
           {
-            id:       session.id,
-            product:  { name: product?.name, images: product?.images },
-            variant:  variant ? { name: variant.name } : null,
-            quantity: session.quantity,
+            id:        session.id,
+            productId: session.productId,
+            variantId: session.variantId || undefined,
+            product:   { id: product?.id, name: product?.name, images: product?.images },
+            variant:   variant ? { id: variant.id, name: variant.name } : null,
+            quantity:  session.quantity,
             unitPrice: session.unitPrice,
           },
         ]);
@@ -239,7 +230,6 @@ function CheckoutContent() {
     e.preventDefault();
     setError("");
 
-    // Terms check
     if (!termsAccepted) {
       setTermsError(true);
       return;
@@ -283,7 +273,6 @@ function CheckoutContent() {
         const order = await checkoutApi.placeDraftOrder(body);
         redirectToWhatsApp(order);
       } else {
-        // Reuse existing pending order if already created, otherwise place a new one
         let order = activeOrder;
         if (!order) {
           const couponCode = sessionStorage.getItem("tcp_coupon");
@@ -364,7 +353,6 @@ function CheckoutContent() {
         notes: { orderNumber: order.orderNumber, orderId: order.id },
         theme: { color: "#2B2B2B" },
 
-        // ── SUCCESS: Verify on server and redirect ONLY if verified ──
         handler: async function (response: any) {
           try {
             const verifyRes = await fetch(
@@ -409,7 +397,7 @@ function CheckoutContent() {
       const rzp = new window.Razorpay(options);
       rzp.on("payment.failed", function (response: any) {
         setPlacing(false);
-        const reason = response?.error?.description || "Payment failed. Please try again or use another payment method.";
+        const reason = response?.error?.description || "Payment failed. Please try again.";
         setError(reason);
       });
       rzp.open();
@@ -884,41 +872,52 @@ function CheckoutContent() {
                         display:        "flex",
                         justifyContent: "space-between",
                         alignItems:     "center",
-                        marginBottom:   "8px",
+                        marginBottom:   "4px",
                       }}
                     >
                       <span style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                         Shipping
-                        {form.shipState.trim() && shippingCharge !== null && (
-                          <span
-                            style={{
-                              marginLeft: "6px",
-                              fontSize:   "10px",
-                              color:      "var(--text-tertiary)",
-                            }}
-                          >
-                            ({isKerala(form.shipState) ? "Kerala" : "Outside Kerala"})
-                          </span>
-                        )}
                       </span>
                       <span
                         style={{
                           fontSize:   "12px",
                           fontWeight: shippingCharge !== null ? 500 : 400,
                           color:
-                            shippingCharge === 0
+                            fetchingShipping
+                              ? "var(--text-tertiary)"
+                              : shippingCharge === 0
                               ? "var(--success)"
                               : shippingCharge !== null
                               ? "var(--text-primary)"
                               : "var(--text-tertiary)",
                         }}
                       >
-                        {shippingCharge === null
-                          ? "Enter state above"
-                          : shippingCharge === 0
-                          ? "Free"
-                          : formatPrice(shippingCharge)}
+                        {fetchingShipping ? (
+                          "Calculating..."
+                        ) : shippingCharge === null ? (
+                          "Enter state above"
+                        ) : shippingCharge === 0 ? (
+                          "Free"
+                        ) : (
+                          formatPrice(shippingCharge)
+                        )}
                       </span>
+                    </div>
+
+                    {/* Weight & Distance shipping descriptor */}
+                    <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                      <p
+                        style={{
+                          fontSize:   "10.5px",
+                          color:      "var(--text-tertiary)",
+                          fontStyle:  "italic",
+                          lineHeight: 1.3,
+                          textAlign:  "right",
+                          maxWidth:   "220px",
+                        }}
+                      >
+                        Calculated based on weight & delivery distance
+                      </p>
                     </div>
                   </div>
 
@@ -1117,12 +1116,12 @@ function CheckoutContent() {
                           display:         "flex",
                           alignItems:      "flex-start",
                           gap:             "8px",
-                        }}
-                      >
-                        <AlertCircle size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: "1px" }} />
-                        Please fix the errors in the form above
-                      </div>
-                    )}
+                      }}
+                    >
+                      <AlertCircle size={14} strokeWidth={1.75} style={{ flexShrink: 0, marginTop: "1px" }} />
+                      Please fix the errors in the form above
+                    </div>
+                  )}
 
                   {/* Submit button */}
                   <button
@@ -1244,7 +1243,7 @@ export default function CheckoutPage() {
   );
 }
 
-/* ── Sub-components (unchanged) ──────────────────────────────────────────── */
+/* ── Sub-components ──────────────────────────────────────────────────────── */
 
 function FormSection({
   title,

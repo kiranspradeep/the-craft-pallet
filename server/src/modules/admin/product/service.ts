@@ -1,4 +1,4 @@
-import { PricingStrategy, ProductImageType, Prisma } from "@prisma/client";
+import { PricingStrategy, ProductImageType, Prisma, ShippingCategory } from "@prisma/client";
 import { prisma } from "../../../prisma/client.js";
 import { Decimal } from "@prisma/client/runtime/library";
 import { productRepository } from "./repository.js";
@@ -47,6 +47,9 @@ export const productService = {
     metaDescription?: string;
     metaKeywords?: string;
     ogImageUrl?: string;
+    shippingCategory?: ShippingCategory;
+    deliveryIncrement?: number;
+    additionalUnitIncrement?: number;
   }) => {
     await assertCategoryExists(input.categoryId);
 
@@ -77,6 +80,15 @@ export const productService = {
       metaDescription: input.metaDescription,
       metaKeywords: input.metaKeywords,
       ogImageUrl: input.ogImageUrl || null,
+      shippingCategory: input.shippingCategory ?? ShippingCategory.SMALL,
+      deliveryIncrement:
+        input.deliveryIncrement !== undefined
+          ? new Decimal(input.deliveryIncrement)
+          : new Decimal(0),
+      additionalUnitIncrement:
+        input.additionalUnitIncrement !== undefined
+          ? new Decimal(input.additionalUnitIncrement)
+          : new Decimal(0),
     });
   },
 
@@ -114,6 +126,9 @@ export const productService = {
       metaDescription?: string;
       metaKeywords?: string;
       ogImageUrl?: string;
+      shippingCategory?: ShippingCategory;
+      deliveryIncrement?: number;
+      additionalUnitIncrement?: number;
     }
   ) => {
     const existing = await assertProductExists(id);
@@ -163,6 +178,15 @@ export const productService = {
       }),
       ...(input.ogImageUrl !== undefined && {
         ogImageUrl: input.ogImageUrl || null,
+      }),
+      ...(input.shippingCategory !== undefined && {
+        shippingCategory: input.shippingCategory,
+      }),
+      ...(input.deliveryIncrement !== undefined && {
+        deliveryIncrement: new Decimal(input.deliveryIncrement),
+      }),
+      ...(input.additionalUnitIncrement !== undefined && {
+        additionalUnitIncrement: new Decimal(input.additionalUnitIncrement),
       }),
     });
 
@@ -230,6 +254,9 @@ export const productService = {
       processingDays?: number;
       isActive?: boolean;
       sortOrder?: number;
+      shippingCategory?: ShippingCategory | null;
+      deliveryIncrement?: number | null;
+      additionalUnitIncrement?: number | null;
     }
   ) => {
     await assertProductExists(productId);
@@ -246,6 +273,15 @@ export const productService = {
       processingDays: input.processingDays,
       isActive: input.isActive ?? true,
       sortOrder: input.sortOrder ?? 0,
+      shippingCategory: input.shippingCategory ?? null,
+      deliveryIncrement:
+        input.deliveryIncrement !== undefined && input.deliveryIncrement !== null
+          ? new Decimal(input.deliveryIncrement)
+          : null,
+      additionalUnitIncrement:
+        input.additionalUnitIncrement !== undefined && input.additionalUnitIncrement !== null
+          ? new Decimal(input.additionalUnitIncrement)
+          : null,
     });
   },
 
@@ -259,6 +295,9 @@ export const productService = {
       processingDays?: number;
       isActive?: boolean;
       sortOrder?: number;
+      shippingCategory?: ShippingCategory | null;
+      deliveryIncrement?: number | null;
+      additionalUnitIncrement?: number | null;
     }
   ) => {
     await assertProductExists(productId);
@@ -281,6 +320,21 @@ export const productService = {
       }),
       ...(input.isActive !== undefined && { isActive: input.isActive }),
       ...(input.sortOrder !== undefined && { sortOrder: input.sortOrder }),
+      ...(input.shippingCategory !== undefined && {
+        shippingCategory: input.shippingCategory,
+      }),
+      ...(input.deliveryIncrement !== undefined && {
+        deliveryIncrement:
+          input.deliveryIncrement !== null
+            ? new Decimal(input.deliveryIncrement)
+            : null,
+      }),
+      ...(input.additionalUnitIncrement !== undefined && {
+        additionalUnitIncrement:
+          input.additionalUnitIncrement !== null
+            ? new Decimal(input.additionalUnitIncrement)
+            : null,
+      }),
     });
   },
 

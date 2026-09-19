@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import Input from "@/components/ui/Input";
 import Toggle from "@/components/ui/Toggle";
+import Select from "@/components/ui/Select";
 
 interface VariantImage {
   id: string;
@@ -32,6 +33,9 @@ interface Variant {
   sortOrder: number;
   processingDays: number | null;
   images: VariantImage[];
+  shippingCategory: string | null;
+  deliveryIncrement: string | null;
+  additionalUnitIncrement: string | null;
 }
 
 interface Props {
@@ -46,6 +50,9 @@ const emptyForm = {
   processingDays: "",
   isActive: true,
   sortOrder: 0,
+  shippingCategory: "",
+  deliveryIncrement: "",
+  additionalUnitIncrement: "",
 };
 
 const formGrid = {
@@ -139,6 +146,57 @@ function VariantForm({
         checked={form.isActive}
         onChange={(v) => onChange("isActive", v)}
       />
+
+      {/* ── Shipping Overrides (Optional) ─────────────────────────────── */}
+      <div style={{ borderTop: "1px dashed var(--border)", paddingTop: "14px", marginTop: "4px" }}>
+        <p
+          style={{
+            fontSize: "10px",
+            fontWeight: 600,
+            letterSpacing: "0.12em",
+            textTransform: "uppercase",
+            color: "var(--text-secondary)",
+            marginBottom: "10px",
+          }}
+        >
+          Shipping Overrides (Optional — leave blank to use product defaults)
+        </p>
+        <div style={formGrid}>
+          <Select
+            label="Shipping Category"
+            value={form.shippingCategory}
+            onChange={(e) => onChange("shippingCategory", e.target.value)}
+            options={[
+              { value: "", label: "Use Product Default" },
+              { value: "SMALL", label: "Small (Polaroids, Keychains)" },
+              { value: "MINI_FRAME", label: "Mini Frame (4×4, 6×6)" },
+              { value: "REGULAR_FRAME", label: "Regular/Large Frame" },
+              { value: "LARGE_HEAVY", label: "Large/Heavy (Hampers)" },
+            ]}
+          />
+          <Input
+            label="Delivery Increment (₹)"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.deliveryIncrement}
+            onChange={(e) => onChange("deliveryIncrement", e.target.value)}
+            placeholder="Product Default"
+            helpText="First unit shipping surcharge"
+          />
+        </div>
+        <Input
+          label="Additional Unit Increment (₹)"
+          type="number"
+          min={0}
+          step="0.01"
+          value={form.additionalUnitIncrement}
+          onChange={(e) => onChange("additionalUnitIncrement", e.target.value)}
+          placeholder="Product Default"
+          helpText="Extra charge per additional unit beyond the first"
+        />
+      </div>
+
       <div style={{ display: "flex", gap: "10px" }}>
         <button
           type="submit"
@@ -209,6 +267,9 @@ export default function VariantsTab({ product, onUpdate }: Props) {
     processingDays: form.processingDays ? parseInt(form.processingDays) : undefined,
     isActive: form.isActive,
     sortOrder: form.sortOrder,
+    shippingCategory: form.shippingCategory || null,
+    deliveryIncrement: form.deliveryIncrement !== "" ? parseFloat(form.deliveryIncrement) : null,
+    additionalUnitIncrement: form.additionalUnitIncrement !== "" ? parseFloat(form.additionalUnitIncrement) : null,
   });
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -313,6 +374,9 @@ export default function VariantsTab({ product, onUpdate }: Props) {
       processingDays: v.processingDays?.toString() || "",
       isActive: v.isActive,
       sortOrder: v.sortOrder,
+      shippingCategory: v.shippingCategory || "",
+      deliveryIncrement: v.deliveryIncrement?.toString() || "",
+      additionalUnitIncrement: v.additionalUnitIncrement?.toString() || "",
     });
     setShowForm(false);
     setExpandedId(v.id);
@@ -454,6 +518,11 @@ export default function VariantsTab({ product, onUpdate }: Props) {
                       ₹{Number(v.price).toFixed(2)}
                       {v.sku && ` · ${v.sku}`}
                       {v.processingDays && ` · ${v.processingDays}d`}
+                      {v.shippingCategory && (
+                        <span style={{ color: "var(--brand)" }}>
+                          {" · "}{v.shippingCategory.replace(/_/g, " ")}
+                        </span>
+                      )}
                       {v.images?.length > 0 && (
                         <span style={{ color: "var(--brand)" }}>
                           {" · "}

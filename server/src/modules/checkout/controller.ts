@@ -3,6 +3,8 @@ import { checkoutService } from "./service.js";
 import { sendSuccess } from "../../shared/helpers/response.js";
 import { asyncHandler } from "../../shared/utils/asyncHandler.js";
 import { BadRequestError } from "../../shared/errors/AppError.js";
+import { prisma } from "../../prisma/client.js";
+import { calculateShipping, CalculatorItem } from "./shippingCalculator.js";
 
 const getSessionId = (req: Request): string => {
   const sessionId = req.headers["x-session-id"] as string;
@@ -98,18 +100,18 @@ export const checkoutController = {
   ),
 
   createRazorpayOrder: asyncHandler(
-  async (req: Request, res: Response): Promise<void> => {
-    const orderNumber = req.params["orderNumber"] as string;
-    const result = await checkoutService.createRazorpayOrder(orderNumber);
-    sendSuccess({
-      res,
-      message: "Razorpay order created",
-      data: result,
-    });
-  }
-),
+    async (req: Request, res: Response): Promise<void> => {
+      const orderNumber = req.params["orderNumber"] as string;
+      const result = await checkoutService.createRazorpayOrder(orderNumber);
+      sendSuccess({
+        res,
+        message: "Razorpay order created",
+        data: result,
+      });
+    }
+  ),
 
-verifyRazorpayPayment: asyncHandler(
+  verifyRazorpayPayment: asyncHandler(
     async (req: Request, res: Response): Promise<void> => {
       const sessionId = req.headers["x-session-id"] as string | undefined;
       const result = await checkoutService.verifyRazorpayPayment({
@@ -124,4 +126,109 @@ verifyRazorpayPayment: asyncHandler(
     }
   ),
 
+  // POST /api/checkout/calculate-shipping  — Public, secure shipping preview
+  getShippingPreview: asyncHandler(
+    async (req: Request, res: Response): Promise<void> => {
+      const { cartItems, shipState } = req.body as {
+        cartItems: { productId: string; variantId?: string; quantity: number }[];
+        shipState: string;
+      };
+
+      if (!shipState || shipState.trim() === "") {
+        throw new BadRequestError("Shipping state is required");
+      }
+
+      if (!Array.isArray(cartItems) || cartItems.length === 0) {
+        sendSuccess({ res, data: { shippingCharge: 0 } });
+        return;
+      }
+
+      // Collect unique product and variant IDs from the request
+      const productIds = [...new Set(cartItems.map((item) => item.productId))];
+      const variantIds = [
+        ...new Set(
+          cartItems
+            .map((item) => item.variantId)
+            .filter((id): id is string => !!id)
+        ),
+      ];
+
+      // Load products and variants in parallel from the database
+      const [dbProducts, dbVariants] = await Promise.all([
+        prisma.product.findMany({
+          where: {
+            id: { in: productIds },
+            deletedAt: null,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            name: true,
+            shippingCategory: true,
+            deliveryIncrement: true,
+            additionalUnitIncrement: true,
+          },
+        }),
+        variantIds.length > 0
+          ? prisma.productVariant.findMany({
+              where: { id: { in: variantIds }, isActive: true },
+              select: {
+                id: true,
+                productId: true,
+                name: true,
+                shippingCategory: true,
+                deliveryIncrement: true,
+                additionalUnitIncrement: true,
+              },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const calculatorItems: CalculatorItem[] = [];
+      for (const item of cartItems) {
+        const dbProd = dbProducts.find((p) => p.id === item.productId);
+        if (!dbProd) continue;
+
+        const dbVar = item.variantId
+          ? dbVariants.find((v) => v.id === item.variantId)
+          : null;
+
+        calculatorItems.push({
+          productId: item.productId,
+          variantId: item.variantId ?? null,
+          quantity: Math.max(1, Number(item.quantity)),
+          product: {
+            id: dbProd.id,
+            name: dbProd.name,
+            shippingCategory: dbProd.shippingCategory,
+            deliveryIncrement: dbProd.deliveryIncrement,
+            additionalUnitIncrement: dbProd.additionalUnitIncrement,
+          },
+          variant: dbVar
+            ? {
+                id: dbVar.id,
+                name: dbVar.name,
+                shippingCategory: dbVar.shippingCategory,
+                deliveryIncrement: dbVar.deliveryIncrement,
+                additionalUnitIncrement: dbVar.additionalUnitIncrement,
+              }
+            : null,
+        });
+      }
+
+      const shippingSettings = await prisma.shippingSetting.findFirst();
+      const shippingCharge = calculateShipping(
+        calculatorItems,
+        shipState,
+        shippingSettings
+      );
+
+      sendSuccess({
+        res,
+        data: {
+          shippingCharge: Number(shippingCharge.toFixed(2)),
+        },
+      });
+    }
+  ),
 };

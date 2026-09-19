@@ -39,6 +39,9 @@ router.post(
 // Website order
 router.post("/", validate(checkoutSchema), checkoutController.placeOrder);
 
+// Public Shipping calculation preview endpoint
+router.post("/calculate-shipping", checkoutController.getShippingPreview);
+
 // Order tracking
 router.get("/track/:orderNumber", checkoutController.trackOrder);
 

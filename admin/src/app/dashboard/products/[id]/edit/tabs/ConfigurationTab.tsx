@@ -4,6 +4,7 @@ import { useState } from "react";
 import { AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import Toggle from "@/components/ui/Toggle";
 import Input from "@/components/ui/Input";
+import Select from "@/components/ui/Select";
 
 const ALL_SOURCES = [
   "DIRECT_UPLOAD",
@@ -46,6 +47,9 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
     allowImageReordering: config?.allowImageReordering ?? true,
     estimatedProductionDays:
       config?.estimatedProductionDays?.toString() || "",
+    shippingCategory: product.shippingCategory || "SMALL",
+    deliveryIncrement: product.deliveryIncrement?.toString() || "0",
+    additionalUnitIncrement: product.additionalUnitIncrement?.toString() || "0",
   });
 
   const set = (key: string, val: unknown) =>
@@ -66,7 +70,15 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
     setError("");
     setSuccess(false);
 
-    const body = {
+    // 1. Submit product-level configuration details first
+    const productBody = {
+      shippingCategory: form.shippingCategory,
+      deliveryIncrement: parseFloat(form.deliveryIncrement) || 0,
+      additionalUnitIncrement: parseFloat(form.additionalUnitIncrement) || 0,
+    };
+
+    // 2. Submit general configuration body
+    const configBody = {
       uploadRequired: form.uploadRequired,
       minImages: form.minImages ? parseInt(form.minImages) : undefined,
       maxImages: form.maxImages ? parseInt(form.maxImages) : undefined,
@@ -91,18 +103,37 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
     };
 
     try {
-      await fetch(`/api/admin/products/${product.id}/configuration`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
+      // Parallel atomic updates for clean saving execution flow
+      const [prodRes, configRes] = await Promise.all([
+        fetch(`/api/admin/products/${product.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(productBody),
+        }),
+        fetch(`/api/admin/products/${product.id}/configuration`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(configBody),
+        }),
+      ]);
+
+      if (!prodRes.ok) {
+        const prodData = await prodRes.json();
+        throw new Error(prodData.message || "Failed to save product shipping configurations");
+      }
+
+      if (!configRes.ok) {
+        const configData = await configRes.json();
+        throw new Error(configData.message || "Failed to save file upload configurations");
+      }
+
       const res = await fetch(`/api/admin/products/${product.id}`);
       const data = await res.json();
       if (data.data) onUpdate(data.data);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || "Network error");
+      setError(err.message || "Network error occurred while saving configuration");
     } finally {
       setLoading(false);
     }
@@ -274,6 +305,49 @@ export default function ConfigurationTab({ product, onUpdate }: Props) {
             label="Allow Image Reordering"
             checked={form.allowImageReordering}
             onChange={(v) => set("allowImageReordering", v)}
+          />
+        </div>
+
+        {/* Shipping Configuration Section */}
+        <div style={{ paddingTop: "20px", borderTop: "1px solid var(--border)" }}>
+          <span style={sectionLabel}>Shipping Configuration</span>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "14px",
+              marginBottom: "14px",
+            }}
+          >
+            <Select
+              label="Shipping Category"
+              value={form.shippingCategory}
+              onChange={(e) => set("shippingCategory", e.target.value)}
+              options={[
+                { value: "SMALL", label: "Small (Polaroids, Keychains, Prints)" },
+                { value: "MINI_FRAME", label: "Mini Frame (4x4, 6x6, Desktop Frames)" },
+                { value: "REGULAR_FRAME", label: "Regular/Large Frame (Wall Frames)" },
+                { value: "LARGE_HEAVY", label: "Large/Heavy (Hampers, Gift Boxes)" },
+              ]}
+            />
+            <Input
+              label="Delivery Increment (₹)"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.deliveryIncrement}
+              onChange={(e) => set("deliveryIncrement", e.target.value)}
+              helpText="Base shipping fee surcharge applied to the first unit."
+            />
+          </div>
+          <Input
+            label="Additional Unit Increment (₹)"
+            type="number"
+            min={0}
+            step="0.01"
+            value={form.additionalUnitIncrement}
+            onChange={(e) => set("additionalUnitIncrement", e.target.value)}
+            helpText="Extra charge per additional unit beyond the first. Default is ₹0."
           />
         </div>
 

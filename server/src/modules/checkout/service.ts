@@ -11,7 +11,7 @@ import {
   TimelineEventType,
   CustomFieldType,
 } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+import { Decimal } from "@prisma/client/runtime/library.js";
 import { prisma } from "../../prisma/client.js";
 import { cartRepository } from "../cart/repository.js";
 import { checkoutRepository } from "./repository.js";
@@ -27,6 +27,7 @@ import {
 } from "../../shared/errors/AppError.js";
 import { logger } from "../../shared/logger/index.js";
 import { emailService } from "../../shared/services/emailService.js";
+import { calculateShipping, CalculatorItem } from "./shippingCalculator.js";
 
 // ── Common inputs ─────────────────────────────────────────────────────────
 
@@ -106,32 +107,6 @@ const determineInitialPhotoStatus = (
   return allUploadsProvided
     ? PhotoStatus.RECEIVED
     : PhotoStatus.NOT_RECEIVED;
-};
-
-// ── Shipping helpers ──────────────────────────────────────────────────────
-
-const isKeralaAddress = (shipState: string): boolean => {
-  return shipState.trim().toLowerCase().includes("kerala");
-};
-
-const calculateShippingCharge = (
-  settings: {
-    keralaShippingCharge: any;
-    outsideKeralaShippingCharge: any;
-  } | null,
-  shipState: string
-): Decimal => {
-  if (!settings) return new Decimal(0);
-
-  if (isKeralaAddress(shipState)) {
-    return settings.keralaShippingCharge
-      ? new Decimal(settings.keralaShippingCharge)
-      : new Decimal(0);
-  } else {
-    return settings.outsideKeralaShippingCharge
-      ? new Decimal(settings.outsideKeralaShippingCharge)
-      : new Decimal(0);
-  }
 };
 
 // ── Service ───────────────────────────────────────────────────────────────
@@ -281,6 +256,8 @@ export const checkoutService = {
     const order = await prisma.$transaction(async (tx) => {
       // ── 1. Calculate subtotal ────────────────────────────────────────
       let subtotal: Decimal;
+      const calculatorItems: CalculatorItem[] = [];
+
       if (itemsSource === "cart") {
         const totals = calculateCartTotals(
           cart.items.map((i: any) => ({
@@ -289,10 +266,102 @@ export const checkoutService = {
           }))
         );
         subtotal = totals.subtotal;
+
+        // Fetch products AND variants inside tx to enforce strict configuration logic
+        const productIds = cart.items.map((i: any) => i.productId);
+        const variantIds = cart.items
+          .map((i: any) => i.variantId)
+          .filter(Boolean) as string[];
+
+        const [dbProducts, dbVariants] = await Promise.all([
+          tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: {
+              id: true,
+              name: true,
+              shippingCategory: true,
+              deliveryIncrement: true,
+              additionalUnitIncrement: true,
+            },
+          }),
+          variantIds.length > 0
+            ? tx.productVariant.findMany({
+                where: { id: { in: variantIds } },
+                select: {
+                  id: true,
+                  productId: true,
+                  name: true,
+                  shippingCategory: true,
+                  deliveryIncrement: true,
+                  additionalUnitIncrement: true,
+                },
+              })
+            : Promise.resolve([]),
+        ]);
+
+        for (const item of cart.items) {
+          const dbProduct = dbProducts.find((p) => p.id === item.productId);
+          if (!dbProduct)
+            throw new NotFoundError(`Product not found: ${item.productId}`);
+
+          const dbVariant = item.variantId
+            ? dbVariants.find((v) => v.id === item.variantId)
+            : null;
+
+          calculatorItems.push({
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity,
+            product: {
+              id: dbProduct.id,
+              name: dbProduct.name,
+              shippingCategory: dbProduct.shippingCategory,
+              deliveryIncrement: dbProduct.deliveryIncrement,
+              additionalUnitIncrement: dbProduct.additionalUnitIncrement,
+            },
+            variant: dbVariant
+              ? {
+                  id: dbVariant.id,
+                  name: dbVariant.name,
+                  shippingCategory: dbVariant.shippingCategory,
+                  deliveryIncrement: dbVariant.deliveryIncrement,
+                  additionalUnitIncrement: dbVariant.additionalUnitIncrement,
+                }
+              : null,
+          });
+        }
       } else {
         subtotal = new Decimal(buyNowSession.unitPrice).mul(
           buyNowSession.quantity
         );
+
+        const buyNowVariant = buyNowSession.variantId
+          ? buyNowProduct.variants.find(
+              (v: any) => v.id === buyNowSession.variantId
+            )
+          : null;
+
+        calculatorItems.push({
+          productId: buyNowProduct.id,
+          variantId: buyNowSession.variantId ?? null,
+          quantity: buyNowSession.quantity,
+          product: {
+            id: buyNowProduct.id,
+            name: buyNowProduct.name,
+            shippingCategory: buyNowProduct.shippingCategory,
+            deliveryIncrement: buyNowProduct.deliveryIncrement,
+            additionalUnitIncrement: buyNowProduct.additionalUnitIncrement,
+          },
+          variant: buyNowVariant
+            ? {
+                id: buyNowVariant.id,
+                name: buyNowVariant.name,
+                shippingCategory: buyNowVariant.shippingCategory,
+                deliveryIncrement: buyNowVariant.deliveryIncrement,
+                additionalUnitIncrement: buyNowVariant.additionalUnitIncrement,
+              }
+            : null,
+        });
       }
 
       // ── 2. Coupon ────────────────────────────────────────────────────
@@ -329,11 +398,12 @@ export const checkoutService = {
         validatedCoupon = { id: coupon.id, code: coupon.code };
       }
 
-      // ── 3. Shipping — Kerala vs outside Kerala ────────────────────────
+      // ── 3. Authoritative Shipping Calculation ────────────────────────
       const shippingSettings = await tx.shippingSetting.findFirst();
-      const shippingCharge = calculateShippingCharge(
-        shippingSettings,
-        input.shipState
+      const shippingCharge = calculateShipping(
+        calculatorItems,
+        input.shipState,
+        shippingSettings
       );
 
       const totalAmount = subtotal
@@ -615,6 +685,8 @@ export const checkoutService = {
     const order = await prisma.$transaction(async (tx) => {
       // Subtotal
       let subtotal: Decimal;
+      const calculatorItems: CalculatorItem[] = [];
+
       if (itemsSource === "cart") {
         subtotal = calculateCartTotals(
           cart.items.map((i: any) => ({
@@ -622,10 +694,102 @@ export const checkoutService = {
             unitPrice: new Decimal(i.unitPrice),
           }))
         ).subtotal;
+
+        // Fetch products AND variants inside tx to enforce strict configuration logic
+        const productIds = cart.items.map((i: any) => i.productId);
+        const variantIds = cart.items
+          .map((i: any) => i.variantId)
+          .filter(Boolean) as string[];
+
+        const [dbProducts, dbVariants] = await Promise.all([
+          tx.product.findMany({
+            where: { id: { in: productIds } },
+            select: {
+              id: true,
+              name: true,
+              shippingCategory: true,
+              deliveryIncrement: true,
+              additionalUnitIncrement: true,
+            },
+          }),
+          variantIds.length > 0
+            ? tx.productVariant.findMany({
+                where: { id: { in: variantIds } },
+                select: {
+                  id: true,
+                  productId: true,
+                  name: true,
+                  shippingCategory: true,
+                  deliveryIncrement: true,
+                  additionalUnitIncrement: true,
+                },
+              })
+            : Promise.resolve([]),
+        ]);
+
+        for (const item of cart.items) {
+          const dbProduct = dbProducts.find((p) => p.id === item.productId);
+          if (!dbProduct)
+            throw new NotFoundError(`Product not found: ${item.productId}`);
+
+          const dbVariant = item.variantId
+            ? dbVariants.find((v) => v.id === item.variantId)
+            : null;
+
+          calculatorItems.push({
+            productId: item.productId,
+            variantId: item.variantId ?? null,
+            quantity: item.quantity,
+            product: {
+              id: dbProduct.id,
+              name: dbProduct.name,
+              shippingCategory: dbProduct.shippingCategory,
+              deliveryIncrement: dbProduct.deliveryIncrement,
+              additionalUnitIncrement: dbProduct.additionalUnitIncrement,
+            },
+            variant: dbVariant
+              ? {
+                  id: dbVariant.id,
+                  name: dbVariant.name,
+                  shippingCategory: dbVariant.shippingCategory,
+                  deliveryIncrement: dbVariant.deliveryIncrement,
+                  additionalUnitIncrement: dbVariant.additionalUnitIncrement,
+                }
+              : null,
+          });
+        }
       } else {
         subtotal = new Decimal(buyNowSession.unitPrice).mul(
           buyNowSession.quantity
         );
+
+        const buyNowVariant = buyNowSession.variantId
+          ? buyNowProduct.variants.find(
+              (v: any) => v.id === buyNowSession.variantId
+            )
+          : null;
+
+        calculatorItems.push({
+          productId: buyNowProduct.id,
+          variantId: buyNowSession.variantId ?? null,
+          quantity: buyNowSession.quantity,
+          product: {
+            id: buyNowProduct.id,
+            name: buyNowProduct.name,
+            shippingCategory: buyNowProduct.shippingCategory,
+            deliveryIncrement: buyNowProduct.deliveryIncrement,
+            additionalUnitIncrement: buyNowProduct.additionalUnitIncrement,
+          },
+          variant: buyNowVariant
+            ? {
+                id: buyNowVariant.id,
+                name: buyNowVariant.name,
+                shippingCategory: buyNowVariant.shippingCategory,
+                deliveryIncrement: buyNowVariant.deliveryIncrement,
+                additionalUnitIncrement: buyNowVariant.additionalUnitIncrement,
+              }
+            : null,
+        });
       }
 
       // Coupon
@@ -653,9 +817,10 @@ export const checkoutService = {
 
       // Shipping — Kerala vs outside Kerala
       const shippingSettings = await tx.shippingSetting.findFirst();
-      const shippingCharge = calculateShippingCharge(
-        shippingSettings,
-        input.shipState
+      const shippingCharge = calculateShipping(
+        calculatorItems,
+        input.shipState,
+        shippingSettings
       );
 
       const totalAmount = subtotal

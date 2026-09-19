@@ -4,6 +4,7 @@ import {
   CustomFieldType,
   PricingStrategy,
   ProductImageType,
+  ShippingCategory,
 } from "@prisma/client";
 
 // ── Reusable ──────────────────────────────────────────────────────────────
@@ -35,6 +36,11 @@ export const createProductSchema = z.object({
     metaDescription: z.string().max(1000).optional(),
     metaKeywords: z.string().max(2000).optional(),
     ogImageUrl: z.string().url().optional().or(z.literal("")),
+
+    // ── Shipping ──────────────────────────────────────────────────────
+    shippingCategory: z.nativeEnum(ShippingCategory).optional(),
+    deliveryIncrement: z.number().min(0).optional(),
+    additionalUnitIncrement: z.number().min(0).optional(),
   }),
 });
 
@@ -57,6 +63,11 @@ export const updateProductSchema = z.object({
     metaDescription: z.string().max(1000).optional(),
     metaKeywords: z.string().max(2000).optional(),
     ogImageUrl: z.string().url().optional().or(z.literal("")),
+
+    // ── Shipping ──────────────────────────────────────────────────────
+    shippingCategory: z.nativeEnum(ShippingCategory).optional(),
+    deliveryIncrement: z.number().min(0).optional(),
+    additionalUnitIncrement: z.number().min(0).optional(),
   }),
 });
 
@@ -155,6 +166,11 @@ export const createVariantSchema = z.object({
     processingDays: z.number().int().positive().optional(),
     isActive: z.boolean().optional().default(true),
     sortOrder: z.number().int().min(0).optional().default(0),
+
+    // ── Shipping variant overrides (nullable = inherit product defaults) ─
+    shippingCategory: z.nativeEnum(ShippingCategory).nullable().optional(),
+    deliveryIncrement: z.number().min(0).nullable().optional(),
+    additionalUnitIncrement: z.number().min(0).nullable().optional(),
   }),
 });
 
@@ -171,6 +187,11 @@ export const updateVariantSchema = z.object({
     processingDays: z.number().int().positive().optional(),
     isActive: z.boolean().optional(),
     sortOrder: z.number().int().min(0).optional(),
+
+    // ── Shipping variant overrides (nullable = inherit product defaults) ─
+    shippingCategory: z.nativeEnum(ShippingCategory).nullable().optional(),
+    deliveryIncrement: z.number().min(0).nullable().optional(),
+    additionalUnitIncrement: z.number().min(0).nullable().optional(),
   }),
 });
 

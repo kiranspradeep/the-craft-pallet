@@ -3,6 +3,7 @@ import {
   AssetSourceType,
   PricingStrategy,
   CustomFieldType,
+  ShippingCategory,
 } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 
@@ -50,6 +51,10 @@ async function ensureCustomField(
   return existing;
 }
 
+/**
+ * Creates or updates a variant.
+ * Supports updating existing variants with variant-level shipping overrides.
+ */
 async function ensureVariant(
   productId: string,
   sku: string,
@@ -58,20 +63,33 @@ async function ensureVariant(
     price: number;
     sortOrder: number;
     processingDays?: number;
+    shippingCategory?: ShippingCategory;
+    deliveryIncrement?: number;
+    additionalUnitIncrement?: number;
   }
 ) {
   const existing = await prisma.productVariant.findUnique({ where: { sku } });
+
+  const variantData = {
+    name: data.name,
+    price: new Decimal(data.price),
+    isActive: true,
+    sortOrder: data.sortOrder,
+    processingDays: data.processingDays ?? 10,
+    shippingCategory: data.shippingCategory !== undefined ? data.shippingCategory : null,
+    deliveryIncrement: data.deliveryIncrement !== undefined && data.deliveryIncrement !== null ? new Decimal(data.deliveryIncrement) : null,
+    additionalUnitIncrement: data.additionalUnitIncrement !== undefined && data.additionalUnitIncrement !== null ? new Decimal(data.additionalUnitIncrement) : null,
+  };
+
   if (!existing) {
     await prisma.productVariant.create({
-      data: {
-        productId,
-        sku,
-        name: data.name,
-        price: new Decimal(data.price),
-        isActive: true,
-        sortOrder: data.sortOrder,
-        processingDays: data.processingDays ?? 10,
-      },
+      data: { productId, sku, ...variantData },
+    });
+  } else {
+    // Update existing variant parameters
+    await prisma.productVariant.update({
+      where: { sku },
+      data: variantData,
     });
   }
 }
@@ -101,7 +119,7 @@ async function ensureTier(
   }
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────
+// ── Main Seeding Routine ──────────────────────────────────────────────────
 
 async function main() {
   console.log("🌱 Seeding The Craft Pallet...\n");
@@ -196,8 +214,17 @@ async function main() {
         metaDescription:
           "Order personalised mini polaroid prints. 36 photos for ₹99. Perfect for room decoration, scrapbooks and gifting.",
         metaKeywords: "mini polaroids, photo prints, personalised polaroids, room decor",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(0),
       },
-      update: { isActive: true, isFeatured: true },
+      update: {
+        isActive: true,
+        isFeatured: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(0),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -248,7 +275,7 @@ async function main() {
       sortOrder: 0,
     });
 
-    console.log("✅ Mini Polaroids 36 seeded");
+    console.log("✅ Mini Polaroids 36 seeded (SMALL / ₹0 / ₹0)");
   }
 
   // ── 2. Mini Polaroids – Set of 30 ─────────────────────────────────────
@@ -270,8 +297,16 @@ async function main() {
         metaDescription:
           "Order personalised mini polaroid prints. 30 photos for ₹99. Premium finish.",
         metaKeywords: "mini polaroids, photo prints, personalised polaroids",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(0),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(0),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -321,7 +356,7 @@ async function main() {
       sortOrder: 0,
     });
 
-    console.log("✅ Mini Polaroids 30 seeded");
+    console.log("✅ Mini Polaroids 30 seeded (SMALL / ₹0 / ₹0)");
   }
 
   // ── 3. Medium Polaroids ────────────────────────────────────────────────
@@ -343,8 +378,17 @@ async function main() {
         metaDescription:
           "Order personalised medium polaroid prints (7×10cm). 18 prints ₹149, 36 prints ₹259. Premium quality.",
         metaKeywords: "medium polaroids, photo prints, personalised polaroids, 7x10",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(5),
       },
-      update: { isActive: true, isFeatured: true },
+      update: {
+        isActive: true,
+        isFeatured: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(5),
+      },
     });
 
     const pricingConfig = await prisma.pricingConfiguration.upsert({
@@ -393,7 +437,7 @@ async function main() {
       sortOrder: 0,
     });
 
-    console.log("✅ Medium Polaroids seeded");
+    console.log("✅ Medium Polaroids seeded (SMALL / ₹0 / ₹5)");
   }
 
   // ── 4. Large Polaroids ─────────────────────────────────────────────────
@@ -415,8 +459,16 @@ async function main() {
         metaDescription:
           "Order personalised large polaroid prints. 12 prints ₹120, 24 prints ₹259. Premium quality.",
         metaKeywords: "large polaroids, photo prints, personalised polaroids, 10x10",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(8),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(8),
+      },
     });
 
     const pricingConfig = await prisma.pricingConfiguration.upsert({
@@ -467,7 +519,7 @@ async function main() {
       sortOrder: 0,
     });
 
-    console.log("✅ Large Polaroids seeded");
+    console.log("✅ Large Polaroids seeded (SMALL / ₹0 / ₹8)");
   }
 
   // ── 5. Sticker Polaroids ───────────────────────────────────────────────
@@ -489,8 +541,17 @@ async function main() {
         metaDescription:
           "Personalised sticker polaroids in 3 sizes. Perfect for laptops, journals, phone cases and scrapbooks.",
         metaKeywords: "sticker polaroids, photo stickers, personalised stickers",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(0),
       },
-      update: { isActive: true, isFeatured: true },
+      update: {
+        isActive: true,
+        isFeatured: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(0),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -499,19 +560,20 @@ async function main() {
       update: { strategy: PricingStrategy.FIXED_VARIANTS },
     });
 
+    // All lightweight - ₹0 delivery and additional unit increments
     const stickerVariants = [
-      { name: "5×7cm — 18 Stickers",  sku: "STICKER-5X7-18",   price: 108, sortOrder: 0 },
-      { name: "5×7cm — 36 Stickers",  sku: "STICKER-5X7-36",   price: 216, sortOrder: 1 },
-      { name: "5×7cm — 54 Stickers",  sku: "STICKER-5X7-54",   price: 324, sortOrder: 2 },
-      { name: "5×7cm — 72 Stickers",  sku: "STICKER-5X7-72",   price: 432, sortOrder: 3 },
-      { name: "6×7cm — 15 Stickers",  sku: "STICKER-6X7-15",   price: 90,  sortOrder: 4 },
-      { name: "6×7cm — 30 Stickers",  sku: "STICKER-6X7-30",   price: 180, sortOrder: 5 },
-      { name: "6×7cm — 45 Stickers",  sku: "STICKER-6X7-45",   price: 270, sortOrder: 6 },
-      { name: "6×7cm — 60 Stickers",  sku: "STICKER-6X7-60",   price: 360, sortOrder: 7 },
-      { name: "7×10cm — 18 Stickers", sku: "STICKER-7X10-18",  price: 162, sortOrder: 8 },
-      { name: "7×10cm — 36 Stickers", sku: "STICKER-7X10-36",  price: 324, sortOrder: 9 },
-      { name: "7×10cm — 54 Stickers", sku: "STICKER-7X10-54",  price: 486, sortOrder: 10 },
-      { name: "7×10cm — 72 Stickers", sku: "STICKER-7X10-72",  price: 648, sortOrder: 11 },
+      { name: "5×7cm — 18 Stickers",  sku: "STICKER-5X7-18",   price: 108, sortOrder: 0,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "5×7cm — 36 Stickers",  sku: "STICKER-5X7-36",   price: 216, sortOrder: 1,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "5×7cm — 54 Stickers",  sku: "STICKER-5X7-54",   price: 324, sortOrder: 2,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "5×7cm — 72 Stickers",  sku: "STICKER-5X7-72",   price: 432, sortOrder: 3,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "6×7cm — 15 Stickers",  sku: "STICKER-6X7-15",   price: 90,  sortOrder: 4,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "6×7cm — 30 Stickers",  sku: "STICKER-6X7-30",   price: 180, sortOrder: 5,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "6×7cm — 45 Stickers",  sku: "STICKER-6X7-45",   price: 270, sortOrder: 6,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "6×7cm — 60 Stickers",  sku: "STICKER-6X7-60",   price: 360, sortOrder: 7,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "7×10cm — 18 Stickers", sku: "STICKER-7X10-18",  price: 162, sortOrder: 8,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "7×10cm — 36 Stickers", sku: "STICKER-7X10-36",  price: 324, sortOrder: 9,  shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "7×10cm — 54 Stickers", sku: "STICKER-7X10-54",  price: 486, sortOrder: 10, shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
+      { name: "7×10cm — 72 Stickers", sku: "STICKER-7X10-72",  price: 648, sortOrder: 11, shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 0 },
     ];
 
     for (const v of stickerVariants) {
@@ -548,7 +610,7 @@ async function main() {
       sortOrder: 0,
     });
 
-    console.log("✅ Sticker Polaroids seeded");
+    console.log("✅ Sticker Polaroids seeded (12 variants w/ ₹0 / ₹0 overrides)");
   }
 
   // ── 6. Laminated Polaroids ─────────────────────────────────────────────
@@ -570,8 +632,16 @@ async function main() {
         metaDescription:
           "Personalised laminated polaroid prints. Glossy or matte finish. Multiple sizes available.",
         metaKeywords: "laminated polaroids, photo prints, laminated photos",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(5),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(5),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -581,10 +651,10 @@ async function main() {
     });
 
     const laminatedVariants = [
-      { name: "5×7cm — 18 Laminated",   sku: "LAM-5X7-18",    price: 129, sortOrder: 0 },
-      { name: "6×7cm — 15 Laminated",   sku: "LAM-6X7-15",    price: 129, sortOrder: 1 },
-      { name: "7×9cm — 18 Laminated",   sku: "LAM-7X9-18",    price: 159, sortOrder: 2 },
-      { name: "10×10.5cm — 15 Laminated", sku: "LAM-10X10-15", price: 169, sortOrder: 3 },
+      { name: "5×7cm — 18 Laminated",     sku: "LAM-5X7-18",    price: 129, sortOrder: 0, shippingCategory: ShippingCategory.SMALL,      deliveryIncrement: 0, additionalUnitIncrement: 5  },
+      { name: "6×7cm — 15 Laminated",     sku: "LAM-6X7-15",    price: 129, sortOrder: 1, shippingCategory: ShippingCategory.SMALL,      deliveryIncrement: 0, additionalUnitIncrement: 5  },
+      { name: "7×9cm — 18 Laminated",     sku: "LAM-7X9-18",    price: 159, sortOrder: 2, shippingCategory: ShippingCategory.MINI_FRAME, deliveryIncrement: 0, additionalUnitIncrement: 10 },
+      { name: "10×10.5cm — 15 Laminated", sku: "LAM-10X10-15",  price: 169, sortOrder: 3, shippingCategory: ShippingCategory.MINI_FRAME, deliveryIncrement: 0, additionalUnitIncrement: 10 },
     ];
 
     for (const v of laminatedVariants) {
@@ -677,7 +747,7 @@ async function main() {
       validationJson: { maxTextLength: 50 },
     });
 
-    console.log("✅ Laminated Polaroids seeded");
+    console.log("✅ Laminated Polaroids seeded (4 variants w/ shipping overrides)");
   }
 
   // ── 7. Wall Posters ────────────────────────────────────────────────────
@@ -699,8 +769,16 @@ async function main() {
         metaDescription:
           "Order personalised wall posters (10×15cm). 9 posters for ₹99. Custom and bulk orders available.",
         metaKeywords: "wall posters, personalised posters, photo wall, room decor",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(8),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(8),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -749,7 +827,7 @@ async function main() {
       sortOrder: 0,
     });
 
-    console.log("✅ Wall Posters seeded");
+    console.log("✅ Wall Posters seeded (SMALL / ₹0 / ₹8)");
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -775,8 +853,17 @@ async function main() {
         metaDescription:
           "Order personalised photo frames from ₹149. Available in 7 sizes. Perfect for birthdays, anniversaries and gifting.",
         metaKeywords: "custom frames, personalised frames, photo frames, gift frames",
+        shippingCategory: ShippingCategory.MINI_FRAME,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
       },
-      update: { isActive: true, isFeatured: true },
+      update: {
+        isActive: true,
+        isFeatured: true,
+        shippingCategory: ShippingCategory.MINI_FRAME,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -786,13 +873,13 @@ async function main() {
     });
 
     const frameVariants = [
-      { name: "4×4 Frame",  sku: "FRAME-4X4",  price: 149, sortOrder: 0 },
-      { name: "5×5 Frame",  sku: "FRAME-5X5",  price: 189, sortOrder: 1 },
-      { name: "6×6 Frame",  sku: "FRAME-6X6",  price: 249, sortOrder: 2 },
-      { name: "6×4 Frame",  sku: "FRAME-6X4",  price: 219, sortOrder: 3 },
-      { name: "5×7 Frame",  sku: "FRAME-5X7",  price: 299, sortOrder: 4 },
-      { name: "A5 Frame",   sku: "FRAME-A5",   price: 399, sortOrder: 5 },
-      { name: "A4 Frame",   sku: "FRAME-A4",   price: 499, sortOrder: 6 },
+      { name: "4×4 Frame", sku: "FRAME-4X4", price: 149, sortOrder: 0, shippingCategory: ShippingCategory.SMALL,         deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "5×5 Frame", sku: "FRAME-5X5", price: 189, sortOrder: 1, shippingCategory: ShippingCategory.SMALL,         deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "6×6 Frame", sku: "FRAME-6X6", price: 249, sortOrder: 2, shippingCategory: ShippingCategory.MINI_FRAME,    deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "6×4 Frame", sku: "FRAME-6X4", price: 219, sortOrder: 3, shippingCategory: ShippingCategory.MINI_FRAME,    deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "5×7 Frame", sku: "FRAME-5X7", price: 299, sortOrder: 4, shippingCategory: ShippingCategory.MINI_FRAME,    deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "A5 Frame",  sku: "FRAME-A5",  price: 399, sortOrder: 5, shippingCategory: ShippingCategory.REGULAR_FRAME, deliveryIncrement: 15, additionalUnitIncrement: 15 },
+      { name: "A4 Frame",  sku: "FRAME-A4",  price: 499, sortOrder: 6, shippingCategory: ShippingCategory.LARGE_HEAVY,   deliveryIncrement: 20, additionalUnitIncrement: 20 },
     ];
 
     for (const v of frameVariants) {
@@ -847,7 +934,7 @@ async function main() {
       sortOrder: 2,
     });
 
-    console.log("✅ Custom Frames seeded");
+    console.log("✅ Custom Frames seeded (7 variants w/ shipping overrides)");
   }
 
   // ── 9. Mini Eye Frame ──────────────────────────────────────────────────
@@ -869,8 +956,16 @@ async function main() {
         metaDescription:
           "Personalised mini eye frame from ₹149. A unique keepsake for anniversaries and birthdays.",
         metaKeywords: "eye frame, personalised frame, couple frame, memory frame",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -880,9 +975,9 @@ async function main() {
     });
 
     const eyeVariants = [
-      { name: "4×4 Frame", sku: "EYEMINI-4X4", price: 149, sortOrder: 0 },
-      { name: "5×5 Frame", sku: "EYEMINI-5X5", price: 189, sortOrder: 1 },
-      { name: "6×6 Frame", sku: "EYEMINI-6X6", price: 249, sortOrder: 2 },
+      { name: "4×4 Frame", sku: "EYEMINI-4X4", price: 149, sortOrder: 0, shippingCategory: ShippingCategory.SMALL,      deliveryIncrement: 0, additionalUnitIncrement: 10 },
+      { name: "5×5 Frame", sku: "EYEMINI-5X5", price: 189, sortOrder: 1, shippingCategory: ShippingCategory.SMALL,      deliveryIncrement: 0, additionalUnitIncrement: 10 },
+      { name: "6×6 Frame", sku: "EYEMINI-6X6", price: 249, sortOrder: 2, shippingCategory: ShippingCategory.MINI_FRAME, deliveryIncrement: 0, additionalUnitIncrement: 15 },
     ];
 
     for (const v of eyeVariants) {
@@ -937,7 +1032,7 @@ async function main() {
       sortOrder: 2,
     });
 
-    console.log("✅ Mini Eye Frame seeded");
+    console.log("✅ Mini Eye Frame seeded (3 variants w/ shipping overrides)");
   }
 
   // ── 10. Couple Eye Frame ───────────────────────────────────────────────
@@ -959,8 +1054,16 @@ async function main() {
         metaDescription:
           "Personalised couple eye frame from ₹299. Perfect for anniversaries and birthdays.",
         metaKeywords: "couple eye frame, personalised frame, couple gift, memory frame",
+        shippingCategory: ShippingCategory.MINI_FRAME,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.MINI_FRAME,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -970,8 +1073,8 @@ async function main() {
     });
 
     const coupleEyeVariants = [
-      { name: "5×7 Frame", sku: "EYECOUPLE-5X7", price: 299, sortOrder: 0 },
-      { name: "A5 Frame",  sku: "EYECOUPLE-A5",  price: 399, sortOrder: 1 },
+      { name: "5×7 Frame", sku: "EYECOUPLE-5X7", price: 299, sortOrder: 0, shippingCategory: ShippingCategory.MINI_FRAME,    deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "A5 Frame",  sku: "EYECOUPLE-A5",  price: 399, sortOrder: 1, shippingCategory: ShippingCategory.REGULAR_FRAME, deliveryIncrement: 15, additionalUnitIncrement: 15 },
     ];
 
     for (const v of coupleEyeVariants) {
@@ -1026,7 +1129,7 @@ async function main() {
       sortOrder: 2,
     });
 
-    console.log("✅ Couple Eye Frame seeded");
+    console.log("✅ Couple Eye Frame seeded (2 variants w/ shipping overrides)");
   }
 
   // ── 11. Pop Up Frame ───────────────────────────────────────────────────
@@ -1048,8 +1151,16 @@ async function main() {
         metaDescription:
           "Personalised pop up frame from ₹219. B&W collage with vibrant colour centre photo.",
         metaKeywords: "pop up frame, photo frame, collage frame, personalised frame",
+        shippingCategory: ShippingCategory.MINI_FRAME,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.MINI_FRAME,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(10),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -1059,10 +1170,10 @@ async function main() {
     });
 
     const popUpVariants = [
-      { name: "6×4 Frame", sku: "POPUP-6X4", price: 219, sortOrder: 0 },
-      { name: "5×7 Frame", sku: "POPUP-5X7", price: 299, sortOrder: 1 },
-      { name: "A5 Frame",  sku: "POPUP-A5",  price: 399, sortOrder: 2 },
-      { name: "A4 Frame",  sku: "POPUP-A4",  price: 499, sortOrder: 3 },
+      { name: "6×4 Frame", sku: "POPUP-6X4", price: 219, sortOrder: 0, shippingCategory: ShippingCategory.MINI_FRAME,    deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "5×7 Frame", sku: "POPUP-5X7", price: 299, sortOrder: 1, shippingCategory: ShippingCategory.MINI_FRAME,    deliveryIncrement: 0,  additionalUnitIncrement: 10 },
+      { name: "A5 Frame",  sku: "POPUP-A5",  price: 399, sortOrder: 2, shippingCategory: ShippingCategory.REGULAR_FRAME, deliveryIncrement: 15, additionalUnitIncrement: 15 },
+      { name: "A4 Frame",  sku: "POPUP-A4",  price: 499, sortOrder: 3, shippingCategory: ShippingCategory.LARGE_HEAVY,   deliveryIncrement: 20, additionalUnitIncrement: 20 },
     ];
 
     for (const v of popUpVariants) {
@@ -1117,7 +1228,7 @@ async function main() {
       sortOrder: 2,
     });
 
-    console.log("✅ Pop Up Frame seeded");
+    console.log("✅ Pop Up Frame seeded (4 variants w/ shipping overrides)");
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -1144,8 +1255,17 @@ async function main() {
           "Premium personalised faux leather wallet with name tag and charm. ₹449. Available in Rust and Brown.",
         metaKeywords:
           "personalised wallet, custom wallet, faux leather wallet, name wallet, gift wallet",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(15),
       },
-      update: { isActive: true, isFeatured: true },
+      update: {
+        isActive: true,
+        isFeatured: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(15),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -1225,7 +1345,7 @@ async function main() {
       validationJson: { maxTextLength: 20 },
     });
 
-    console.log("✅ Customised Imported Wallet seeded");
+    console.log("✅ Customised Imported Wallet seeded (SMALL / ₹0 / ₹15)");
   }
 
   // ── 13. Customised Name Wallet ─────────────────────────────────────────
@@ -1248,8 +1368,16 @@ async function main() {
           "Premium personalised name wallet with charm. ₹399. Available in 6 colours.",
         metaKeywords:
           "personalised wallet, name wallet, custom wallet, faux leather wallet, gift wallet",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(15),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(15),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -1333,7 +1461,7 @@ async function main() {
       validationJson: { maxTextLength: 20 },
     });
 
-    console.log("✅ Customised Name Wallet seeded");
+    console.log("✅ Customised Name Wallet seeded (SMALL / ₹0 / ₹15)");
   }
 
   // ── 14. Customised Mug ─────────────────────────────────────────────────
@@ -1356,8 +1484,16 @@ async function main() {
           "Order a personalised photo mug. ₹399. Upload up to 3 photos with a message.",
         metaKeywords:
           "personalised mug, custom mug, photo mug, gift mug, custom coffee mug",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(20),
+        additionalUnitIncrement: new Decimal(25),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(20),
+        additionalUnitIncrement: new Decimal(25),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -1417,7 +1553,7 @@ async function main() {
       sortOrder: 2,
     });
 
-    console.log("✅ Customised Mug seeded");
+    console.log("✅ Customised Mug seeded (SMALL / ₹20 / ₹25)");
   }
 
   // ── 15. Polaroid Fridge Magnet ─────────────────────────────────────────
@@ -1440,8 +1576,16 @@ async function main() {
           "Personalised polaroid fridge magnets. 7×7cm ₹149 or 6×9cm ₹179. Unique gift for any occasion.",
         metaKeywords:
           "fridge magnet, polaroid magnet, personalised magnet, photo magnet, custom magnet",
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(8),
       },
-      update: { isActive: true },
+      update: {
+        isActive: true,
+        shippingCategory: ShippingCategory.SMALL,
+        deliveryIncrement: new Decimal(0),
+        additionalUnitIncrement: new Decimal(8),
+      },
     });
 
     await prisma.pricingConfiguration.upsert({
@@ -1451,8 +1595,8 @@ async function main() {
     });
 
     const magnetVariants = [
-      { name: "7×7 cm", sku: "MAGNET-7X7", price: 149, sortOrder: 0 },
-      { name: "6×9 cm", sku: "MAGNET-6X9", price: 179, sortOrder: 1 },
+      { name: "7×7 cm", sku: "MAGNET-7X7", price: 149, sortOrder: 0, shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 8 },
+      { name: "6×9 cm", sku: "MAGNET-6X9", price: 179, sortOrder: 1, shippingCategory: ShippingCategory.SMALL, deliveryIncrement: 0, additionalUnitIncrement: 8 },
     ];
 
     for (const v of magnetVariants) {
@@ -1506,15 +1650,16 @@ async function main() {
       sortOrder: 2,
     });
 
-    console.log("✅ Polaroid Fridge Magnet seeded");
+    console.log("✅ Polaroid Fridge Magnet seeded (2 variants w/ shipping overrides)");
   }
 
-  console.log("\n🎉 All products seeded successfully!");
+  console.log("\n🎉 All products seeded successfully with shipping overrides!");
   console.log("\nSummary:");
   console.log("  📁 Categories: Polaroids, Photo Frames, Personalised Gifts");
   console.log("  📸 Polaroids:  Mini 36, Mini 30, Medium, Large, Sticker, Laminated, Wall Posters");
   console.log("  🖼️  Frames:    Custom Frames, Mini Eye Frame, Couple Eye Frame, Pop Up Frame");
   console.log("  🎁 Gifts:     Imported Wallet, Name Wallet, Mug, Fridge Magnet");
+  console.log("  🚚 Shipping:  Product + Variant level overrides applied successfully");
 }
 
 main()
