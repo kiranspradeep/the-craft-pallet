@@ -66,16 +66,23 @@ async function getOrders(
 ) {
   const page = parseInt(params.page || "1");
 
-  const query = new URLSearchParams({
+  const queryParams: Record<string, string> = {
     limit: PER_PAGE.toString(),
     page: page.toString(),
     sortBy: "createdAt",
     sortOrder: "desc",
-    ...(params.status ? { status: params.status } : {}),
-    ...(params.search ? { search: params.search } : {}),
-    ...(params.dateFrom ? { dateFrom: params.dateFrom } : {}),
-    ...(params.dateTo ? { dateTo: params.dateTo } : {}),
-  }).toString();
+  };
+
+  // Map filters dynamically from URL params
+  if (params.status) queryParams.status = params.status;
+  if (params.search) queryParams.search = params.search;
+  if (params.dateFrom) queryParams.dateFrom = params.dateFrom;
+  if (params.dateTo) queryParams.dateTo = params.dateTo;
+  if (params.orderSource) queryParams.orderSource = params.orderSource;
+  if (params.photoStatus) queryParams.photoStatus = params.photoStatus;
+  if (params.productionStage) queryParams.productionStage = params.productionStage;
+
+  const query = new URLSearchParams(queryParams).toString();
 
   const res = await fetch(`${API}/api/admin/orders?${query}`, {
     headers: { Authorization: `Bearer ${token}` },

@@ -135,9 +135,8 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-async function getDashboardStats(token: string) {
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+async function getRecentOrders(token: string) {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
   try {
     const res = await fetch(`${API_URL}/api/admin/orders?limit=5`, {
@@ -152,49 +151,69 @@ async function getDashboardStats(token: string) {
   }
 }
 
+async function getDashboardMetrics(token: string) {
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+
+  try {
+    const res = await fetch(`${API_URL}/api/admin/orders/stats`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function DashboardPage() {
   const cookieStore = await cookies();
   const token = cookieStore.get("tcp_admin_token")?.value || "";
   const adminRaw = cookieStore.get("tcp_admin_user")?.value;
   const admin = adminRaw ? JSON.parse(adminRaw) : null;
 
-  const ordersData = await getDashboardStats(token);
-  const totalOrders = ordersData?.meta?.total ?? 0;
+  // Fetch both datasets concurrently
+  const [ordersData, metrics] = await Promise.all([
+    getRecentOrders(token),
+    getDashboardMetrics(token),
+  ]);
 
   const stats = [
     {
       label: "Total Orders",
-      value: totalOrders,
+      value: metrics?.totalOrders ?? 0,
       icon: <ShoppingBag size={18} strokeWidth={1.75} />,
       color: "#A68A75",
     },
     {
       label: "Awaiting Payment",
-      value: "—",
+      value: metrics?.pendingPayment ?? 0,
       icon: <Clock size={18} strokeWidth={1.75} />,
       color: "#C96C4A",
     },
     {
       label: "In Production",
-      value: "—",
+      value: metrics?.inProduction ?? 0,
       icon: <Package size={18} strokeWidth={1.75} />,
       color: "#8E9F82",
     },
     {
-      label: "Ready to Ship",
-      value: "—",
+      label: "Shipped",
+      value: metrics?.shipped ?? 0,
       icon: <Truck size={18} strokeWidth={1.75} />,
       color: "#6B9FBF",
     },
     {
       label: "Delivered",
-      value: "—",
+      value: metrics?.delivered ?? 0,
       icon: <CheckCircle size={18} strokeWidth={1.75} />,
       color: "#8E9F82",
     },
     {
       label: "Revenue",
-      value: "—",
+      value: `₹${Number(metrics?.totalRevenue ?? 0).toLocaleString("en-IN")}`,
       icon: <TrendingUp size={18} strokeWidth={1.75} />,
       color: "#A68A75",
     },

@@ -1,4 +1,6 @@
 import { prisma } from "../../../prisma/client.js";
+import fs from "fs";
+import path from "path";
 import {
   OrderStatus,
   PhotoStatus,
@@ -8,6 +10,7 @@ import {
   PaymentMethod,
   OrderSource,
 } from "@prisma/client";
+import { logger } from "../../../shared/logger/index.js";
 
 export type OrderWithRelations = Prisma.OrderGetPayload<{
   include: {
@@ -310,6 +313,7 @@ export const orderRepository = {
       whatsappOrders,
       awaitingPhotos,
       photosToVerify,
+      revenueResult,
     ] = await prisma.$transaction([
       prisma.order.count(),
       prisma.order.count({ where: { status: OrderStatus.DRAFT } }),
@@ -326,6 +330,21 @@ export const orderRepository = {
       prisma.order.count({
         where: { photoStatus: PhotoStatus.RECEIVED },
       }),
+      prisma.order.aggregate({
+        where: {
+          status: {
+            in: [
+              OrderStatus.CONFIRMED,
+              OrderStatus.IN_PRODUCTION,
+              OrderStatus.SHIPPED,
+              OrderStatus.DELIVERED,
+            ],
+          },
+        },
+        _sum: {
+          totalAmount: true,
+        },
+      }),
     ]);
 
     return {
@@ -340,52 +359,113 @@ export const orderRepository = {
       whatsappOrders,
       awaitingPhotos,
       photosToVerify,
+      totalRevenue: Number(revenueResult._sum.totalAmount || 0),
     };
   },
 
   createShipment: async (data: {
-  orderId: string;
-  trackingNumber: string;
-  shippingPartnerId?: string;
-  estimatedDelivery?: Date;
-}) => {
-  // Find or create a default shipping partner if none provided
-  let partnerId = data.shippingPartnerId;
-  if (!partnerId) {
-    // Use India Post as default
-    let partner = await prisma.shippingPartner.findFirst({
-      where: { code: "INDIA_POST" },
+    orderId: string;
+    trackingNumber: string;
+    shippingPartnerId?: string;
+    estimatedDelivery?: Date;
+  }) => {
+    let partnerId = data.shippingPartnerId;
+    if (!partnerId) {
+      let partner = await prisma.shippingPartner.findFirst({
+        where: { code: "INDIA_POST" },
+      });
+      if (!partner) {
+        partner = await prisma.shippingPartner.create({
+          data: {
+            name: "India Post",
+            code: "INDIA_POST",
+            trackingUrl: "https://www.indiapost.gov.in/",
+            isActive: true,
+          },
+        });
+      }
+      partnerId = partner.id;
+    }
+
+    return prisma.shipment.upsert({
+      where: { orderId: data.orderId },
+      create: {
+        orderId: data.orderId,
+        shippingPartnerId: partnerId,
+        trackingNumber: data.trackingNumber,
+        status: "PENDING",
+        shippedAt: new Date(),
+        estimatedDelivery: data.estimatedDelivery,
+      },
+      update: {
+        trackingNumber: data.trackingNumber,
+        shippingPartnerId: partnerId,
+        shippedAt: new Date(),
+        estimatedDelivery: data.estimatedDelivery,
+      },
     });
-    if (!partner) {
-      partner = await prisma.shippingPartner.create({
-        data: {
-          name: "India Post",
-          code: "INDIA_POST",
-          trackingUrl: "https://www.indiapost.gov.in/",
-          isActive: true,
+  },
+
+  purgeOrderAssets: async (orderId: string) => {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            customizations: {
+              include: {
+                asset: {
+                  include: {
+                    files: true,
+                  },
+                },
+              },
+            },
+          },
         },
+      },
+    });
+
+    if (!order) return;
+
+    const filesToDelete: { id: string; storagePath: string }[] = [];
+    const assetIds: string[] = [];
+
+    for (const item of order.items) {
+      for (const cust of item.customizations) {
+        if (cust.asset) {
+          assetIds.push(cust.asset.id);
+          for (const file of cust.asset.files) {
+            filesToDelete.push({ id: file.id, storagePath: file.storagePath });
+          }
+        }
+      }
+    }
+
+    // Delete physically from disk
+    for (const file of filesToDelete) {
+      const filePath = path.join(process.cwd(), file.storagePath);
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch (err) {
+        logger.error(`Failed to delete file from disk: ${filePath}`, err);
+      }
+    }
+
+    // Remove DB records
+    if (filesToDelete.length > 0) {
+      await prisma.assetFile.deleteMany({
+        where: { id: { in: filesToDelete.map((f) => f.id) } },
       });
     }
-    partnerId = partner.id;
-  }
 
-  return prisma.shipment.upsert({
-    where: { orderId: data.orderId },
-    create: {
-      orderId: data.orderId,
-      shippingPartnerId: partnerId,
-      trackingNumber: data.trackingNumber,
-      status: "PENDING",
-      shippedAt: new Date(),
-      estimatedDelivery: data.estimatedDelivery,
-    },
-    update: {
-      trackingNumber: data.trackingNumber,
-      shippingPartnerId: partnerId,
-      shippedAt: new Date(),
-      estimatedDelivery: data.estimatedDelivery,
-    },
-  });
-},
-
+    if (assetIds.length > 0) {
+      await prisma.asset.updateMany({
+        where: { id: { in: assetIds } },
+        data: { status: "PURGED" as any },
+      });
+    }
+  },
 };

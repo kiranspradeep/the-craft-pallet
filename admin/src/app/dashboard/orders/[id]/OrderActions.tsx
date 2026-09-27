@@ -13,6 +13,7 @@ import {
   AlertCircle,
   CreditCard,
   Camera,
+  Trash2,
 } from "lucide-react";
 
 interface Order {
@@ -21,6 +22,11 @@ interface Order {
   photoStatus: string;
   productionStage: string | null;
   payment: { status: string } | null;
+}
+
+interface OrderActionsProps {
+  order: Order;
+  isPurged: boolean;
 }
 
 const PRODUCTION_STAGES = [
@@ -40,7 +46,7 @@ const NEXT_STAGE: Record<string, string> = {
   PACKING:  "READY",
 };
 
-export default function OrderActions({ order }: { order: Order }) {
+export default function OrderActions({ order, isPurged }: OrderActionsProps) {
   const router = useRouter();
   const [loading,           setLoading]           = useState<string | null>(null);
   const [error,             setError]             = useState("");
@@ -603,6 +609,33 @@ export default function OrderActions({ order }: { order: Order }) {
           }
           Mark as Delivered
         </button>
+      )}
+
+      {/* ── Image Manual Purge ───────────────────────────────────────────── */}
+      {order.photoStatus !== "NOT_REQUIRED" && !isPurged && (
+        <div style={{ paddingTop: "14px", borderTop: "1px solid var(--border)" }}>
+          <span style={sectionLabel}>Data Retention Control</span>
+          <button
+            style={solidBtn("#DC2626")}
+            disabled={loading === "purge"}
+            onClick={() => {
+              if (
+                confirm(
+                  "Are you sure you want to permanently delete all uploaded client images for this order from server disks? This action CANNOT be undone."
+                )
+              ) {
+                action("purge", () => call("/photos", "DELETE"), "All order images purged successfully");
+              }
+            }}
+          >
+            {loading === "purge" ? (
+              <Loader2 size={13} className="animate-spin" />
+            ) : (
+              <Trash2 size={13} strokeWidth={1.75} />
+            )}
+            Purge Photos Manually
+          </button>
+        </div>
       )}
 
       {/* ── Admin Note ───────────────────────────────────────────────────── */}

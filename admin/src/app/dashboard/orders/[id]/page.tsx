@@ -1,5 +1,5 @@
 import { cookies } from "next/headers";
-import { ArrowLeft, Download, CheckCircle } from "lucide-react";
+import { ArrowLeft, Download, CheckCircle, AlertTriangle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 import Badge from "@/components/ui/Badge";
 import OrderActions from "./OrderActions";
@@ -15,6 +15,20 @@ async function getOrder(id: string, token: string) {
   if (!res.ok) return null;
   const data = await res.json();
   return data.data;
+}
+
+async function getImageRetentionSettings(token: string) {
+  try {
+    const res = await fetch(`${API}/api/admin/settings/image-retention`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.success ? json.data : null;
+  } catch {
+    return null;
+  }
 }
 
 function Section({
@@ -158,7 +172,12 @@ export default async function OrderDetailPage({
   const { id } = await params;
   const cookieStore = await cookies();
   const token = cookieStore.get("tcp_admin_token")?.value || "";
-  const order = await getOrder(id, token);
+
+  // Fetch Order and Retention Settings in Parallel
+  const [order, retention] = await Promise.all([
+    getOrder(id, token),
+    getImageRetentionSettings(token),
+  ]);
 
   if (!order) {
     return (
@@ -173,6 +192,21 @@ export default async function OrderDetailPage({
   const currentStageIndex = order.productionStage
     ? STAGE_STEPS.indexOf(order.productionStage)
     : -1;
+
+  // Compute Image Deletion Lifespan / Retention Status
+  const retentionDays = retention?.retentionDays ?? 30;
+  const orderDate = new Date(order.createdAt);
+  const deletionDate = new Date(orderDate.getTime() + retentionDays * 24 * 60 * 60 * 1000);
+  const msRemaining = deletionDate.getTime() - Date.now();
+  const daysRemaining = Math.ceil(msRemaining / (1000 * 60 * 60 * 24));
+
+  // Determine if photos are already purged from database
+  const activePhotosCount = order.items?.reduce((acc: number, item: OrderItem) => {
+    const itemFiles = item.customizations?.reduce((fAcc: number, c) => fAcc + (c.asset?.files?.length ?? 0), 0) ?? 0;
+    return acc + itemFiles;
+  }, 0) ?? 0;
+
+  const isPurged = activePhotosCount === 0;
 
   return (
     <>
@@ -269,6 +303,61 @@ export default async function OrderDetailPage({
             variant={statusVariant(order.status)}
           />
         </div>
+
+        {/* ── Image Retention Alert Indicator Banner ──────────────── */}
+        {order.photoStatus !== "NOT_REQUIRED" && (
+          <div
+            style={{
+              padding: "12px 16px",
+              borderRadius: "8px",
+              backgroundColor: isPurged
+                ? "var(--bg-primary)"
+                : daysRemaining > 0
+                ? "rgba(201,108,74,0.08)"
+                : "#FEF2F2",
+              border: `1px solid ${
+                isPurged
+                  ? "var(--border)"
+                  : daysRemaining > 0
+                  ? "rgba(201,108,74,0.2)"
+                  : "#FECACA"
+              }`,
+              color: isPurged
+                ? "var(--text-secondary)"
+                : daysRemaining > 0
+                ? "var(--accent)"
+                : "#DC2626",
+              marginBottom: "16px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              fontSize: "12.5px",
+            }}
+          >
+            {isPurged ? (
+              <>
+                <ShieldCheck size={16} strokeWidth={2} style={{ color: "var(--success)", flexShrink: 0 }} />
+                <p>
+                  <strong>Image Purge Completed:</strong> All client images have been securely deleted from server storage.
+                </p>
+              </>
+            ) : daysRemaining > 0 ? (
+              <>
+                <AlertTriangle size={16} strokeWidth={2} style={{ color: "var(--accent)", flexShrink: 0 }} />
+                <p>
+                  <strong>Retention Schedule:</strong> Original customer images will automatically delete in <strong>{daysRemaining} days</strong> (on {deletionDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}).
+                </p>
+              </>
+            ) : (
+              <>
+                <AlertTriangle size={16} strokeWidth={2} style={{ color: "#DC2626", flexShrink: 0 }} />
+                <p>
+                  <strong>Retention Expired:</strong> Images are scheduled for deletion or can be manually purged below.
+                </p>
+              </>
+            )}
+          </div>
+        )}
 
         {/* Production Stage Progress */}
         {order.status === "IN_PRODUCTION" && order.productionStage && (
@@ -469,7 +558,6 @@ export default async function OrderDetailPage({
                         </p>
 
                         {(() => {
-                          // Group by unitIndex
                           const byUnit = new Map<number, Customization[]>();
                           for (const c of item.customizations) {
                             const ui = c.unitIndex ?? 0;
@@ -490,7 +578,6 @@ export default async function OrderDetailPage({
                                 overflow: "hidden",
                               }}
                             >
-                              {/* Unit header — only if multiple units */}
                               {totalUnits > 1 && (
                                 <div
                                   style={{
@@ -518,7 +605,6 @@ export default async function OrderDetailPage({
                               >
                                 {customizations.map((c) => (
                                   <div key={c.id}>
-                                    {/* Non-photo fields */}
                                     {c.fieldType !== "PHOTO_UPLOAD" && (
                                       <div
                                         style={{
@@ -557,10 +643,8 @@ export default async function OrderDetailPage({
                                       </div>
                                     )}
 
-                                    {/* Photo upload fields */}
                                     {c.fieldType === "PHOTO_UPLOAD" && c.asset && (
                                       <div>
-                                        {/* Row: label + status + download ZIP */}
                                         <div
                                           style={{
                                             display: "flex",
@@ -596,11 +680,15 @@ export default async function OrderDetailPage({
                                                 padding: "3px 8px",
                                                 borderRadius: "999px",
                                                 backgroundColor:
-                                                  c.asset.status === "UPLOADED"
+                                                  c.asset.status === "PURGED"
+                                                    ? "var(--bg-primary)"
+                                                    : c.asset.status === "UPLOADED"
                                                     ? "rgba(142,159,130,0.12)"
                                                     : "rgba(166,138,117,0.1)",
                                                 color:
-                                                  c.asset.status === "UPLOADED"
+                                                  c.asset.status === "PURGED"
+                                                    ? "var(--text-tertiary)"
+                                                    : c.asset.status === "UPLOADED"
                                                     ? "var(--success)"
                                                     : "var(--brand)",
                                               }}
@@ -609,7 +697,7 @@ export default async function OrderDetailPage({
                                             </span>
                                           </div>
 
-                                          {/* Download ZIP button */}
+                                          {/* Download ZIP */}
                                           {c.asset.files.length > 0 && (
                                             <a
                                               href={`/api/admin/orders/${order.id}/items/${item.id}/download?unitIndex=${unitIndex}`}
@@ -641,7 +729,7 @@ export default async function OrderDetailPage({
                                         </div>
 
                                         {/* Thumbnails */}
-                                        {c.asset.files.length > 0 && (
+                                        {c.asset.files.length > 0 ? (
                                           <div
                                             style={{
                                               display: "grid",
@@ -731,7 +819,11 @@ export default async function OrderDetailPage({
                                               </div>
                                             )}
                                           </div>
-                                        )}
+                                        ) : c.asset.status === "PURGED" ? (
+                                          <p style={{ fontSize: "12px", color: "var(--text-tertiary)", fontStyle: "italic" }}>
+                                            Photos deleted permanently.
+                                          </p>
+                                        ) : null}
                                       </div>
                                     )}
                                   </div>
@@ -1026,7 +1118,7 @@ export default async function OrderDetailPage({
             )}
 
             <Section title="Actions">
-              <OrderActions order={order} />
+              <OrderActions order={order} isPurged={isPurged} />
             </Section>
           </div>
         </div>
